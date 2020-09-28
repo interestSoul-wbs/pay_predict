@@ -26,9 +26,10 @@ object PlaysProcess {
       )
     )
     import org.apache.spark.sql.functions._
-
-    val playRawPath="hdfs:///pay_predict/data/train/common/raw/plays/behavior_*.txt"
-    val playProcessedPath="hdfs:///pay_predict/data/train/common/processed/plays"
+    //val hdfsPath="hdfs:///pay_predict/"
+    val hdfsPath=""
+    val playRawPath=hdfsPath+"data/train/common/raw/plays/behavior_*.txt"
+    val playProcessedPath=hdfsPath+"hdfs:///pay_predict/data/train/common/processed/plays"
     val df = spark.read
       .option("delimiter", "\t")
       .option("header", false)

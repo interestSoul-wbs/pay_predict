@@ -14,20 +14,22 @@ object FeatureProcessOld {
     Logger.getLogger("org").setLevel(Level.ERROR)
 
     //val userProfilePath =  "pay_predict/data/train/common/processed/userfile_0601.pkl"
+    //val hdfsPath="hdfs:///pay_predict/"
+    val hdfsPath=""
     //筛选的训练集用户名单路径
-    val userListPath = "hdfs:///pay_predict/data/train/userpay/trainusersold" + args(0)
+    val userListPath = hdfsPath+"data/train/userpay/trainusersold" + args(0)
     //媒资数据路径
-    val mediasPath = "hdfs:///pay_predict/data/train/common/processed/mediastemp.pkl"
+    val mediasPath = hdfsPath+"data/train/common/processed/mediastemp.pkl"
     //训练集数据的保存路径
-    val trainSetSavePath = "hdfs:///pay_predict/data/train/userpay/"
+    val trainSetSavePath = hdfsPath+"data/train/userpay/"
     //最初生成的用户画像数据集路径
-    val userProfilePlayPartPath = "hdfs:///pay_predict/data/train/common/processed/userprofileplaypart" + args(0)
-    val userProfilePreferencePartPath = "hdfs:///pay_predict/data/train/common/processed/userprofilepreferencepart" + args(0)
-    val userProfileOrderPartPath = "hdfs:///pay_predict/data/train/common/processed/userprofileorderpart" + args(0)
+    val userProfilePlayPartPath = hdfsPath+"data/train/common/processed/userprofileplaypart" + args(0)
+    val userProfilePreferencePartPath = hdfsPath+"data/train/common/processed/userprofilepreferencepart" + args(0)
+    val userProfileOrderPartPath = hdfsPath+"data/train/common/processed/userprofileorderpart" + args(0)
 
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("FeatureProcessOld")
-      //.master("local[6]")
+      .master("local[6]")
       .getOrCreate()
     import org.apache.spark.sql.functions._
     val userProfilePlayPart = spark.read.format("parquet").load(userProfilePlayPartPath)
@@ -58,9 +60,9 @@ object FeatureProcessOld {
     //# 观看时长异常数据处理：1天24h
 
 
-    val videoFirstCategoryTempPath = "hdfs:///pay_predict/data/train/common/processed/videofirstcategorytemp.txt"
-    val videoSecondCategoryTempPath = "hdfs:///pay_predict/data/train/common/processed/videosecondcategorytemp.txt"
-    val labelTempPath = "hdfs:///pay_predict/data/train/common/processed/labeltemp.txt"
+    val videoFirstCategoryTempPath = hdfsPath+"data/train/common/processed/videofirstcategorytemp.txt"
+    val videoSecondCategoryTempPath = hdfsPath+"data/train/common/processed/videosecondcategorytemp.txt"
+    val labelTempPath = hdfsPath+"data/train/common/processed/labeltemp.txt"
     var videoFirstCategoryMap: Map[String, Int] = Map()
     var videoSecondCategoryMap: Map[String, Int] = Map()
     var labelMap: Map[String, Int] = Map()

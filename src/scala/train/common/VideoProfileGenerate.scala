@@ -14,12 +14,12 @@ import scala.collection.mutable.ListBuffer
 
 object VideoProfileGenerate {
 
-  def videoProfileGenerate(now:String,timeWindow:Int,medias_path:String,plays_path:String,orders_path:String): Unit ={
+  def videoProfileGenerate(now:String,timeWindow:Int,medias_path:String,plays_path:String,orders_path:String,hdfsPath:String): Unit ={
     System.setProperty("hadoop.home.dir", "c:\\winutils")
     Logger.getLogger("org").setLevel(Level.ERROR)
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("VideoProfileGenerate")
-      //.master("local[6]")
+      .master("local[6]")
       .getOrCreate()
     //设置shuffle过程中分区数
     // spark.sqlContext.setConf("spark.sql.shuffle.partitions", "1000")
@@ -168,7 +168,7 @@ object VideoProfileGenerate {
    // result10.show()
     //result11.show()
 
-    val videoProfilePath="hdfs:///pay_predict/data/train/common/processed/videoprofile"+now.split(" ")(0)
+    val videoProfilePath=hdfsPath+"data/train/common/processed/videoprofile"+now.split(" ")(0)
    // val videoProfileSavePath="pay_predict/data/train/common/processed/videoprofile.csv"
     result10.write.mode(SaveMode.Overwrite).format("parquet").save(videoProfilePath)
     //result11.write.mode(SaveMode.Overwrite).format("parquet").save(userProfileOrderPartSavePath)
@@ -177,11 +177,13 @@ object VideoProfileGenerate {
   }
 
   def main(args:Array[String]): Unit = {
-    val mediasProcessedPath="hdfs:///pay_predict/data/train/common/processed/mediastemp"
-    val playsProcessedPath="hdfs:///pay_predict/data/train/common/processed/plays"
-    val ordersProcessedPath="hdfs:///pay_predict/data/train/common/processed/orders"
+    //val hdfsPath="hdfs:///pay_predict/"
+    val hdfsPath=""
+    val mediasProcessedPath=hdfsPath+"data/train/common/processed/mediastemp"
+    val playsProcessedPath=hdfsPath+"data/train/common/processed/plays"
+    val ordersProcessedPath=hdfsPath+"data/train/common/processed/orders"
     val now=args(0)+" "+args(1)
-    videoProfileGenerate(now,30,mediasProcessedPath,playsProcessedPath,ordersProcessedPath)
+    videoProfileGenerate(now,30,mediasProcessedPath,playsProcessedPath,ordersProcessedPath,hdfsPath)
   }
 
 }

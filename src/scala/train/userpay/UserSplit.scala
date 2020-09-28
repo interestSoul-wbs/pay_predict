@@ -19,17 +19,20 @@ object UserSplit {
 
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("UserSplit")
-      //.master("local[6]")
+      .master("local[6]")
       .getOrCreate()
     import spark.implicits._
     import org.apache.spark.sql.functions._
 
-    val playsProcessedPath="hdfs:///pay_predict/data/train/common/processed/plays"
-    val ordersProcessedPath="hdfs:///pay_predict/data/train/common/processed/orders"
+    //val hdfsPath="hdfs:///pay_predict/"
+    val hdfsPath=""
+
+    val playsProcessedPath=hdfsPath+"data/train/common/processed/plays"
+    val ordersProcessedPath=hdfsPath+"data/train/common/processed/orders"
     //老用户名单保存路径
-    val oldUserSavePath = "hdfs:///pay_predict/data/train/userpay/"
+    val oldUserSavePath =hdfsPath+"data/train/userpay/"
     //新用户名单保存路径
-    val newUserSavePath = "hdfs:///pay_predict/data/train/userpay/"
+    val newUserSavePath = hdfsPath+"data/train/userpay/"
     val trainTime=args(0)+" "+args(1)
     val timeWindow=30
 
