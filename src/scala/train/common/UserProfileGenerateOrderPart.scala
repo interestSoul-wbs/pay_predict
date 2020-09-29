@@ -8,7 +8,7 @@ import org.apache.spark.sql.{SaveMode, SparkSession}
 
 object UserProfileGenerateOrderPart {
 
-  def userProfileGenerateOrderPart(now:String,timeWindow:Int,medias_path:String,plays_path:String,orders_path:String): Unit = {
+  def userProfileGenerateOrderPart(now:String,timeWindow:Int,medias_path:String,plays_path:String,orders_path:String,hdfsPath:String): Unit = {
      System.setProperty("hadoop.home.dir", "c:\\winutils")
     Logger.getLogger("org").setLevel(Level.ERROR)
     val spark: SparkSession = new sql.SparkSession.Builder()
@@ -176,7 +176,7 @@ object UserProfileGenerateOrderPart {
 
    // result49.show()
 
-    val userProfileOrderPartSavePath="hdfs:///pay_predict/data/train/common/processed/userprofileorderpart"+now.split(" ")(0)
+    val userProfileOrderPartSavePath=hdfsPath+"data/train/common/processed/userprofileorderpart"+now.split(" ")(0)
     //大约有85万用户
     result49.write.mode(SaveMode.Overwrite).format("parquet").save(userProfileOrderPartSavePath)
 
@@ -187,12 +187,13 @@ object UserProfileGenerateOrderPart {
 
 
     def main(args:Array[String]): Unit ={
-
-    val mediasProcessedPath="hdfs:///pay_predict/data/train/common/processed/mediastemp"
-    val playsProcessedPath="hdfs:///pay_predict/data/train/common/processed/plays"
-    val ordersProcessedPath="hdfs:///pay_predict/data/train/common/processed/orders"
-    val now=args(0)+" "+args(1)
-    userProfileGenerateOrderPart(now,30,mediasProcessedPath,playsProcessedPath,ordersProcessedPath)
+      //val hdfsPath="hdfs:///pay_predict/"
+      val hdfsPath=""
+      val mediasProcessedPath=hdfsPath+"data/train/common/processed/mediastemp"
+      val playsProcessedPath=hdfsPath+"data/train/common/processed/plays"
+      val ordersProcessedPath=hdfsPath+"data/train/common/processed/orders"
+      val now=args(0)+" "+args(1)
+      userProfileGenerateOrderPart(now,30,mediasProcessedPath,playsProcessedPath,ordersProcessedPath,hdfsPath)
 
 
 

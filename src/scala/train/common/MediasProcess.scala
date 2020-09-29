@@ -51,13 +51,14 @@ object MediasProcess {
         StructField(Dic.colIntroduction, StringType)
       )
     )
-    //hdfs:///pay_predict
+    //val hdfsPath="hdfs:///pay_predict"
+    val hdfsPath=""
     import org.apache.spark.sql.functions._
-    val mediasRawPath="data/train/common/raw/medias/medias.txt"
-    val mediasProcessedPath="data/train/common/processed/mediastemp"
-    val videoFirstCategoryTempPath="data/train/common/processed/videofirstcategorytemp.txt"
-    val videoSecondCategoryTempPath="data/train/common/processed/videosecondcategorytemp.txt"
-    val labelTempPath="data/train/common/processed/labeltemp.txt"///pay_predict/data/train/common/processed
+    val mediasRawPath=hdfsPath+"data/train/common/raw/medias/medias.txt"
+    val mediasProcessedPath=hdfsPath+"data/train/common/processed/mediastemp"
+    val videoFirstCategoryTempPath=hdfsPath+"data/train/common/processed/videofirstcategorytemp.txt"
+    val videoSecondCategoryTempPath=hdfsPath+"data/train/common/processed/videosecondcategorytemp.txt"
+    val labelTempPath=hdfsPath+"data/train/common/processed/labeltemp.txt"///pay_predict/data/train/common/processed
     val df = spark.read
       .option("delimiter", "\t")
       .option("header", false)

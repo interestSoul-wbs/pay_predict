@@ -9,6 +9,27 @@ import scala.collection.immutable.ListMap
 import scala.collection.mutable
 
 object Utils {
+  //orderProcess
+  def udfChangeDateFormat=udf(changeDateFormat _)
+  def changeDateFormat(date:String)= {
+    if(date=="NULL"){
+      "NULL"
+    }else{
+      //
+      try{
+        val sdf=new SimpleDateFormat("yyyyMMddHHmmSS")
+        val dt:Long=sdf.parse(date).getTime()
+        val new_time: String = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(dt)
+        new_time
+      }
+      catch{
+        case e: Exception =>{
+          "NULL"
+        }
+      }
+    }
+
+  }
 
   def udfLongToTimestamp=udf(longToTimestamp _)
   def longToTimestamp(time:String)={

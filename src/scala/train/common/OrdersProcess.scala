@@ -3,6 +3,8 @@ package train.common
 import java.text.SimpleDateFormat
 
 import mam.Dic
+import mam.Utils
+import mam.Utils.udfChangeDateFormat
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
 import org.apache.spark.sql.functions.udf
@@ -11,34 +13,12 @@ import org.apache.spark.sql.{SaveMode, SparkSession}
 
 object OrdersProcess {
 
-  def udfChangeDateFormat=udf(changeDateFormat _)
-  def changeDateFormat(date:String)= {
-    if(date=="NULL"){
-      "NULL"
-    }else{
-      //
-      try{
-        val sdf=new SimpleDateFormat("yyyyMMddHHmmSS")
-        val dt:Long=sdf.parse(date).getTime()
-        val new_time: String = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(dt)
-        new_time
-      }
-      catch{
-        case e: Exception =>{
-          "NULL"
-        }
-      }
-    }
-
-  }
-
-
     def main(args: Array[String]): Unit ={
       System.setProperty("hadoop.home.dir","c:\\winutils")
       Logger.getLogger("org").setLevel(Level.ERROR)
       val spark: SparkSession = new sql.SparkSession.Builder()
         .appName("OrdersProcess")
-        //.master("local[6]")
+        .master("local[6]")
         .getOrCreate()
       val schema= StructType(
         List(
@@ -55,10 +35,12 @@ object OrdersProcess {
 
         )
       )
-
+       //hdfs:///pay_predict/
       import org.apache.spark.sql.functions._
-      val orderRawPath="hdfs:///pay_predict/data/train/common/raw/orders/order*.txt"
-      val orderProcessedPath="hdfs:///pay_predict/data/train/common/processed/orders"
+      //val hdfsPath="hdfs:///pay_predict/"
+      val hdfsPath=""
+      val orderRawPath=hdfsPath+"data/train/common/raw/orders/order*.txt"
+      val orderProcessedPath=hdfsPath+"data/train/common/processed/orders"
       val df = spark.read
         .option("delimiter", "\t")
         .option("header", false)

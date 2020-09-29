@@ -16,14 +16,15 @@ object UserDivisionTrainDatasetGenerate {
   def main(args:Array[String]): Unit ={
     System.setProperty("hadoop.home.dir", "c:\\winutils")
     Logger.getLogger("org").setLevel(Level.ERROR)
-
-    val orderProcessedPath="hdfs:///pay_predict/data/train/common/processed/orders"
-    val userProfilePlayPartPath="hdfs:///pay_predict/data/train/common/processed/userprofileplaypart"+args(0)
-    val userProfilePreferencePartPath="hdfs:///pay_predict/data/train/common/processed/userprofilepreferencepart"+args(0)
-    val userProfileOrderPartPath="hdfs:///pay_predict/data/train/common/processed/userprofileorderpart"+args(0)
+    //val hdfsPath="hdfs:///pay_predict/"
+    val hdfsPath=""
+    val orderProcessedPath=hdfsPath+"data/train/common/processed/orders"
+    val userProfilePlayPartPath=hdfsPath+"data/train/common/processed/userprofileplaypart"+args(0)
+    val userProfilePreferencePartPath=hdfsPath+"data/train/common/processed/userprofilepreferencepart"+args(0)
+    val userProfileOrderPartPath=hdfsPath+"data/train/common/processed/userprofileorderpart"+args(0)
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("UserDivisionTrainDatasetGenerate")
-      //.master("local[6]")
+      .master("local[6]")
       .getOrCreate()
     import org.apache.spark.sql.functions._
     val userProfilePlayPart = spark.read.format("parquet").load(userProfilePlayPartPath)
@@ -104,7 +105,7 @@ object UserDivisionTrainDatasetGenerate {
 //
 //    // rescale each feature to range [min, max].
 //    val scaledData = scaleModel.transform(allUsersConcat)
-    val dataPath="hdfs:///pay_predict/data/train/singlepoint/userdivisiontraindata"
+    val dataPath=hdfsPath+"data/train/singlepoint/userdivisiontraindata"
     allUsersNotNull.write.mode(SaveMode.Overwrite).format("parquet").save(dataPath+args(0)+"-"+args(2))
     allUsersNotNull.coalesce(1).write.mode(SaveMode.Overwrite).option("header","true").csv(dataPath+args(0)+"-"+args(2)+".csv")
 

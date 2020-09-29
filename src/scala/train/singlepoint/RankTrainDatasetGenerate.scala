@@ -17,54 +17,25 @@ object RankTrainDatasetGenerate {
 
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("RankTrainDatasetGenerate")
-      //.master("local[6]")
+      .master("local[6]")
       .config("spark.sql.crossJoin.enabled","true")  //spark2.x默认不能进行笛卡尔积的操作需要进行设置
       .getOrCreate()
     import spark.implicits._
     import org.apache.spark.sql.functions._
 
-    //val playsProcessedPath="pay_predict/data/train/common/processed/plays"
-    val ordersProcessedPath="hdfs:///pay_predict/data/train/common/processed/orders"
-    //val mediasProcessedPath="pay_predict/data/train/common/processed/mediastemp"
-    //val plays=spark.read.format("parquet").load(playsProcessedPath)
+    //val hdfsPath="hdfs:///pay_predict/"
+    val hdfsPath=""
+    val ordersProcessedPath=hdfsPath+"data/train/common/processed/orders"
     val orders=spark.read.format("parquet").load(ordersProcessedPath)
-    //val medias=spark.read.format("parquet").load(mediasProcessedPath)
 
-
-    val userProfilePlayPartPath="hdfs:///pay_predict/data/train/common/processed/userprofileplaypart"+args(0)
-    val userProfilePreferencePartPath="hdfs:///pay_predict/data/train/common/processed/userprofilepreferencepart"+args(0)
-    val userProfileOrderPartPath="hdfs:///pay_predict/data/train/common/processed/userprofileorderpart"+args(0)
-    val videoProfilePath="hdfs:///pay_predict/data/train/common/processed/videoprofile"+args(0)
+    val userProfilePlayPartPath=hdfsPath+"data/train/common/processed/userprofileplaypart"+args(0)
+    val userProfilePreferencePartPath=hdfsPath+"data/train/common/processed/userprofilepreferencepart"+args(0)
+    val userProfileOrderPartPath=hdfsPath+"data/train/common/processed/userprofileorderpart"+args(0)
+    val videoProfilePath=hdfsPath+"data/train/common/processed/videoprofile"+args(0)
     val userProfilePlayPart = spark.read.format("parquet").load(userProfilePlayPartPath)
     val userProfilePreferencePart = spark.read.format("parquet").load(userProfilePreferencePartPath)
     val userProfileOrderPart = spark.read.format("parquet").load(userProfileOrderPartPath)
     val videoProfile=spark.read.format("parquet").load(videoProfilePath)
-
-
-
-//    //val playsProcessedPath="pay_predict/data/train/common/processed/plays"
-//    val ordersProcessedPath="pay_predict/data/train/common/processed/orders"
-//    //val mediasProcessedPath="pay_predict/data/train/common/processed/mediastemp"
-//    //val plays=spark.read.format("parquet").load(playsProcessedPath)
-//    val orders=spark.read.format("parquet").load(ordersProcessedPath)
-//    //val medias=spark.read.format("parquet").load(mediasProcessedPath)
-//
-//
-//    val userProfilePlayPartPath="pay_predict/data/train/common/processed/userprofileplaypart"+args(0)
-//    val userProfilePreferencePartPath="pay_predict/data/train/common/processed/userprofilepreferencepart"+args(0)
-//    val userProfileOrderPartPath="pay_predict/data/train/common/processed/userprofileorderpart"+args(0)
-//    val videoProfilePath="pay_predict/data/train/common/processed/videoprofile"+args(0)
-//    val userProfilePlayPart = spark.read.format("parquet").load(userProfilePlayPartPath)
-//    val userProfilePreferencePart = spark.read.format("parquet").load(userProfilePreferencePartPath)
-//    val userProfileOrderPart = spark.read.format("parquet").load(userProfileOrderPartPath)
-//    val videoProfile=spark.read.format("parquet").load(videoProfilePath)
-
-
-
-
-
-
-
 
 
 
@@ -150,9 +121,9 @@ object RankTrainDatasetGenerate {
 //    val seq=mapColList.toSeq
 //    result.select(seq.map(result.col(_)):_*).show()
 
-    val videoFirstCategoryTempPath="hdfs:///pay_predict/data/train/common/processed/videofirstcategorytemp.txt"
-    val videoSecondCategoryTempPath="hdfs:///pay_predict/data/train/common/processed/videosecondcategorytemp.txt"
-    val labelTempPath="hdfs:///pay_predict/data/train/common/processed/labeltemp.txt"
+    val videoFirstCategoryTempPath=hdfsPath+"data/train/common/processed/videofirstcategorytemp.txt"
+    val videoSecondCategoryTempPath=hdfsPath+"data/train/common/processed/videosecondcategorytemp.txt"
+    val labelTempPath=hdfsPath+"data/train/common/processed/labeltemp.txt"
     var videoFirstCategoryMap: Map[String, Int] = Map()
     var videoSecondCategoryMap: Map[String, Int] = Map()
     var labelMap: Map[String, Int] = Map()
@@ -381,7 +352,7 @@ object RankTrainDatasetGenerate {
     result.show()
     println("总样本的条数"+result.count())
 
-    val resultSavePath="hdfs:///pay_predict/data/train/singlepoint/ranktraindata"
+    val resultSavePath=hdfsPath+"data/train/singlepoint/ranktraindata"
     result.write.mode(SaveMode.Overwrite).format("parquet").save(resultSavePath+args(0)+"-"+args(2))
     //val csvData=spark.read.format("parquet").load(resultSavePath+args(0)+"-"+args(2))
     //csvData.coalesce(1).write.mode(SaveMode.Overwrite).option("header","true").csv(resultSavePath+args(0)+"-"+args(2)+".csv")

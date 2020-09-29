@@ -10,12 +10,12 @@ import scala.collection.mutable.ListBuffer
 
 object UserProfileGeneratePlayPart {
 
-  def userProfileGeneratePlayPart(now:String,timeWindow:Int,medias_path:String,plays_path:String,orders_path:String): Unit = {
+  def userProfileGeneratePlayPart(now:String,timeWindow:Int,medias_path:String,plays_path:String,orders_path:String,hdfsPath:String): Unit = {
     System.setProperty("hadoop.home.dir", "c:\\winutils")
     Logger.getLogger("org").setLevel(Level.ERROR)
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("UserProfileGeneratePlayPart")
-      //.master("local[6]")
+      .master("local[6]")
       .getOrCreate()
     //设置shuffle过程中分区数
    // spark.sqlContext.setConf("spark.sql.shuffle.partitions", "1000")
@@ -293,7 +293,7 @@ object UserProfileGeneratePlayPart {
 
 
 
-    val userProfilePlayPartSavePath="hdfs:///pay_predict/data/train/common/processed/userprofileplaypart"+now.split(" ")(0)
+    val userProfilePlayPartSavePath=hdfsPath+"data/train/common/processed/userprofileplaypart"+now.split(" ")(0)
     //大约有85万用户
     result19.write.mode(SaveMode.Overwrite).format("parquet").save(userProfilePlayPartSavePath)
 
@@ -304,12 +304,13 @@ object UserProfileGeneratePlayPart {
 
 
   def main(args:Array[String]): Unit ={
-
-    val mediasProcessedPath="hdfs:///pay_predict/data/train/common/processed/mediastemp"
-    val playsProcessedPath="hdfs:///pay_predict/data/train/common/processed/plays"
-    val ordersProcessedPath="hdfs:///pay_predict/data/train/common/processed/orders"
+    //val hdfsPath="hdfs:///pay_predict/"
+    val hdfsPath=""
+    val mediasProcessedPath=hdfsPath+"data/train/common/processed/mediastemp"
+    val playsProcessedPath=hdfsPath+"data/train/common/processed/plays"
+    val ordersProcessedPath=hdfsPath+"data/train/common/processed/orders"
     val now=args(0)+" "+args(1)
-    userProfileGeneratePlayPart(now,30,mediasProcessedPath,playsProcessedPath,ordersProcessedPath)
+    userProfileGeneratePlayPart(now,30,mediasProcessedPath,playsProcessedPath,ordersProcessedPath,hdfsPath)
 
 
 
