@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.example</groupId>
-    <artifactId>SparkTest</artifactId>
+    <artifactId>pay_predict</artifactId>
     <version>1.0-SNAPSHOT</version>
     <properties>
         <scala.version>2.11.8</scala.version>

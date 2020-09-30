@@ -29,7 +29,7 @@ object PlaysProcess {
     //val hdfsPath="hdfs:///pay_predict/"
     val hdfsPath=""
     val playRawPath=hdfsPath+"data/train/common/raw/plays/behavior_*.txt"
-    val playProcessedPath=hdfsPath+"hdfs:///pay_predict/data/train/common/processed/plays"
+    val playProcessedPath=hdfsPath+"data/train/common/processed/plays"
     val df = spark.read
       .option("delimiter", "\t")
       .option("header", false)
@@ -39,7 +39,7 @@ object PlaysProcess {
      val df1=df.withColumn(Dic.colPlayEndTime,substring(col(Dic.colPlayEndTime),0,10))
      val df2=df1.groupBy(col(Dic.colUserId),col(Dic.colVideoId),col(Dic.colPlayEndTime))
      val df3=df2.agg(sum(col(Dic.colBroadcastTime)) as Dic.colBroadcastTime)
-     val time_limit=86400
+     val time_limit=43200
      val df4=df3.where(col(Dic.colBroadcastTime)<time_limit)
      val df5=df4.orderBy(col(Dic.colUserId),col(Dic.colPlayEndTime))
      val df6=df5.withColumn(Dic.colPlayEndTime,udfAddSuffix(col(Dic.colPlayEndTime)))

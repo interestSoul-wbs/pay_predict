@@ -18,8 +18,8 @@ object MediasProcess {
     System.setProperty("hadoop.home.dir","c:\\winutils")
     Logger.getLogger("org").setLevel(Level.ERROR)
     val spark: SparkSession = new sql.SparkSession.Builder()
-      .appName("MediasProcess")
-      .master("local[6]")
+      .appName("PredictMediasProcess")
+      //.master("local[6]")
       .getOrCreate()
 
     val schema= StructType(
@@ -47,8 +47,8 @@ object MediasProcess {
         StructField(Dic.colIntroduction, StringType)
       )
     )
-    //val hdfsPath="hdfs:///pay_predict"
-    val hdfsPath=""
+    val hdfsPath="hdfs:///pay_predict/"
+    //val hdfsPath=""
     import org.apache.spark.sql.functions._
     val mediasRawPath=hdfsPath+"data/predict/common/raw/medias/medias.txt"
     val mediasProcessedPath=hdfsPath+"data/predict/common/processed/mediastemp"

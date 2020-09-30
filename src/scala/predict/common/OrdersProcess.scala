@@ -13,8 +13,8 @@ object OrdersProcess {
       System.setProperty("hadoop.home.dir","c:\\winutils")
       Logger.getLogger("org").setLevel(Level.ERROR)
       val spark: SparkSession = new sql.SparkSession.Builder()
-        .appName("OrdersProcess")
-        .master("local[6]")
+        .appName("PredictOrdersProcess")
+        //.master("local[6]")
         .getOrCreate()
       val schema= StructType(
         List(
@@ -33,8 +33,8 @@ object OrdersProcess {
       )
        //hdfs:///pay_predict/
       import org.apache.spark.sql.functions._
-      //val hdfsPath="hdfs:///pay_predict/"
-      val hdfsPath=""
+      val hdfsPath="hdfs:///pay_predict/"
+      //val hdfsPath=""
       val orderRawPath=hdfsPath+"data/predict/common/raw/orders/order*.txt"
       val orderProcessedPath=hdfsPath+"data/predict/common/processed/orders"
       val df = spark.read
