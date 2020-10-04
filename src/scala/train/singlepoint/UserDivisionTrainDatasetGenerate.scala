@@ -16,8 +16,8 @@ object UserDivisionTrainDatasetGenerate {
   def main(args:Array[String]): Unit ={
     System.setProperty("hadoop.home.dir", "c:\\winutils")
     Logger.getLogger("org").setLevel(Level.ERROR)
-    //val hdfsPath="hdfs:///pay_predict/"
-    val hdfsPath=""
+    val hdfsPath="hdfs:///pay_predict/"
+   // val hdfsPath=""
     val orderProcessedPath=hdfsPath+"data/train/common/processed/orders"
     val userProfilePlayPartPath=hdfsPath+"data/train/common/processed/userprofileplaypart"+args(0)
     val userProfilePreferencePartPath=hdfsPath+"data/train/common/processed/userprofilepreferencepart"+args(0)
@@ -75,8 +75,8 @@ object UserDivisionTrainDatasetGenerate {
       .except(usersPaidProfile).sample(fraction = 1.0).limit(NEGATIVE_N*positiveCount)
     println("负样本的条数为："+negativeUsers.count())
     //为正负样本分别添加标签
-    val negativeUsersWithLabel=negativeUsers.withColumn(Dic.colOrderStatus,udfAddOrderStatus(col(Dic.colUserId)))
-    val usersPaidWithLabel=usersPaidProfile.withColumn(Dic.colOrderStatus,udfAddOrderStatus(col(Dic.colUserId))-1)
+    val negativeUsersWithLabel=negativeUsers.withColumn(Dic.colOrderStatus,udfAddOrderStatus(col(Dic.colUserId))-1)
+    val usersPaidWithLabel=usersPaidProfile.withColumn(Dic.colOrderStatus,udfAddOrderStatus(col(Dic.colUserId)))
     //将正负样本组合在一起并shuffle
     val allUsers=usersPaidWithLabel.union(negativeUsersWithLabel).sample(fraction = 1.0)
     println("总样本的条数为："+allUsers.count())
