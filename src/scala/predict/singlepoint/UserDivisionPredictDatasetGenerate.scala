@@ -12,14 +12,14 @@ object UserDivisionPredictDatasetGenerate {
   def main(args: Array[String]): Unit = {
     System.setProperty("hadoop.home.dir", "c:\\winutils")
     Logger.getLogger("org").setLevel(Level.ERROR)
-    //val hdfsPath="hdfs:///pay_predict/"
-    val hdfsPath=""
+    val hdfsPath="hdfs:///pay_predict/"
+    //val hdfsPath=""
     val userProfilePlayPartPath=hdfsPath+"data/predict/common/processed/userprofileplaypart"+args(0)
     val userProfilePreferencePartPath=hdfsPath+"data/predict/common/processed/userprofilepreferencepart"+args(0)
     val userProfileOrderPartPath=hdfsPath+"data/predict/common/processed/userprofileorderpart"+args(0)
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("UserDivisionPredictDatasetGenerate")
-      .master("local[6]")
+      //.master("local[6]")
       .getOrCreate()
     import org.apache.spark.sql.functions._
     val userProfilePlayPart = spark.read.format("parquet").load(userProfilePlayPartPath)
@@ -80,8 +80,8 @@ object UserDivisionPredictDatasetGenerate {
       .except(usersPaidProfile).sample(fraction = 1.0).limit(NEGATIVE_N*positiveCount)
     println("测试负样本的条数为："+negativeUsers.count())
     //为正负样本分别添加标签
-    val negativeUsersWithLabel=negativeUsers.withColumn(Dic.colOrderStatus,udfAddOrderStatus(col(Dic.colUserId)))
-    val usersPaidWithLabel=usersPaidProfile.withColumn(Dic.colOrderStatus,udfAddOrderStatus(col(Dic.colUserId))-1)
+    val negativeUsersWithLabel=negativeUsers.withColumn(Dic.colOrderStatus,udfAddOrderStatus(col(Dic.colUserId))-1)
+    val usersPaidWithLabel=usersPaidProfile.withColumn(Dic.colOrderStatus,udfAddOrderStatus(col(Dic.colUserId)))
     //将正负样本组合在一起并shuffle
     var allUsers=usersPaidWithLabel.union(negativeUsersWithLabel).sample(fraction = 1.0)
     println("测试总样本的条数为："+allUsers.count())
@@ -92,8 +92,8 @@ object UserDivisionPredictDatasetGenerate {
     allUsers=allUsers.na.drop()
 
     val testDataSavePath=hdfsPath+"data/predict/singlepoint/userdivisiontestdata"
-   allUsers.write.mode(SaveMode.Overwrite).format("parquet").save(predictDataSavePath+args(0)+"-"+args(2))
-    allUsers.write.mode(SaveMode.Overwrite).option("header","true").csv(predictDataSavePath+args(0)+"-"+args(2)+".csv")
+   allUsers.write.mode(SaveMode.Overwrite).format("parquet").save(testDataSavePath+args(0)+"-"+args(2))
+    allUsers.write.mode(SaveMode.Overwrite).option("header","true").csv(testDataSavePath+args(0)+"-"+args(2)+".csv")
 
 
     //allUsersNotNull=allUsersNotNull.na.drop()

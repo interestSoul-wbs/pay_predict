@@ -319,21 +319,21 @@ object RankTrainDatasetGenerate {
 //
 //    val test=testUser.crossJoin(testVideo)
 
-    result=result.withColumn("video_level_one_similarity",
-      udfCalFirstCategorySimilarity(col(Dic.colVideoOneLevelClassification),
-        col(Dic.colVideoOneLevelPreference),lit(videoFirstCategoryMap.mkString(","))))
-    result=result.withColumn("video_level_two_similarity",
-      udfCalSecondCategorySimilarity(col(Dic.colVideoTwoLevelClassificationList),
-        col(Dic.colVideoTwoLevelPreference),lit(videoSecondCategoryMap.mkString(","))))
-    result=result.withColumn("label_similarity",
-      udfCalLabelSimilarity(col(Dic.colVideoTagList),
-        col(Dic.colTagPreference),lit(labelMap.mkString(","))))
-     result=result.withColumn("movie_level_two_similarity",
-      udfCalSecondCategorySimilarity(col(Dic.colVideoTwoLevelClassificationList),
-        col(Dic.colMovieTwoLevelPreference),lit(videoSecondCategoryMap.mkString(","))))
-    result=result.withColumn("movie_tag_similarity",
-      udfCalLabelSimilarity(col(Dic.colVideoTagList),
-        col(Dic.colMovieTagPreference),lit(labelMap.mkString(","))))
+//    result=result.withColumn("video_level_one_similarity",
+//      udfCalFirstCategorySimilarity(col(Dic.colVideoOneLevelClassification),
+//        col(Dic.colVideoOneLevelPreference),lit(videoFirstCategoryMap.mkString(","))))
+//    result=result.withColumn("video_level_two_similarity",
+//      udfCalSecondCategorySimilarity(col(Dic.colVideoTwoLevelClassificationList),
+//        col(Dic.colVideoTwoLevelPreference),lit(videoSecondCategoryMap.mkString(","))))
+//    result=result.withColumn("label_similarity",
+//      udfCalLabelSimilarity(col(Dic.colVideoTagList),
+//        col(Dic.colTagPreference),lit(labelMap.mkString(","))))
+//     result=result.withColumn("movie_level_two_similarity",
+//      udfCalSecondCategorySimilarity(col(Dic.colVideoTwoLevelClassificationList),
+//        col(Dic.colMovieTwoLevelPreference),lit(videoSecondCategoryMap.mkString(","))))
+//    result=result.withColumn("movie_tag_similarity",
+//      udfCalLabelSimilarity(col(Dic.colVideoTagList),
+//        col(Dic.colMovieTagPreference),lit(labelMap.mkString(","))))
 //      .select(col(Dic.colVideoTwoLevelClassificationList),col(Dic.colMovieTwoLevelPreference),col("movie_level_two_similarity"),
 //        col(Dic.colVideoTagList),col(Dic.colMovieTagPreference),col("movie_tag_similarity")
 //        //col(Dic.colVideoTagList),col(Dic.colTagPreference),col("label_similarity"),
@@ -371,7 +371,7 @@ object RankTrainDatasetGenerate {
     result=result.na.fill(30,List(Dic.colDaysSinceLastPurchasePackage,Dic.colDaysSinceLastClickPackage,
       Dic.colDaysFromLastActive,Dic.colDaysSinceFirstActiveInTimewindow,Dic.colAbsOfNumberOfDaysBetweenStorageAndCurrent))
     result=result.na.fill(0)
-    result.show()
+    //result.show()
     println("总样本的条数"+result.count())
 
     val resultSavePath=hdfsPath+"data/train/singlepoint/ranktraindata"
