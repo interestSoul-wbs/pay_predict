@@ -19,13 +19,13 @@ object UserSplit {
 
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("UserSplit")
-      .master("local[6]")
+      //.master("local[6]")
       .getOrCreate()
     import spark.implicits._
     import org.apache.spark.sql.functions._
 
-    //val hdfsPath="hdfs:///pay_predict/"
-    val hdfsPath=""
+    val hdfsPath="hdfs:///pay_predict/"
+    //val hdfsPath=""
 
     val playsProcessedPath=hdfsPath+"data/train/common/processed/plays"
     val ordersProcessedPath=hdfsPath+"data/train/common/processed/orders"
@@ -135,7 +135,7 @@ object UserSplit {
             col(Dic.colPlayEndTime).===(trainTime)
             && col(Dic.colBroadcastTime)>120
           ).select(col(Dic.colUserId)).distinct()
-    trainPlay.except(trainOld).except(trainPosUsers).except(trainNegOrderUsers)
+    trainPlay=trainPlay.except(trainOld).except(trainPosUsers).except(trainNegOrderUsers)
     if(trainPlay.count()>(9*trainPosUsers.count()-trainNegOrderUsers.count())){
             trainPlay=trainPlay.sample(1).limit((9*trainPosUsers.count()-trainNegOrderUsers.count()).toInt)
           }

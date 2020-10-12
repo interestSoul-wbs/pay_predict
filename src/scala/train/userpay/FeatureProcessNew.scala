@@ -17,8 +17,8 @@ object FeatureProcessNew {
     Logger.getLogger("org").setLevel(Level.ERROR)
 
     //val userProfilePath =  "pay_predict/data/train/common/processed/userfile_0601.pkl"
-    //val hdfsPath="hdfs:///pay_predict/"
-    val hdfsPath=""
+    val hdfsPath="hdfs:///pay_predict/"
+    //val hdfsPath=""
     //筛选的训练集用户名单路径
     val userListPath = hdfsPath+"data/train/userpay/trainusersnew"+args(0)
     //媒资数据路径
@@ -32,7 +32,7 @@ object FeatureProcessNew {
 
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("FeatureProcessNew")
-      .master("local[6]")
+      //.master("local[6]")
       .getOrCreate()
     import org.apache.spark.sql.functions._
     import spark.implicits._
@@ -97,21 +97,7 @@ object FeatureProcessNew {
       labelMap+=(s.substring(1,s.length-1).split("\t")(1) -> s.substring(1,s.length-1).split("\t")(0).toInt)
 
     }
-//    println(labelMap)
-//    println(videoFirstCategoryMap)
-//    println(videoSecondCategoryMap)
-//    val videoSecondCategory = Source.fromFile(videoSecondCategoryTempPath, "UTF-8")
-//    var lineIterator2 = videoSecondCategory.getLines()
-//    //迭代打印所有行
-//    lineIterator2.foreach(line=>videoSecondCategoryMap += (line.split("\t")(1) -> line.split("\t")(0).toInt))
-//   // println( "videoSecondCategoryMap中的键为 : " + videoSecondCategoryMap.keys )
-//    val label = Source.fromFile(labelTempPath, "UTF-8")
-//    var lineIterator3 = label.getLines()
-//    //迭代打印所有行
-//    lineIterator3.foreach(line=>labelMap += (line.split("\t")(1) -> line.split("\t")(0).toInt))
-//   // println( "label中的键为 : " + labelMap.keys )
-//
-    //trainSetNotNull.filter(!isnull(col(Dic.colVideoTwoLevelPreference))).select(col(Dic.colVideoTwoLevelPreference)).show()
+
 
     val pre=List(Dic.colVideoOneLevelPreference,Dic.colVideoTwoLevelPreference,
       Dic.colMovieTwoLevelPreference,Dic.colSingleTwoLevelPreference,Dic.colInPackageVideoTwoLevelPreference)
@@ -139,7 +125,7 @@ object FeatureProcessNew {
         .withColumn(elem+"_2",udfFillPreference(col(elem),lit(2)))
         .withColumn(elem+"_3",udfFillPreference(col(elem),lit(3)))
     }
-   // tempDataFrame.show()
+    //tempDataFrame.show()
     //tempDataFrame.filter(!isnull(col("video_one_level_preference_1"))).show()
    def udfFillPreferenceIndex=udf(fillPreferenceIndex _)
    def fillPreferenceIndex(prefer:String,mapLine:String)={
@@ -155,7 +141,7 @@ object FeatureProcessNew {
    }
 
     for(elem<-pre){
-      if(elem.contains(Dic.colVideoOneLevelPreference)){
+      if(elem.equals(Dic.colVideoOneLevelPreference)){
         tempDataFrame=tempDataFrame.withColumn(elem+"_1",udfFillPreferenceIndex(col(elem+"_1"),lit(videoFirstCategoryMap.mkString(","))))
           .withColumn(elem+"_2",udfFillPreferenceIndex(col(elem+"_2"),lit(videoFirstCategoryMap.mkString(","))))
           .withColumn(elem+"_3",udfFillPreferenceIndex(col(elem+"_3"),lit(videoFirstCategoryMap.mkString(","))))
@@ -167,10 +153,10 @@ object FeatureProcessNew {
     }
     //tempDataFrame.filter(!isnull(col("video_one_level_preference_1"))).show()
     for(elem<-pre){
-      if(elem.contains(Dic.colVideoOneLevelPreference)){
-        tempDataFrame=tempDataFrame.na.fill(videoFirstCategoryMap.size,List(elem+"_1",elem+"_2",elem+"_3"))
+      if(elem.equals(Dic.colVideoOneLevelPreference)){
+        tempDataFrame=tempDataFrame.na.fill(videoFirstCategoryMap.size+1,List(elem+"_1",elem+"_2",elem+"_3"))
       }else{
-        tempDataFrame=tempDataFrame.na.fill(videoSecondCategoryMap.size,List(elem+"_1",elem+"_2",elem+"_3"))
+        tempDataFrame=tempDataFrame.na.fill(videoSecondCategoryMap.size+1,List(elem+"_1",elem+"_2",elem+"_3"))
       }
 
     }

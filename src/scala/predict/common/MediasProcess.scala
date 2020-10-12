@@ -137,11 +137,12 @@ object MediasProcess {
 
     result_1.foreach(row=> {
       val rs = row.getList(0)
-      val mutableset = Set[String]()
+      val mutableSet = Set[String]()
       for (i <- 0 to rs.size() - 1) {
-        mutableset.add(rs.get(i))
+        if(!rs.get(i).asInstanceOf[String].contains("\""))
+          mutableSet.add(rs.get(i))
       }
-      var level_one: Array[String] = mutableset.mkString(",").split(",")
+      var level_one: Array[String] = mutableSet.mkString(",").split(",")
       //val  file=new File(videoFirstCategoryTempPath)
       //val out = new PrintWriter(videoFirstCategoryTempPath)
       for (i<-0 to level_one.length-1) {

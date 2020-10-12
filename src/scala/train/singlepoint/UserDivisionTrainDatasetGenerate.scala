@@ -24,7 +24,7 @@ object UserDivisionTrainDatasetGenerate {
     val userProfileOrderPartPath=hdfsPath+"data/train/common/processed/userprofileorderpart"+args(0)
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("UserDivisionTrainDatasetGenerate")
-      .master("local[6]")
+      //.master("local[6]")
       .getOrCreate()
     import org.apache.spark.sql.functions._
     val userProfilePlayPart = spark.read.format("parquet").load(userProfilePlayPartPath)

@@ -19,7 +19,7 @@ object VideoProfileGenerate {
     Logger.getLogger("org").setLevel(Level.ERROR)
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("VideoProfileGenerate")
-      .master("local[6]")
+      //.master("local[6]")
       .getOrCreate()
     //设置shuffle过程中分区数
     // spark.sqlContext.setConf("spark.sql.shuffle.partitions", "1000")
@@ -177,8 +177,8 @@ object VideoProfileGenerate {
   }
 
   def main(args:Array[String]): Unit = {
-    //val hdfsPath="hdfs:///pay_predict/"
-    val hdfsPath=""
+    val hdfsPath="hdfs:///pay_predict/"
+    //val hdfsPath=""
     val mediasProcessedPath=hdfsPath+"data/train/common/processed/mediastemp"
     val playsProcessedPath=hdfsPath+"data/train/common/processed/plays"
     val ordersProcessedPath=hdfsPath+"data/train/common/processed/orders"

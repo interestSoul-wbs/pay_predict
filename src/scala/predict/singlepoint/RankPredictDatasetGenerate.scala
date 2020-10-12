@@ -29,6 +29,7 @@ object RankPredictDatasetGenerate {
     val userProfilePreferencePartPath=hdfsPath+"data/predict/common/processed/userprofilepreferencepart"+args(0)
     val userProfileOrderPartPath=hdfsPath+"data/predict/common/processed/userprofileorderpart"+args(0)
     val videoProfilePath=hdfsPath+"data/predict/common/processed/videoprofile"+args(0)
+    val videoVectorPath=hdfsPath+"data/predict/common/processed/videovector"+args(0)
     val userDivisionResultPath=hdfsPath+"data/predict/singlepoint/userdivisionresult"+args(0)+"-"+args(2)
 
     val userProfilePlayPart = spark.read.format("parquet").load(userProfilePlayPartPath)
@@ -36,6 +37,7 @@ object RankPredictDatasetGenerate {
     val userProfileOrderPart = spark.read.format("parquet").load(userProfileOrderPartPath)
     val userDivisionResult=spark.read.format("parquet").load(userDivisionResultPath)
     val videoProfile=spark.read.format("parquet").load(videoProfilePath)
+    val videoVector=spark.read.format("parquet").load(videoVectorPath)
 
 
     val joinKeysUserId=Seq(Dic.colUserId)
@@ -57,6 +59,7 @@ object RankPredictDatasetGenerate {
     var selectVideos=selectSinglePoint.join(videoProfile,joinKeysVideoId,"inner")
     var selectUsers=userDivisionResult.select(col(Dic.colUserId)).join(userProfile,joinKeysUserId,"inner")
     var result=selectUsers.crossJoin(selectVideos)
+    result=result.join(videoVector,joinKeysVideoId,"left")
 
 
     val colTypeList=result.dtypes.toList
