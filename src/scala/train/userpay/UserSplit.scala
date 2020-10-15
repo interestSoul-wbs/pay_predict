@@ -139,7 +139,7 @@ object UserSplit {
     if(trainPlay.count()>(9*trainPosUsers.count()-trainNegOrderUsers.count())){
             trainPlay=trainPlay.sample(1).limit((9*trainPosUsers.count()-trainNegOrderUsers.count()).toInt)
           }
-    val trainNewNeg=trainPlay.union(trainNegOrderUsers).withColumn(Dic.colOrderStatus,udfAddOrderStatus(col(Dic.colUserId)-1))
+    val trainNewNeg=trainPlay.union(trainNegOrderUsers).withColumn(Dic.colOrderStatus,udfAddOrderStatus(col(Dic.colUserId))-1)
 
     val trainNewResult=trainNewPos.union(trainNewNeg)
     println("新用户正样本数量："+trainNewPos.count())

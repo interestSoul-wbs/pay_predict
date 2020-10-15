@@ -350,11 +350,11 @@ object RankTrainDatasetGenerate {
     colList-=Dic.colIsSingle
     colList-=Dic.colIsTrailers
     colList-=Dic.colIsPaid
-    colList-=Dic.colVideoTime
-    colList-=Dic.colScore
-    colList-=Dic.colPackageId
-//    colList.foreach(println)
-//    println(colList.length)
+    //colList-=Dic.colVideoTime
+    //colList-=Dic.colScore
+    //colList-=Dic.colPackageId
+    //colList.foreach(println)
+    //println(colList.length)
     val seqColList=colList.toSeq
     result=result.select(seqColList.map(result.col(_)):_*)
     result=result.na.fill(30,List(Dic.colDaysSinceLastPurchasePackage,Dic.colDaysSinceLastClickPackage,
@@ -366,7 +366,7 @@ object RankTrainDatasetGenerate {
     val resultSavePath=hdfsPath+"data/train/singlepoint/ranktraindata"
     result.write.mode(SaveMode.Overwrite).format("parquet").save(resultSavePath+args(0)+"-"+args(2))
     val csvData=spark.read.format("parquet").load(resultSavePath+args(0)+"-"+args(2))
-    csvData.coalesce(1).write.mode(SaveMode.Overwrite).option("header","true").csv(resultSavePath+args(0)+"-"+args(2)+".csv")
+    csvData.write.mode(SaveMode.Overwrite).option("header","true").csv(resultSavePath+args(0)+"-"+args(2)+".csv")
     //result.write.mode(SaveMode.Overwrite).format("tfrecords").option("recordType", "Example").save(resultSavePath+args(0)+"-"+args(2)+".tfrecords")
 
 

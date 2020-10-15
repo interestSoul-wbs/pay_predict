@@ -107,7 +107,7 @@ object UserDivisionTrainDatasetGenerate {
 //    val scaledData = scaleModel.transform(allUsersConcat)
     val dataPath=hdfsPath+"data/train/singlepoint/userdivisiontraindata"
     allUsersNotNull.write.mode(SaveMode.Overwrite).format("parquet").save(dataPath+args(0)+"-"+args(2))
-    allUsersNotNull.coalesce(1).write.mode(SaveMode.Overwrite).option("header","true").csv(dataPath+args(0)+"-"+args(2)+".csv")
+    allUsersNotNull.write.mode(SaveMode.Overwrite).option("header","true").csv(dataPath+args(0)+"-"+args(2)+".csv")
 
 //    val model = new LogisticRegression()  //建立模型
 //    model.setLabelCol(Dic.colOrderStatus).setFeaturesCol("features_scale").fit(scaledData)

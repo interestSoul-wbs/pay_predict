@@ -3,6 +3,7 @@ package predict.common
 import mam.Dic
 import mam.Utils.udfLongToTimestamp
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.ml.feature.Imputer
 import org.apache.spark.sql
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{SaveMode, SparkSession}
@@ -178,10 +179,18 @@ object MediasProcess {
     var secondCsv = secondList.toDF("content")
     secondCsv.coalesce(1).write.mode(SaveMode.Overwrite).option("header","false").csv(videoSecondCategoryTempPath)
 
+    //使用均值填充
+    val cols=Array(Dic.colScore,Dic.colVideoTime)
+    val imputer = new Imputer()
+      .setInputCols(cols)
+      .setOutputCols(cols)
+      .setStrategy("mean")
+
+    val df3=imputer.fit(df2).transform(df2)
 
 
 
-     df2.write.mode(SaveMode.Overwrite).format("parquet").save(mediasProcessedPath)
+     df3.write.mode(SaveMode.Overwrite).format("parquet").save(mediasProcessedPath)
      println("预测阶段媒资数据处理完成！")
 
 

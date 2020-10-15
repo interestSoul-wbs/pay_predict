@@ -12,6 +12,7 @@ import org.apache.spark.sql.{SaveMode, SparkSession}
 
 import scala.collection.mutable.ListBuffer
 
+
 object VideoProfileGenerate {
 
   def videoProfileGenerate(now:String,timeWindow:Int,medias_path:String,plays_path:String,orders_path:String,hdfsPath:String): Unit ={
@@ -184,6 +185,8 @@ object VideoProfileGenerate {
     val ordersProcessedPath=hdfsPath+"data/train/common/processed/orders"
     val now=args(0)+" "+args(1)
     videoProfileGenerate(now,30,mediasProcessedPath,playsProcessedPath,ordersProcessedPath,hdfsPath)
+
+
   }
 
 }

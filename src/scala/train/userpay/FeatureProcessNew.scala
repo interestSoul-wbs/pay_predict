@@ -154,9 +154,9 @@ object FeatureProcessNew {
     //tempDataFrame.filter(!isnull(col("video_one_level_preference_1"))).show()
     for(elem<-pre){
       if(elem.equals(Dic.colVideoOneLevelPreference)){
-        tempDataFrame=tempDataFrame.na.fill(videoFirstCategoryMap.size+1,List(elem+"_1",elem+"_2",elem+"_3"))
+        tempDataFrame=tempDataFrame.na.fill(videoFirstCategoryMap.size,List(elem+"_1",elem+"_2",elem+"_3"))
       }else{
-        tempDataFrame=tempDataFrame.na.fill(videoSecondCategoryMap.size+1,List(elem+"_1",elem+"_2",elem+"_3"))
+        tempDataFrame=tempDataFrame.na.fill(videoSecondCategoryMap.size,List(elem+"_1",elem+"_2",elem+"_3"))
       }
 
     }

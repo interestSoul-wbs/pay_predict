@@ -7,9 +7,11 @@ import mam.Dic
 import mam.Utils.udfLongToTimestamp
 import org.apache.log4j.{Level, Logger}
 import org.apache.parquet.schema.Types.ListBuilder
+import org.apache.spark.ml.feature.Imputer
 import org.apache.spark.{SparkConf, SparkContext, sql}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{SaveMode, SparkSession}
+import org.apache.spark.ml.feature.Imputer
 
 import scala.collection.mutable
 import scala.collection.mutable.{ListBuffer, Set} // 可以在任何地方引入 可变集合
@@ -149,7 +151,7 @@ object MediasProcess {
       }
       //mutableSet.foreach(println)
       var level_one: Array[String] = mutableSet.mkString(",").split(",")
-      println(mutableSet.mkString(","))
+      //println(mutableSet.mkString(","))
       for (i<-0 to level_one.length-1) {
          // out.println(i+"\t"+level_one(i))
         firstList.append(i+"\t"+level_one(i))
@@ -168,9 +170,16 @@ object MediasProcess {
     var secondCsv = secondList.toDF("content")
     secondCsv.coalesce(1).write.mode(SaveMode.Overwrite).option("header","false").csv(videoSecondCategoryTempPath)
 
+    //score和VideoTime使用均值填充
+    val cols=Array(Dic.colScore,Dic.colVideoTime)
+    val imputer = new Imputer()
+      .setInputCols(cols)
+      .setOutputCols(cols)
+      .setStrategy("mean")
 
-     //df2.show()
-     df2.write.mode(SaveMode.Overwrite).format("parquet").save(mediasProcessedPath)
+    val df3=imputer.fit(df2).transform(df2)
+     //df3.show()
+     df3.write.mode(SaveMode.Overwrite).format("parquet").save(mediasProcessedPath)
      println("媒资数据处理完成！")
 
 

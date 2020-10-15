@@ -45,6 +45,7 @@ object RankPredictDatasetGenerate {
 
     var userProfile=userProfilePlayPart.join(userProfilePreferencePart,joinKeysUserId,"left")
     userProfile=userProfile.join(userProfileOrderPart,joinKeysUserId,"left")
+    //由于内存的限制，设置预测的单点视频的数量，如果内存足够大可以将单点视频的数量设置为媒资中所有单点视频的数量
     val selectN=20
     var selectSinglePoint=orders.filter(
       col(Dic.colResourceType).===(0)
@@ -57,9 +58,16 @@ object RankPredictDatasetGenerate {
       .select(col(Dic.colResourceId))
       .withColumnRenamed(Dic.colResourceId,Dic.colVideoId)
     var selectVideos=selectSinglePoint.join(videoProfile,joinKeysVideoId,"inner")
+    //之前考虑只将订单中销量最好的单点视频推荐给用户，现修改为将媒资数据中的
+//    val selectVideos=videoProfile.filter(col(Dic.colIsSingle).===(1))
+    //println("预测的单点视频的数量："+selectVideos.count())
+
     var selectUsers=userDivisionResult.select(col(Dic.colUserId)).join(userProfile,joinKeysUserId,"inner")
+    println("预测的用户的数量："+selectUsers.count())
     var result=selectUsers.crossJoin(selectVideos)
     result=result.join(videoVector,joinKeysVideoId,"left")
+    //println("预测的数据的条数："+result.count())
+
 
 
     val colTypeList=result.dtypes.toList
@@ -74,8 +82,8 @@ object RankPredictDatasetGenerate {
     colList-=Dic.colIsSingle
     colList-=Dic.colIsTrailers
     colList-=Dic.colIsPaid
-    colList-=Dic.colVideoTime
-    colList-=Dic.colScore
+    //colList-=Dic.colVideoTime
+    //colList-=Dic.colScore
     //    colList.foreach(println)
     //    println(colList.length)
     val seqColList=colList.toSeq
@@ -89,7 +97,7 @@ object RankPredictDatasetGenerate {
     val resultSavePath=hdfsPath+"data/predict/singlepoint/rankpredictdata"
     result.write.mode(SaveMode.Overwrite).format("parquet").save(resultSavePath+args(0)+"-"+args(2))
     val csvData=spark.read.format("parquet").load(resultSavePath+args(0)+"-"+args(2))
-    csvData.coalesce(1).write.mode(SaveMode.Overwrite).option("header","true").csv(resultSavePath+args(0)+"-"+args(2)+".csv")
+    csvData.write.mode(SaveMode.Overwrite).option("header","true").csv(resultSavePath+args(0)+"-"+args(2)+".csv")
 
 
 
