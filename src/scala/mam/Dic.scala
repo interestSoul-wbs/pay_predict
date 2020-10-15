@@ -222,6 +222,23 @@ object Dic {
   val colNumberOfTimesPurchasedTotal="number_of_times_purchased_total"
 
 
+  /**
+   * click中的用户属性
+   */
+  //"subscriberid","devicemsg","featurecode","bigversion","province","city","citylevel","areaid",
+  // "time","itemtype","itemid","partitiondate"
+  val colDeviceMsg="devicemsg"
+  val colFeatureCode="featurecode"
+  val colBigVersion="bigversion"
+  val colProvince="province"
+  val colCity="city"
+  val colCityLevel="citylevel"
+  val colAreaId="areaid"
+  val colTime="time"
+  val colItemType="itemtype"
+  val colItemId="itemid"
+  val colPartitionDate="partitiondate"
+
 
 
 

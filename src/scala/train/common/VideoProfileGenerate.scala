@@ -12,6 +12,7 @@ import org.apache.spark.sql.{SaveMode, SparkSession}
 
 import scala.collection.mutable.ListBuffer
 
+
 object VideoProfileGenerate {
 
   def videoProfileGenerate(now:String,timeWindow:Int,medias_path:String,plays_path:String,orders_path:String,hdfsPath:String): Unit ={
@@ -19,7 +20,7 @@ object VideoProfileGenerate {
     Logger.getLogger("org").setLevel(Level.ERROR)
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("VideoProfileGenerate")
-      .master("local[6]")
+      //.master("local[6]")
       .getOrCreate()
     //设置shuffle过程中分区数
     // spark.sqlContext.setConf("spark.sql.shuffle.partitions", "1000")
@@ -177,13 +178,15 @@ object VideoProfileGenerate {
   }
 
   def main(args:Array[String]): Unit = {
-    //val hdfsPath="hdfs:///pay_predict/"
-    val hdfsPath=""
+    val hdfsPath="hdfs:///pay_predict/"
+    //val hdfsPath=""
     val mediasProcessedPath=hdfsPath+"data/train/common/processed/mediastemp"
     val playsProcessedPath=hdfsPath+"data/train/common/processed/plays"
     val ordersProcessedPath=hdfsPath+"data/train/common/processed/orders"
     val now=args(0)+" "+args(1)
     videoProfileGenerate(now,30,mediasProcessedPath,playsProcessedPath,ordersProcessedPath,hdfsPath)
+
+
   }
 
 }

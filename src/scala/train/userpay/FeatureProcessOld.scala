@@ -14,8 +14,8 @@ object FeatureProcessOld {
     Logger.getLogger("org").setLevel(Level.ERROR)
 
     //val userProfilePath =  "pay_predict/data/train/common/processed/userfile_0601.pkl"
-    //val hdfsPath="hdfs:///pay_predict/"
-    val hdfsPath=""
+    val hdfsPath="hdfs:///pay_predict/"
+    //val hdfsPath=""
     //筛选的训练集用户名单路径
     val userListPath = hdfsPath+"data/train/userpay/trainusersold" + args(0)
     //媒资数据路径
@@ -29,7 +29,7 @@ object FeatureProcessOld {
 
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("FeatureProcessOld")
-      .master("local[6]")
+      //.master("local[6]")
       .getOrCreate()
     import org.apache.spark.sql.functions._
     val userProfilePlayPart = spark.read.format("parquet").load(userProfilePlayPartPath)
@@ -137,7 +137,7 @@ object FeatureProcessOld {
     }
 
     for (elem <- pre) {
-      if (elem.contains(Dic.colVideoOneLevelPreference)) {
+      if (elem.equals(Dic.colVideoOneLevelPreference)) {
         tempDataFrame = tempDataFrame.withColumn(elem + "_1", udfFillPreferenceIndex(col(elem + "_1"), lit(videoFirstCategoryMap.mkString(","))))
           .withColumn(elem + "_2", udfFillPreferenceIndex(col(elem + "_2"), lit(videoFirstCategoryMap.mkString(","))))
           .withColumn(elem + "_3", udfFillPreferenceIndex(col(elem + "_3"), lit(videoFirstCategoryMap.mkString(","))))
@@ -149,7 +149,7 @@ object FeatureProcessOld {
     }
     //tempDataFrame.filter(!isnull(col("video_one_level_preference_1"))).show()
     for (elem <- pre) {
-      if (elem.contains(Dic.colVideoOneLevelPreference)) {
+      if (elem.equals(Dic.colVideoOneLevelPreference)) {
         tempDataFrame = tempDataFrame.na.fill(videoFirstCategoryMap.size, List(elem + "_1", elem + "_2", elem + "_3"))
       } else {
         tempDataFrame = tempDataFrame.na.fill(videoSecondCategoryMap.size, List(elem + "_1", elem + "_2", elem + "_3"))
