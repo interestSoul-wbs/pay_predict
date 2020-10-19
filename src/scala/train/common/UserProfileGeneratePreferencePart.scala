@@ -21,10 +21,10 @@ object UserProfileGeneratePreferencePart {
 
     val medias = spark.read.format("parquet").load(medias_path)
     val plays = spark.read.format("parquet").load(plays_path)
-    val orders = spark.read.format("parquet").load(orders_path)
+    //val orders = spark.read.format("parquet").load(orders_path)
 
 
-    val result = plays.select(col(Dic.colUserId)).distinct()
+    var result = plays.select(col(Dic.colUserId)).distinct()
 
 
 
@@ -85,11 +85,11 @@ object UserProfileGeneratePreferencePart {
         sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimeMoviesLast1Days)
       )
 
-    val result20=result.join(play_medias_part_41,joinKeysUserId,"left")
-    val result21=result20.join(play_medias_part_42,joinKeysUserId, "left")
-    val result22=result21.join(play_medias_part_43,joinKeysUserId,"left")
-    val result23=result22.join(play_medias_part_44,joinKeysUserId, "left")
-    val result24=result23.join(play_medias_part_45,joinKeysUserId, "left")
+    result=result.join(play_medias_part_41,joinKeysUserId,"left")
+      .join(play_medias_part_42,joinKeysUserId, "left")
+      .join(play_medias_part_43,joinKeysUserId,"left")
+      .join(play_medias_part_44,joinKeysUserId, "left")
+      .join(play_medias_part_45,joinKeysUserId, "left")
 
 
 
@@ -143,11 +143,11 @@ object UserProfileGeneratePreferencePart {
       .agg(
         sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimePaidMoviesLast1Days)
       )
-    val result25=result24.join(play_medias_part_51,joinKeysUserId,"left")
-    val result26=result25.join(play_medias_part_52,joinKeysUserId, "left")
-    val result27=result26.join(play_medias_part_53,joinKeysUserId,"left")
-    val result28=result27.join(play_medias_part_54,joinKeysUserId, "left")
-    val result29=result28.join(play_medias_part_55,joinKeysUserId, "left")
+    result=result.join(play_medias_part_51,joinKeysUserId,"left")
+      .join(play_medias_part_52,joinKeysUserId, "left")
+      .join(play_medias_part_53,joinKeysUserId,"left")
+      .join(play_medias_part_54,joinKeysUserId, "left")
+      .join(play_medias_part_55,joinKeysUserId, "left")
 
 
 
@@ -195,10 +195,10 @@ object UserProfileGeneratePreferencePart {
       .agg(
         avg(col(Dic.colBroadcastTime)).as(Dic.colAvgRestdailyTimePaidVideosLast30Days)
       )
-    val result30=result29.join(play_medias_part_61,joinKeysUserId,"left")
-    val result31=result30.join(play_medias_part_62,joinKeysUserId, "left")
-    val result32=result31.join(play_medias_part_63,joinKeysUserId,"left")
-    val result33=result32.join(play_medias_part_64,joinKeysUserId, "left")
+    result=result.join(play_medias_part_61,joinKeysUserId,"left")
+      .join(play_medias_part_62,joinKeysUserId, "left")
+      .join(play_medias_part_63,joinKeysUserId,"left")
+      .join(play_medias_part_64,joinKeysUserId, "left")
 
 
 
@@ -270,15 +270,15 @@ object UserProfileGeneratePreferencePart {
 
 
 
-        val result34=result33.join(play_medias_part_71,joinKeysUserId,"left")
-        val result35=result34.join(play_medias_part_72,joinKeysUserId, "left")
-        val result36=result35.join(play_medias_part_73,joinKeysUserId,"left")
-        val result37=result36.join(play_medias_part_74,joinKeysUserId, "left")
+    result=result.join(play_medias_part_71,joinKeysUserId,"left")
+      .join(play_medias_part_72,joinKeysUserId, "left")
+      .join(play_medias_part_73,joinKeysUserId,"left")
+      .join(play_medias_part_74,joinKeysUserId, "left")
 
 
     val userProfilePreferencePartSavePath=hdfsPath+"data/train/common/processed/userprofilepreferencepart"+now.split(" ")(0)
     //大约有85万用户
-    result37.write.mode(SaveMode.Overwrite).format("parquet").save(userProfilePreferencePartSavePath)
+    result.write.mode(SaveMode.Overwrite).format("parquet").save(userProfilePreferencePartSavePath)
 
 
 

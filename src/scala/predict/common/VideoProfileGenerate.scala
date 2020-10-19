@@ -81,11 +81,11 @@ object VideoProfileGenerate {
 
 
 
-    val result1=medias.join(part_11,joinKeysVideoId,"left")
-    val result2=result1.join(part_12,joinKeysVideoId,"left")
-    val result3=result2.join(part_13,joinKeysVideoId,"left")
-    val result4=result3.join(part_14,joinKeysVideoId,"left")
-    val result5=result4.join(part_15,joinKeysVideoId,"left")
+    var result=medias.join(part_11,joinKeysVideoId,"left")
+      .join(part_12,joinKeysVideoId,"left")
+      .join(part_13,joinKeysVideoId,"left")
+      .join(part_14,joinKeysVideoId,"left")
+      .join(part_15,joinKeysVideoId,"left")
 
 
 
@@ -133,40 +133,40 @@ object VideoProfileGenerate {
       .agg(
         count(col(Dic.colResourceId)).as(Dic.colNumberOfTimesPurchasedTotal)
       )
-    val result6=result5.join(part_21,result5.col(Dic.colVideoId)===part_21.col(Dic.colResourceId),"left")
-      .select(result5.col("*"),part_21.col(Dic.colNumberOfTimesPurchasedWithin30Days))
-    val result7=result6.join(part_22,result6.col(Dic.colVideoId)===part_22.col(Dic.colResourceId),"left")
-      .select(result6.col("*"),part_22.col(Dic.colNumberOfTimesPurchasedWithin14Days))
-    val result8=result7.join(part_23,result7.col(Dic.colVideoId)===part_23.col(Dic.colResourceId),"left")
-      .select(result7.col("*"),part_23.col(Dic.colNumberOfTimesPurchasedWithin7Days))
-    val result9=result8.join(part_24,result8.col(Dic.colVideoId)===part_24.col(Dic.colResourceId),"left")
-      .select(result8.col("*"),part_24.col(Dic.colNumberOfTimesPurchasedWithin3Days))
-    val result10=result9.join(part_25,result9.col(Dic.colVideoId)===part_25.col(Dic.colResourceId),"left")
-      .select(result9.col("*"),part_25.col(Dic.colNumberOfTimesPurchasedTotal))
+    result=result.join(part_21,result.col(Dic.colVideoId)===part_21.col(Dic.colResourceId),"left")
+      .select(result.col("*"),part_21.col(Dic.colNumberOfTimesPurchasedWithin30Days))
+    result=result.join(part_22,result.col(Dic.colVideoId)===part_22.col(Dic.colResourceId),"left")
+      .select(result.col("*"),part_22.col(Dic.colNumberOfTimesPurchasedWithin14Days))
+    result=result.join(part_23,result.col(Dic.colVideoId)===part_23.col(Dic.colResourceId),"left")
+      .select(result.col("*"),part_23.col(Dic.colNumberOfTimesPurchasedWithin7Days))
+    result=result.join(part_24,result.col(Dic.colVideoId)===part_24.col(Dic.colResourceId),"left")
+      .select(result.col("*"),part_24.col(Dic.colNumberOfTimesPurchasedWithin3Days))
+    result=result.join(part_25,result.col(Dic.colVideoId)===part_25.col(Dic.colResourceId),"left")
+      .select(result.col("*"),part_25.col(Dic.colNumberOfTimesPurchasedTotal))
 
     //result10.show()
     //选出数据类型为数值类型的列
     val numColumns=new ListBuffer[String]
-    for(elem<-result10.dtypes){
+    for(elem<-result.dtypes){
       if(elem._2.equals("DoubleType")||elem._2.equals("LongType")||elem._2.equals("IntegerType")){
           numColumns.insert(numColumns.length,elem._1)
       }
     }
 
     //将其他类型的列转化为字符串，容易保存为csv文件
-    val anoColumns=result10.columns.diff(numColumns)
-    val result11= anoColumns.foldLeft(result10){
+    val anoColumns=result.columns.diff(numColumns)
+     result= anoColumns.foldLeft(result){
       (currentDF, column) => currentDF.withColumn(column, col(column).cast("string"))
     }
-    result10.na.fill(0,numColumns)
-    result11.na.fill(0,numColumns)
+    result.na.fill(0,numColumns)
+    //result.na.fill(0,numColumns)
 
    // result10.show()
     //result11.show()
 
     val videoProfilePath=hdfsPath+"data/predict/common/processed/videoprofile"+now.split(" ")(0)
    // val videoProfileSavePath="pay_predict/data/train/common/processed/videoprofile.csv"
-    result10.write.mode(SaveMode.Overwrite).format("parquet").save(videoProfilePath)
+    result.write.mode(SaveMode.Overwrite).format("parquet").save(videoProfilePath)
     //result11.write.mode(SaveMode.Overwrite).format("parquet").save(userProfileOrderPartSavePath)
 
 
