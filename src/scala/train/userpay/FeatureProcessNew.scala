@@ -173,7 +173,7 @@ object FeatureProcessNew {
     val result=tempDataFrame.select(columnList.map(tempDataFrame.col(_)):_*)
     //result.show()
     result.write.mode(SaveMode.Overwrite).format("parquet").save(trainSetSavePath+"trainsetnew"+args(0))
-    result.coalesce(1).write.mode(SaveMode.Overwrite).option("header","true").csv(trainSetSavePath + "trainsetnew" + args(0)+".csv")
+    result.write.mode(SaveMode.Overwrite).option("header","true").csv(trainSetSavePath + "trainsetnew" + args(0)+".csv")
 
 
 
