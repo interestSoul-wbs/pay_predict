@@ -1,4 +1,9 @@
 package train.common
+/**
+ * @Author wj
+ * @Date 2020/09
+ * @Version 1.0
+ */
 
 import java.text.SimpleDateFormat
 

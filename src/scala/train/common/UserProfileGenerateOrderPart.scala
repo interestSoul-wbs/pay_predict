@@ -19,12 +19,12 @@ object UserProfileGenerateOrderPart {
     // spark.sqlContext.setConf("spark.sql.shuffle.partitions", "1000")
     import org.apache.spark.sql.functions._
 
-    val medias = spark.read.format("parquet").load(medias_path)
+    //val medias = spark.read.format("parquet").load(medias_path)
     val plays = spark.read.format("parquet").load(plays_path)
     val orders = spark.read.format("parquet").load(orders_path)
 
 
-    val result = plays.select(col(Dic.colUserId)).distinct()
+    var result = plays.select(col(Dic.colUserId)).distinct()
 
 
     val pre_30 = calDate(now, -30)
@@ -161,24 +161,24 @@ object UserProfileGenerateOrderPart {
 
 
 
-    val result38=result.join(order_part_1,joinKeysUserId,"left")
-    val result39=result38.join(order_part_2,joinKeysUserId, "left")
-    val result40=result39.join(order_part_3,joinKeysUserId,"left")
-    val result41=result40.join(order_part_4,joinKeysUserId, "left")
-    val result42=result41.join(order_part_5,joinKeysUserId, "left")
-    val result43=result42.join(order_part_6,joinKeysUserId, "left")
-    val result44=result43.join(order_part_7,joinKeysUserId, "left")
-    val result45=result44.join(order_part_8,joinKeysUserId,"left")
-    val result46=result45.join(order_part_9,joinKeysUserId, "left")
-    val result47=result46.join(order_part_10,joinKeysUserId, "left")
-    val result48=result47.join(order_part_11,joinKeysUserId, "left")
-    val result49=result48.join(order_part_12,joinKeysUserId, "left")
+    result=result.join(order_part_1,joinKeysUserId,"left")
+    .join(order_part_2,joinKeysUserId, "left")
+    .join(order_part_3,joinKeysUserId,"left")
+    .join(order_part_4,joinKeysUserId, "left")
+    .join(order_part_5,joinKeysUserId, "left")
+    .join(order_part_6,joinKeysUserId, "left")
+    .join(order_part_7,joinKeysUserId, "left")
+    .join(order_part_8,joinKeysUserId,"left")
+    .join(order_part_9,joinKeysUserId, "left")
+    .join(order_part_10,joinKeysUserId, "left")
+    .join(order_part_11,joinKeysUserId, "left")
+    .join(order_part_12,joinKeysUserId, "left")
 
    // result49.show()
 
     val userProfileOrderPartSavePath=hdfsPath+"data/train/common/processed/userprofileorderpart"+now.split(" ")(0)
     //大约有85万用户
-    result49.write.mode(SaveMode.Overwrite).format("parquet").save(userProfileOrderPartSavePath)
+    result.write.mode(SaveMode.Overwrite).format("parquet").save(userProfileOrderPartSavePath)
 
 
 

@@ -1,5 +1,11 @@
 package predict.common
 
+/**
+ * @Author wj
+ * @Date 2020/09
+ * @Version 1.0
+ */
+
 import mam.Dic
 import mam.Utils.udfLongToTimestamp
 import org.apache.log4j.{Level, Logger}
@@ -55,7 +61,7 @@ object MediasProcess {
     val mediasProcessedPath=hdfsPath+"data/predict/common/processed/mediastemp"
     val videoFirstCategoryTempPath=hdfsPath+"data/predict/common/processed/videofirstcategorytemp.txt"
     val videoSecondCategoryTempPath=hdfsPath+"data/predict/common/processed/videosecondcategorytemp.txt"
-    val labelTempPath=hdfsPath+"data/predict/common/processed/labeltemp.txt"///pay_predict/data/train/common/processed
+    val labelTempPath=hdfsPath+"data/predict/common/processed/labeltemp.txt"
     val df = spark.read
       .option("delimiter", "\t")
       .option("header", false)
@@ -96,7 +102,6 @@ object MediasProcess {
     val firstList=ListBuffer[String]()
     val secondList=ListBuffer[String]()
     result_3.foreach(row=>{
-      //println(row.get(0))
       val rs = row.getList(0)
       val mutableset = Set[String]()
       for (i <- 0 to rs.size() - 1) {
@@ -105,13 +110,9 @@ object MediasProcess {
           mutableset.add(temp(j))
       }
       var label: Array[String] = mutableset.mkString(",").split(",")
-      //val  file=new File()
-      //val out = new PrintWriter(labelTempPath)
       for (i<-0 to label.length-1) {
-          //out.println(i+"\t"+label(i))
         labelList.append(i+"\t"+label(i))
       }
-      //out.close()
 
     })
     //val rs=mutable.WrappedArray[String]
@@ -153,23 +154,7 @@ object MediasProcess {
       //out.close()
     })
 
-    //df2.show()
-    //println(labelList)
-//    val writer1 = new PrintWriter(new File(labelTempPath))
-//    for(elem<-labelList){
-//      writer1.write(elem)
-//    }
-//    writer1.close()
-//    val writer2 = new PrintWriter(new File(videoSecondCategoryTempPath))
-//    for(elem<-secondList){
-//      writer2.write(elem)
-//    }
-//    writer2.close()
-//    val writer3 = new PrintWriter(new File(videoFirstCategoryTempPath))
-//    for(elem<-firstList){
-//      writer3.write(elem)
-//    }
-//    writer3.close()
+
 
     import spark.implicits._
     var labelCsv = labelList.toDF("content")

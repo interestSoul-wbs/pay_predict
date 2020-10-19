@@ -1,4 +1,9 @@
 package predict.common
+/**
+ * @Author wj
+ * @Date 2020/09
+ * @Version 1.0
+ */
 
 import mam.Dic
 import mam.Utils.udfChangeDateFormat
@@ -31,7 +36,6 @@ object OrdersProcess {
 
         )
       )
-       //hdfs:///pay_predict/
       import org.apache.spark.sql.functions._
       val hdfsPath="hdfs:///pay_predict/"
       //val hdfsPath=""

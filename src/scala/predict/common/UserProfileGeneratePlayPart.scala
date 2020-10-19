@@ -23,10 +23,10 @@ object UserProfileGeneratePlayPart {
 
     val medias = spark.read.format("parquet").load(medias_path)
     val plays = spark.read.format("parquet").load(plays_path)
-    val orders = spark.read.format("parquet").load(orders_path)
+   // val orders = spark.read.format("parquet").load(orders_path)
 
 
-    val result=plays.select(col(Dic.colUserId)).distinct()
+    var result=plays.select(col(Dic.colUserId)).distinct()
 
     //val result = users.toDF("user_id")
 
@@ -81,23 +81,13 @@ object UserProfileGeneratePlayPart {
         countDistinct(col(Dic.colPlayEndTime)).as(Dic.colActiveDaysLast3Days),
         sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimeLast3Days)
       )
-//
-//    dataFrameList:+(play_part_1)
-//    dataFrameList:+(play_part_2)
-//    dataFrameList:+(play_part_3)
-//    dataFrameList:+(play_part_4)
-//    val joinKeysUserId = Seq(Dic.colUserId)
-//    var play_part_result=result
-//    for(elem <- dataFrameList){
-//        play_part_result=play_part_result.join(elem,joinKeysUserId,"left")
-//    }
-//    play_part_result.show()
+
 
     val joinKeysUserId = Seq(Dic.colUserId)
-    val result1=result.join(play_part_1,joinKeysUserId,"left")
-    val result2 =result1.join(play_part_2, joinKeysUserId, "left")
-    val result3 = result2.join(play_part_3, joinKeysUserId, "left")
-    val result4 = result3.join(play_part_4, joinKeysUserId, "left")
+    result=result.join(play_part_1,joinKeysUserId,"left")
+    .join(play_part_2, joinKeysUserId, "left")
+    .join(play_part_3, joinKeysUserId, "left")
+    .join(play_part_4, joinKeysUserId, "left")
 
     val joinKeyVideoId=Seq(Dic.colVideoId)
     val user_medias=plays.join(medias,joinKeyVideoId,"inner")
@@ -152,11 +142,11 @@ object UserProfileGeneratePlayPart {
         sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimePaidVideosLast1Days)
       )
 
-    val result5=result4.join(play_medias_part_11,joinKeysUserId,"left")
-    val result6=result5.join(play_medias_part_12,joinKeysUserId, "left")
-    val result7=result6.join(play_medias_part_13,joinKeysUserId,"left")
-    val result8=result7.join(play_medias_part_14,joinKeysUserId, "left")
-    val result9=result8.join(play_medias_part_15,joinKeysUserId, "left")
+     result=result.join(play_medias_part_11,joinKeysUserId,"left")
+    .join(play_medias_part_12,joinKeysUserId, "left")
+    .join(play_medias_part_13,joinKeysUserId,"left")
+    .join(play_medias_part_14,joinKeysUserId, "left")
+    .join(play_medias_part_15,joinKeysUserId, "left")
 
 
 
@@ -221,11 +211,11 @@ object UserProfileGeneratePlayPart {
         countDistinct(col(Dic.colVideoId)).as(Dic.colNumberInPackagesVideosLast1Days)
       )
 
-    val result10=result9.join(play_medias_part_21,joinKeysUserId,"left")
-    val result11=result10.join(play_medias_part_22,joinKeysUserId, "left")
-    val result12=result11.join(play_medias_part_23,joinKeysUserId,"left")
-    val result13=result12.join(play_medias_part_24,joinKeysUserId, "left")
-    val result14=result13.join(play_medias_part_25,joinKeysUserId, "left")
+     result=result.join(play_medias_part_21,joinKeysUserId,"left")
+     .join(play_medias_part_22,joinKeysUserId, "left")
+     .join(play_medias_part_23,joinKeysUserId,"left")
+     .join(play_medias_part_24,joinKeysUserId, "left")
+     .join(play_medias_part_25,joinKeysUserId, "left")
 
 
 
@@ -279,11 +269,11 @@ object UserProfileGeneratePlayPart {
         sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimeChildrenVideosLast1Days),
         countDistinct(col(Dic.colVideoId)).as(Dic.colNumberChildrenVideosLast1Days)
       )
-    val result15=result14.join(play_medias_part_31,joinKeysUserId,"left")
-    val result16=result15.join(play_medias_part_32,joinKeysUserId, "left")
-    val result17=result16.join(play_medias_part_33,joinKeysUserId,"left")
-    val result18=result17.join(play_medias_part_34,joinKeysUserId, "left")
-    val result19=result18.join(play_medias_part_35,joinKeysUserId, "left")
+    result=result.join(play_medias_part_31,joinKeysUserId,"left")
+    .join(play_medias_part_32,joinKeysUserId, "left")
+    .join(play_medias_part_33,joinKeysUserId,"left")
+    .join(play_medias_part_34,joinKeysUserId, "left")
+    .join(play_medias_part_35,joinKeysUserId, "left")
 
 
 
@@ -292,10 +282,10 @@ object UserProfileGeneratePlayPart {
 
 
 
-
+    //result.show()
     val userProfilePlayPartSavePath=hdfsPath+"data/predict/common/processed/userprofileplaypart"+now.split(" ")(0)
     //大约有85万用户
-    result19.write.mode(SaveMode.Overwrite).format("parquet").save(userProfilePlayPartSavePath)
+    result.write.mode(SaveMode.Overwrite).format("parquet").save(userProfilePlayPartSavePath)
 
 
 
@@ -305,7 +295,7 @@ object UserProfileGeneratePlayPart {
 
   def main(args:Array[String]): Unit ={
     val hdfsPath="hdfs:///pay_predict/"
-   // val hdfsPath=""
+    //val hdfsPath=""
     val mediasProcessedPath=hdfsPath+"data/predict/common/processed/mediastemp"
     val playsProcessedPath=hdfsPath+"data/predict/common/processed/plays"
     val ordersProcessedPath=hdfsPath+"data/predict/common/processed/orders"
