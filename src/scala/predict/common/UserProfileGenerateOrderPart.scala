@@ -5,11 +5,14 @@ import mam.Utils.{calDate, udfGetDays}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
 import org.apache.spark.sql.{SaveMode, SparkSession}
+import mam.Utils.printDf
 
 object UserProfileGenerateOrderPart {
 
   def userProfileGenerateOrderPart(now:String,timeWindow:Int,medias_path:String,plays_path:String,orders_path:String,hdfsPath:String): Unit = {
-     System.setProperty("hadoop.home.dir", "c:\\winutils")
+    import org.apache.spark.sql.functions._
+
+    System.setProperty("hadoop.home.dir", "c:\\winutils")
     Logger.getLogger("org").setLevel(Level.ERROR)
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("PredictUserProfileGenerateOrderPart")
@@ -17,15 +20,19 @@ object UserProfileGenerateOrderPart {
       .getOrCreate()
     //设置shuffle过程中分区数
     // spark.sqlContext.setConf("spark.sql.shuffle.partitions", "1000")
-    import org.apache.spark.sql.functions._
 
     //val medias = spark.read.format("parquet").load(medias_path)
     val plays = spark.read.format("parquet").load(plays_path)
+
+    printDf("plays", plays)
+
     val orders = spark.read.format("parquet").load(orders_path)
 
+    printDf("orders", orders)
 
     var result = plays.select(col(Dic.colUserId)).distinct()
 
+    printDf("result", result)
 
     val pre_30 = calDate(now, -30)
     val pre_14 = calDate(now, days = -14)
@@ -157,10 +164,6 @@ object UserProfileGenerateOrderPart {
         udfGetDays(max(col(Dic.colOrderEndTime)),lit(now)).as(Dic.colDaysRemainingPackage)
       )
 
-
-
-
-
      result=result.join(order_part_1,joinKeysUserId,"left")
      .join(order_part_2,joinKeysUserId, "left")
      .join(order_part_3,joinKeysUserId,"left")
@@ -174,14 +177,11 @@ object UserProfileGenerateOrderPart {
      .join(order_part_11,joinKeysUserId, "left")
      .join(order_part_12,joinKeysUserId, "left")
 
-      result.show()
+    printDf("result", result)
 
     val userProfileOrderPartSavePath=hdfsPath+"data/predict/common/processed/userprofileorderpart"+now.split(" ")(0)
     //大约有85万用户
     result.write.mode(SaveMode.Overwrite).format("parquet").save(userProfileOrderPartSavePath)
-
-
-
 
   }
 
@@ -190,17 +190,15 @@ object UserProfileGenerateOrderPart {
       val hdfsPath="hdfs:///pay_predict/"
       //val hdfsPath=""
       val mediasProcessedPath=hdfsPath+"data/predict/common/processed/mediastemp"
+
       val playsProcessedPath=hdfsPath+"data/predict/common/processed/plays"
+
       val ordersProcessedPath=hdfsPath+"data/predict/common/processed/orders"
+
+      // 【Q】 What are the args?
       val now=args(0)+" "+args(1)
+
       userProfileGenerateOrderPart(now,30,mediasProcessedPath,playsProcessedPath,ordersProcessedPath,hdfsPath)
-
-
-
-
-
-
-
 
   }
 

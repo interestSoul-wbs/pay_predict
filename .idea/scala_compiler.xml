@@ -4,7 +4,7 @@
     <profile name="Maven 1" modules="pay_predict">
       <parameters>
         <parameter value="-dependencyfile" />
-        <parameter value="G:\pay_predict\target/.scala_dependencies" />
+        <parameter value="C:\Users\chenzhengkun\Desktop\payment\pay_predict\target/.scala_dependencies" />
       </parameters>
     </profile>
   </component>

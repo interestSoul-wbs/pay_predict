@@ -3,6 +3,7 @@ package mam
 import java.text.SimpleDateFormat
 import java.util.Calendar
 
+import org.apache.spark.sql.{DataFrame, Row}
 import org.apache.spark.sql.functions.udf
 
 import scala.collection.immutable.ListMap
@@ -189,6 +190,35 @@ object Utils {
     //result
     ListMap(result.toSeq.sortWith(_._2 >_._2) :_ *)
   }
-  
 
+  /**
+    * Show the dataframe specifically.
+    * @param df_name - name of dataframe
+    * @param df - dataframe to be showed
+    */
+  def printDf(df_name: String, df: DataFrame) = {
+
+    println("—————————\n"*2)
+    println(df_name)
+    println("—————————\n")
+    df.show(false)
+    println("—————————\n")
+    df.printSchema()
+    println("—————————\n"*2)
+  }
+
+  /**
+    * Show the Array.
+    * @param array_name - name of Array
+    * @param array_self - Array to be showed
+    */
+  def printArray(array_name: String, array_self: Array[Row]) = {
+
+    println("—————————\n"*2)
+    println(array_name)
+    println("—————————\n")
+    array_self.take(10).foreach(println)
+    println("—————————\n"*2)
+
+  }
 }
