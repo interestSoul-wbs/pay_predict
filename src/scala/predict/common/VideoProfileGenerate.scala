@@ -25,7 +25,6 @@ object VideoProfileGenerate {
     val plays = spark.read.format("parquet").load(plays_path)
     val orders = spark.read.format("parquet").load(orders_path)
 
-
     val pre_30 = calDate(now, -30)
     val pre_14 = calDate(now, days = -14)
     val pre_7 = calDate(now, -7)
