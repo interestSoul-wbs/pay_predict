@@ -86,8 +86,6 @@ object VideoProfileGenerate {
       .join(part_14,joinKeysVideoId,"left")
       .join(part_15,joinKeysVideoId,"left")
 
-
-
     val part_21=orders.filter(
       col(Dic.colCreationTime).<(now)
       && col(Dic.colCreationTime).>=(pre_30)
