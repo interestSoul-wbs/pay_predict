@@ -14,10 +14,15 @@ import scala.collection.mutable
 
 object Utils {
 
-  // dataFrame信息打印函数
-  def udfPrintDf = udf(printDf _)
-  def printDf(df_name:String, df:DataFrame) = {
 
+  def printDf(df_name:String, df:DataFrame) = {
+   /**
+    * @description dataframe信息输出
+    * @author wx
+    * @param [df_name]
+    * @param [df]
+    * @return {@link void }
+    **/
     println("_____________________\n"*2)
     println(df_name)
     println("_____________________\n")
@@ -28,7 +33,6 @@ object Utils {
 
   }
 
-  def udfPrintArray = udf(printArray _)
   def printArray(array_name:String, array_self:Array[Row]) = {
 
     println("_____________________\n"*2)
@@ -68,9 +72,15 @@ object Utils {
     }
 
   }
-  //Long类型转换成时间
+
   def udfLongToDateTime = udf(longToDateTime _)
   def longToDateTime(time: Long) = {
+    /**
+     * @description Long类型转换成时间格式
+     * @author wx
+     * @param [time]
+     * @return {@link java.lang.String }
+     **/
     val newTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(time*1000)
     newTime
   }
@@ -189,6 +199,13 @@ object Utils {
   //根据 time_validity 和 resource_type 填充order中 discount_description 为 null的数值
   def udfFillDiscountDescription = udf(fillDiscountDescription _)
   def fillDiscountDescription(resourceType:Double, timeValidity:Int):String={
+    /**
+     * @description 订单打折描述填充
+     * @author wx
+     * @param [resourceType] 订单资源类型
+     * @param [timeValidity] 订单有效时长
+     * @return {@link java.lang.String }
+     **/
     var dis = ""
     if (resourceType == 0.0){
       dis = "单点"
@@ -207,9 +224,15 @@ object Utils {
 
   }
 
-//  创建时间与生效时间的计算 返回是否保留的标记
   def udfGetKeepSign = udf(getKeepSign _)
   def getKeepSign(creationTime:String, startTime: String):Int={
+    /**
+     * @description 创建时间与生效时间的计算 返回是否保留的标记
+     * @author wx
+     * @param [creationTime] 订单创建时间
+     * @param [startTime] 订单开始生效时间
+     * @return {@link int }
+     **/
     val sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:SS")
     val d1 = sdf.parse(creationTime)
     val d2 = sdf.parse(startTime)

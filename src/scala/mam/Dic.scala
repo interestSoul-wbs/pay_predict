@@ -10,10 +10,26 @@ object Dic {
   /**
    * play数据集中的属性
    */
+    //原始属性
   val colUserId = "user_id"
+
   val colPlayEndTime = "play_end_time"
   val colBroadcastTime =  "broadcast_time"
-  //还有一个video_id
+  //处理过程中添加
+  val colPlayStartTime ="play_start_time"
+  val colTimeSum = "time_sum"
+  val colStartTimeLeadSameVideo = "start_time_lead_Same_video"
+  val colStartTimeLeadPlay = "start_time_lead_play"
+  val colTimeGapLeadSameVideo = "time_gap_lead_same_video"
+  val colTimeGap30minSign = "timeGap_30min_sign"
+  val colTimeGap30minSignLag = "timeGap_30min_sign_lag"
+  val colTimeGap3hSign = "timeGap_3h_sign"
+  val colTimeGap3hSignLag = "timeGap_3h_sign_lag"
+  val colConvertEndTime = "convert_end_time"
+  val colSessionSign = "session_sign"
+
+
+  //还有一个video_id  colVideoId
 
   /**
    * medias数据集中的属性
@@ -51,7 +67,8 @@ object Dic {
   val colMoney="money"
   val colOrderStartTime="order_start_time"
   val colOrderEndTime="order_end_time"
-
+  val colTimeValidity = "time_validity"  //有效时长
+  val colKeepSign = "keep_sign" //筛选数据使用
 
 
   /**
@@ -77,10 +94,6 @@ object Dic {
   val colActiveDaysLast3Days = "active_days_last_3_days"
   //最近3天总的观看时间
   val colTotalTimeLast3Days = "total_time_last_3_days"
-
-
-
-
 
   //用户最近30天的观看付费视频总时长
   val colTotalTimePaidVideosLast30Days="total_time_paid_videos_last_30_days"
