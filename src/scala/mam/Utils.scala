@@ -3,14 +3,46 @@ package mam
 import java.text.SimpleDateFormat
 import java.util.Calendar
 
-import org.apache.spark.sql.functions.udf
+import org.apache.directory.shared.kerberos.codec.krbCredInfo.actions.StoreStartTime
+import org.apache.spark
+import org.apache.spark.sql
+import org.apache.spark.sql.{DataFrame, Dataset, Row}
+import org.apache.spark.sql.functions.{length, udf}
 
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
 
 object Utils {
+
+  // dataFrame信息打印函数
+  def udfPrintDf = udf(printDf _)
+  def printDf(df_name:String, df:DataFrame) = {
+
+    println("_____________________\n"*2)
+    println(df_name)
+    println("_____________________\n")
+    df.show(false)
+    println("_____________________\n")
+    df.printSchema()
+    println("_____________________\n"*2)
+
+  }
+
+  def udfPrintArray = udf(printArray _)
+  def printArray(array_name:String, array_self:Array[Row]) = {
+
+    println("_____________________\n"*2)
+    println(array_name)
+    println("_____________________\n")
+    array_self.take(10).foreach(println)
+    println("_____________________\n"*2)
+
+  }
+
+
+
   //orderProcess
-  def udfChangeDateFormat=udf(changeDateFormat _)
+  def udfChangeDateFormat=udf(changeDateFormat _)   //实名函数的注册 要在后面加 _(
   def changeDateFormat(date:String)= {
     if(date=="NULL"){
       "NULL"
@@ -30,6 +62,13 @@ object Utils {
     }
 
   }
+  //Long类型转换成时间
+  def udfLongToDateTime = udf(longToDateTime _)
+  def longToDateTime(time: Long) = {
+    val newTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(time*1000)
+    newTime
+  }
+
 
   def udfLongToTimestamp=udf(longToTimestamp _)
   def longToTimestamp(time:String)={
@@ -60,9 +99,10 @@ object Utils {
     if (arg.getClass.getName == "java.lang.String") 1 else 0
   }
 
-  def udfAddSuffix=udf(addSuffix _)
-  def addSuffix(playEndTime:String)={
-    playEndTime+" 00:00:00"
+
+  def udfAddSuffix = udf(addSuffix _)
+  def addSuffix(playEndTime:String) = {
+    playEndTime + " 00:00:00"
   }
 
 
@@ -85,7 +125,7 @@ object Utils {
     if(date==null){
       -1
     }else{
-      val sdf=new SimpleDateFormat("yyyy-MM-dd HH:mm:SS")
+      val sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:SS")
       val d1=sdf.parse(now)
       var d2=sdf.parse(now)
       if(date.length<19){
@@ -103,13 +143,51 @@ object Utils {
 
     }
 
+  }
+
+  //根据 time_validity 和 resource_type 填充order中 discount_description 为 null的数值
+  def udfFillDiscountDescription = udf(fillDiscountDescription _)
+  def fillDiscountDescription(resourceType:Double, timeValidity:Int):String={
+    var dis = ""
+    if (resourceType == 0.0){
+      dis = "单点"
+    }else{
+      if (timeValidity <= 31) {
+        dis = "包月"
+      }else if (timeValidity > 31 && timeValidity < 180) {
+        dis = "包季"
+      }else if(timeValidity >= 180 && timeValidity < 360 ){
+        dis =  "包半年"
+      }else if(timeValidity >= 360){
+        dis = "包年"
+      }
+    }
+    return dis
 
   }
+
+//  创建时间与生效时间的计算 返回是否保留的标记
+  def udfGetKeepSign = udf(getKeepSign _)
+  def getKeepSign(creationTime:String, startTime: String):Int={
+    val sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:SS")
+    val d1 = sdf.parse(creationTime)
+    val d2 = sdf.parse(startTime)
+
+    if (d1.getTime() <= d2.getTime() + 60000){  //创建时间小于生效时间加1min
+       1
+    } else{
+       0
+    }
+
+  }
+
+
+
   //类似于计算wordcount
   def udfGetLabelAndCount=udf(getLabelAndCount _)
   def getLabelAndCount(array:mutable.WrappedArray[String])={
-    val group_data=array.map(item=>(item,1)).groupBy(item=>item._1)
-    val res=group_data.map(tp => {
+    val group_data = array.map(item=>(item,1)).groupBy(item=>item._1)
+    val res = group_data.map(tp => {
       val list: mutable.WrappedArray[(String, Int)] = tp._2
       val counts: mutable.WrappedArray[Int] = list.map(t => t._2)
       (tp._1, counts.sum)
@@ -117,6 +195,7 @@ object Utils {
     //res
     ListMap(res.toSeq.sortWith(_._2 >_._2) :_ *)
   }
+
   def udfGetLabelAndCount2=udf(getLabelAndCount2 _)
   def getLabelAndCount2(array:mutable.WrappedArray[mutable.WrappedArray[String]])={
     //可变长数组
@@ -135,5 +214,15 @@ object Utils {
     //result
     ListMap(result.toSeq.sortWith(_._2 >_._2) :_ *)
   }
+
+//  def udfGetSign = udf(getSign _)
+//  def getSign(data: , timeGapCol: String):Int = {
+//    for(a <- 0 to 10){
+//      println(a)
+//    }
+//
+//    return 1
+//  }
+
 
 }
