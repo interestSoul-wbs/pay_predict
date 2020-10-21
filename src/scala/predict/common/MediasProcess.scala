@@ -1,8 +1,15 @@
 package predict.common
 
+/**
+ * @Author wj
+ * @Date 2020/09
+ * @Version 1.0
+ */
+
 import mam.Dic
 import mam.Utils.udfLongToTimestamp
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.ml.feature.Imputer
 import org.apache.spark.sql
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{SaveMode, SparkSession}
@@ -54,7 +61,7 @@ object MediasProcess {
     val mediasProcessedPath=hdfsPath+"data/predict/common/processed/mediastemp"
     val videoFirstCategoryTempPath=hdfsPath+"data/predict/common/processed/videofirstcategorytemp.txt"
     val videoSecondCategoryTempPath=hdfsPath+"data/predict/common/processed/videosecondcategorytemp.txt"
-    val labelTempPath=hdfsPath+"data/predict/common/processed/labeltemp.txt"///pay_predict/data/train/common/processed
+    val labelTempPath=hdfsPath+"data/predict/common/processed/labeltemp.txt"
     val df = spark.read
       .option("delimiter", "\t")
       .option("header", false)
@@ -95,7 +102,6 @@ object MediasProcess {
     val firstList=ListBuffer[String]()
     val secondList=ListBuffer[String]()
     result_3.foreach(row=>{
-      //println(row.get(0))
       val rs = row.getList(0)
       val mutableset = Set[String]()
       for (i <- 0 to rs.size() - 1) {
@@ -104,13 +110,9 @@ object MediasProcess {
           mutableset.add(temp(j))
       }
       var label: Array[String] = mutableset.mkString(",").split(",")
-      //val  file=new File()
-      //val out = new PrintWriter(labelTempPath)
       for (i<-0 to label.length-1) {
-          //out.println(i+"\t"+label(i))
         labelList.append(i+"\t"+label(i))
       }
-      //out.close()
 
     })
     //val rs=mutable.WrappedArray[String]
@@ -137,11 +139,12 @@ object MediasProcess {
 
     result_1.foreach(row=> {
       val rs = row.getList(0)
-      val mutableset = Set[String]()
+      val mutableSet = Set[String]()
       for (i <- 0 to rs.size() - 1) {
-        mutableset.add(rs.get(i))
+        if(!rs.get(i).asInstanceOf[String].contains("\""))
+          mutableSet.add(rs.get(i))
       }
-      var level_one: Array[String] = mutableset.mkString(",").split(",")
+      var level_one: Array[String] = mutableSet.mkString(",").split(",")
       //val  file=new File(videoFirstCategoryTempPath)
       //val out = new PrintWriter(videoFirstCategoryTempPath)
       for (i<-0 to level_one.length-1) {
@@ -151,23 +154,7 @@ object MediasProcess {
       //out.close()
     })
 
-    //df2.show()
-    //println(labelList)
-//    val writer1 = new PrintWriter(new File(labelTempPath))
-//    for(elem<-labelList){
-//      writer1.write(elem)
-//    }
-//    writer1.close()
-//    val writer2 = new PrintWriter(new File(videoSecondCategoryTempPath))
-//    for(elem<-secondList){
-//      writer2.write(elem)
-//    }
-//    writer2.close()
-//    val writer3 = new PrintWriter(new File(videoFirstCategoryTempPath))
-//    for(elem<-firstList){
-//      writer3.write(elem)
-//    }
-//    writer3.close()
+
 
     import spark.implicits._
     var labelCsv = labelList.toDF("content")
@@ -177,10 +164,18 @@ object MediasProcess {
     var secondCsv = secondList.toDF("content")
     secondCsv.coalesce(1).write.mode(SaveMode.Overwrite).option("header","false").csv(videoSecondCategoryTempPath)
 
+    //使用均值填充
+    val cols=Array(Dic.colScore,Dic.colVideoTime)
+    val imputer = new Imputer()
+      .setInputCols(cols)
+      .setOutputCols(cols)
+      .setStrategy("mean")
+
+    val df3=imputer.fit(df2).transform(df2)
 
 
 
-     df2.write.mode(SaveMode.Overwrite).format("parquet").save(mediasProcessedPath)
+     df3.write.mode(SaveMode.Overwrite).format("parquet").save(mediasProcessedPath)
      println("预测阶段媒资数据处理完成！")
 
 

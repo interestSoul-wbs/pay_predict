@@ -32,11 +32,12 @@ object RankTrainDatasetGenerate {
     val userProfilePreferencePartPath=hdfsPath+"data/train/common/processed/userprofilepreferencepart"+args(0)
     val userProfileOrderPartPath=hdfsPath+"data/train/common/processed/userprofileorderpart"+args(0)
     val videoProfilePath=hdfsPath+"data/train/common/processed/videoprofile"+args(0)
+    val videoVectorPath=hdfsPath+"data/train/common/processed/videovector"+args(0)
     val userProfilePlayPart = spark.read.format("parquet").load(userProfilePlayPartPath)
     val userProfilePreferencePart = spark.read.format("parquet").load(userProfilePreferencePartPath)
     val userProfileOrderPart = spark.read.format("parquet").load(userProfileOrderPartPath)
     val videoProfile=spark.read.format("parquet").load(videoProfilePath)
-
+    val videoVector=spark.read.format("parquet").load(videoVectorPath)
 
 
 
@@ -61,6 +62,7 @@ object RankTrainDatasetGenerate {
         col(Dic.colResourceType).===(0)
         && col(Dic.colCreationTime).>=(predictWindowStart)
         && col(Dic.colCreationTime).<=(predictWindowEnd)
+        && col(Dic.colOrderStatus).>(1)
       ).select(col(Dic.colUserId),col(Dic.colResourceId),col(Dic.colOrderStatus))
       .withColumnRenamed(Dic.colResourceId,Dic.colVideoId)
     var dataset1=orderSinglePoint.join(userProfile,joinKeysUserId,"inner")
@@ -90,34 +92,20 @@ object RankTrainDatasetGenerate {
 
     //第二部分的负样本
     //开始构造第三部分的样本,用户选自没有在订单中出现过的用户
-    val negativeUserN=20*temp.select(col(Dic.colUserId)).distinct().count()
+    val negativeUserN=10*temp.select(col(Dic.colUserId)).distinct().count()
     val negativeUsers=userProfile.select(col(Dic.colUserId)).except(temp.select(col(Dic.colUserId))).limit(negativeUserN.toInt)
-   // val negativeVideos=temp.select(col(Dic.colVideoId))
-    var dataset3=negativeUsers.crossJoin(popularVideo)
+    //val negativeVideos=temp.select(col(Dic.colVideoId)).distinct()
+    var dataset3=negativeUsers.crossJoin(popularVideo)//.sample(false,1/negativeVideos.count())
     dataset3=dataset3.withColumn(Dic.colOrderStatus,udfAddOrderStatus(col(Dic.colUserId))-1)
     println("第三部分数据条数："+dataset3.count())
 
     dataset3=dataset3.join(userProfile,joinKeysUserId,"inner")
     dataset3=dataset3.join(videoProfile,joinKeysVideoId,"inner")
     //dataset3.show()
-    var result=dataset1.union(dataset2).union(dataset3)
+    var result=dataset1.union(dataset2)//.union(dataset3)
+    result=result.join(videoVector,joinKeysVideoId,"left")
 
-    //result.show()
-//    val colList=userProfile.columns.toList
-//    val colTypeList=userProfile.dtypes.toList
-//    val mapColList=ArrayBuffer[String]()
-//    for(elem<- colTypeList){
-//      if(!elem._2.equals("StringType") && !elem._2.equals("IntegerType")
-//        && !elem._2.equals("DoubleType") && !elem._2.equals("LongType")){
-//        mapColList.append(elem._1)
-//      }
-//    }
-//    mapColList.foreach(println)
-//    val numColList=colList.diff(mapColList)
-//     result=result.na.fill(30,List(Dic.colDaysSinceLastPurchasePackage,Dic.colDaysSinceLastClickPackage,
-//      Dic.colDaysFromLastActive,Dic.colDaysSinceFirstActiveInTimewindow))
-//     result=result.na.fill(0,numColList)
-//
+
 //    val seq=mapColList.toSeq
 //    result.select(seq.map(result.col(_)):_*).show()
 
@@ -319,21 +307,21 @@ object RankTrainDatasetGenerate {
 //
 //    val test=testUser.crossJoin(testVideo)
 
-    result=result.withColumn("video_level_one_similarity",
-      udfCalFirstCategorySimilarity(col(Dic.colVideoOneLevelClassification),
-        col(Dic.colVideoOneLevelPreference),lit(videoFirstCategoryMap.mkString(","))))
-    result=result.withColumn("video_level_two_similarity",
-      udfCalSecondCategorySimilarity(col(Dic.colVideoTwoLevelClassificationList),
-        col(Dic.colVideoTwoLevelPreference),lit(videoSecondCategoryMap.mkString(","))))
-    result=result.withColumn("label_similarity",
-      udfCalLabelSimilarity(col(Dic.colVideoTagList),
-        col(Dic.colTagPreference),lit(labelMap.mkString(","))))
-     result=result.withColumn("movie_level_two_similarity",
-      udfCalSecondCategorySimilarity(col(Dic.colVideoTwoLevelClassificationList),
-        col(Dic.colMovieTwoLevelPreference),lit(videoSecondCategoryMap.mkString(","))))
-    result=result.withColumn("movie_tag_similarity",
-      udfCalLabelSimilarity(col(Dic.colVideoTagList),
-        col(Dic.colMovieTagPreference),lit(labelMap.mkString(","))))
+//    result=result.withColumn("video_level_one_similarity",
+//      udfCalFirstCategorySimilarity(col(Dic.colVideoOneLevelClassification),
+//        col(Dic.colVideoOneLevelPreference),lit(videoFirstCategoryMap.mkString(","))))
+//    result=result.withColumn("video_level_two_similarity",
+//      udfCalSecondCategorySimilarity(col(Dic.colVideoTwoLevelClassificationList),
+//        col(Dic.colVideoTwoLevelPreference),lit(videoSecondCategoryMap.mkString(","))))
+//    result=result.withColumn("label_similarity",
+//      udfCalLabelSimilarity(col(Dic.colVideoTagList),
+//        col(Dic.colTagPreference),lit(labelMap.mkString(","))))
+//     result=result.withColumn("movie_level_two_similarity",
+//      udfCalSecondCategorySimilarity(col(Dic.colVideoTwoLevelClassificationList),
+//        col(Dic.colMovieTwoLevelPreference),lit(videoSecondCategoryMap.mkString(","))))
+//    result=result.withColumn("movie_tag_similarity",
+//      udfCalLabelSimilarity(col(Dic.colVideoTagList),
+//        col(Dic.colMovieTagPreference),lit(labelMap.mkString(","))))
 //      .select(col(Dic.colVideoTwoLevelClassificationList),col(Dic.colMovieTwoLevelPreference),col("movie_level_two_similarity"),
 //        col(Dic.colVideoTagList),col(Dic.colMovieTagPreference),col("movie_tag_similarity")
 //        //col(Dic.colVideoTagList),col(Dic.colTagPreference),col("label_similarity"),
@@ -362,22 +350,23 @@ object RankTrainDatasetGenerate {
     colList-=Dic.colIsSingle
     colList-=Dic.colIsTrailers
     colList-=Dic.colIsPaid
-    colList-=Dic.colVideoTime
-    colList-=Dic.colScore
-//    colList.foreach(println)
-//    println(colList.length)
+    //colList-=Dic.colVideoTime
+    //colList-=Dic.colScore
+    //colList-=Dic.colPackageId
+    //colList.foreach(println)
+    //println(colList.length)
     val seqColList=colList.toSeq
     result=result.select(seqColList.map(result.col(_)):_*)
     result=result.na.fill(30,List(Dic.colDaysSinceLastPurchasePackage,Dic.colDaysSinceLastClickPackage,
       Dic.colDaysFromLastActive,Dic.colDaysSinceFirstActiveInTimewindow,Dic.colAbsOfNumberOfDaysBetweenStorageAndCurrent))
     result=result.na.fill(0)
-    result.show()
+    //result.show()
     println("总样本的条数"+result.count())
 
     val resultSavePath=hdfsPath+"data/train/singlepoint/ranktraindata"
     result.write.mode(SaveMode.Overwrite).format("parquet").save(resultSavePath+args(0)+"-"+args(2))
     val csvData=spark.read.format("parquet").load(resultSavePath+args(0)+"-"+args(2))
-    csvData.coalesce(1).write.mode(SaveMode.Overwrite).option("header","true").csv(resultSavePath+args(0)+"-"+args(2)+".csv")
+    csvData.write.mode(SaveMode.Overwrite).option("header","true").csv(resultSavePath+args(0)+"-"+args(2)+".csv")
     //result.write.mode(SaveMode.Overwrite).format("tfrecords").option("recordType", "Example").save(resultSavePath+args(0)+"-"+args(2)+".tfrecords")
 
 

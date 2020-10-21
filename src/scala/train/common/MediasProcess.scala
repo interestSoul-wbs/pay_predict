@@ -1,5 +1,9 @@
 package train.common
-
+/**
+ * @Author wj
+ * @Date 2020/09
+ * @Version 1.0
+ */
 import java.io.{File, PrintWriter}
 import java.text.SimpleDateFormat
 
@@ -7,9 +11,11 @@ import mam.Dic
 import mam.Utils.udfLongToTimestamp
 import org.apache.log4j.{Level, Logger}
 import org.apache.parquet.schema.Types.ListBuilder
+import org.apache.spark.ml.feature.Imputer
 import org.apache.spark.{SparkConf, SparkContext, sql}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{SaveMode, SparkSession}
+import org.apache.spark.ml.feature.Imputer
 
 import scala.collection.mutable
 import scala.collection.mutable.{ListBuffer, Set} // 可以在任何地方引入 可变集合
@@ -23,7 +29,7 @@ object MediasProcess {
     Logger.getLogger("org").setLevel(Level.ERROR)
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("MediasProcess")
-      .master("local[6]")
+      //.master("local[6]")
       .getOrCreate()
 
     val schema= StructType(
@@ -51,8 +57,8 @@ object MediasProcess {
         StructField(Dic.colIntroduction, StringType)
       )
     )
-    //val hdfsPath="hdfs:///pay_predict"
-    val hdfsPath=""
+    val hdfsPath="hdfs:///pay_predict/"
+    //val hdfsPath=""
     import org.apache.spark.sql.functions._
     val mediasRawPath=hdfsPath+"data/train/common/raw/medias/medias.txt"
     val mediasProcessedPath=hdfsPath+"data/train/common/processed/mediastemp"
@@ -95,6 +101,7 @@ object MediasProcess {
     val result_1=df2.select(collect_list(Dic.colVideoOneLevelClassification)).collect()
     val result_2=df2.select(collect_list(Dic.colVideoTwoLevelClassificationList)).collect()
     val result_3=df2.select(collect_list(Dic.colVideoTagList)).collect()
+    //result_1.show()
     val labelList=ListBuffer[String]()
     val firstList=ListBuffer[String]()
     val secondList=ListBuffer[String]()
@@ -141,37 +148,23 @@ object MediasProcess {
 
     result_1.foreach(row=> {
       val rs = row.getList(0)
-      val mutableset = Set[String]()
+      val mutableSet = Set[String]()
       for (i <- 0 to rs.size() - 1) {
-        mutableset.add(rs.get(i))
+        if(!rs.get(i).asInstanceOf[String].contains("\""))
+          mutableSet.add(rs.get(i))
       }
-      var level_one: Array[String] = mutableset.mkString(",").split(",")
-      //val  file=new File(videoFirstCategoryTempPath)
-      //val out = new PrintWriter(videoFirstCategoryTempPath)
+      //mutableSet.foreach(println)
+      var level_one: Array[String] = mutableSet.mkString(",").split(",")
+      //println(mutableSet.mkString(","))
       for (i<-0 to level_one.length-1) {
          // out.println(i+"\t"+level_one(i))
         firstList.append(i+"\t"+level_one(i))
+        //println(level_one(i))
       }
       //out.close()
     })
 
-    //df2.show()
-    //println(labelList)
-//    val writer1 = new PrintWriter(new File(labelTempPath))
-//    for(elem<-labelList){
-//      writer1.write(elem)
-//    }
-//    writer1.close()
-//    val writer2 = new PrintWriter(new File(videoSecondCategoryTempPath))
-//    for(elem<-secondList){
-//      writer2.write(elem)
-//    }
-//    writer2.close()
-//    val writer3 = new PrintWriter(new File(videoFirstCategoryTempPath))
-//    for(elem<-firstList){
-//      writer3.write(elem)
-//    }
-//    writer3.close()
+
 
     import spark.implicits._
     var labelCsv = labelList.toDF("content")
@@ -181,10 +174,16 @@ object MediasProcess {
     var secondCsv = secondList.toDF("content")
     secondCsv.coalesce(1).write.mode(SaveMode.Overwrite).option("header","false").csv(videoSecondCategoryTempPath)
 
+    //score和VideoTime使用均值填充
+    val cols=Array(Dic.colScore,Dic.colVideoTime)
+    val imputer = new Imputer()
+      .setInputCols(cols)
+      .setOutputCols(cols)
+      .setStrategy("mean")
 
-
-
-     df2.write.mode(SaveMode.Overwrite).format("parquet").save(mediasProcessedPath)
+    val df3=imputer.fit(df2).transform(df2)
+     //df3.show()
+     df3.write.mode(SaveMode.Overwrite).format("parquet").save(mediasProcessedPath)
      println("媒资数据处理完成！")
 
 

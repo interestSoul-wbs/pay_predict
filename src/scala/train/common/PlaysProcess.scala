@@ -26,8 +26,8 @@ object PlaysProcess {
       )
     )
     import org.apache.spark.sql.functions._
-    //val hdfsPath="hdfs:///pay_predict/"
-    val hdfsPath=""
+    val hdfsPath="hdfs:///pay_predict/"
+    //val hdfsPath=""
     val playRawPath=hdfsPath+"data/train/common/raw/plays/behavior_*.txt"
     val playProcessedPath=hdfsPath+"data/train/common/processed/plays"
     val df = spark.read

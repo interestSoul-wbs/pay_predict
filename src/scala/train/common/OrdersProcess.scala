@@ -1,4 +1,9 @@
 package train.common
+/**
+ * @Author wj
+ * @Date 2020/09
+ * @Version 1.0
+ */
 
 import java.text.SimpleDateFormat
 
@@ -18,7 +23,7 @@ object OrdersProcess {
       Logger.getLogger("org").setLevel(Level.ERROR)
       val spark: SparkSession = new sql.SparkSession.Builder()
         .appName("OrdersProcess")
-        .master("local[6]")
+        //.master("local[6]")
         .getOrCreate()
       val schema= StructType(
         List(
@@ -37,8 +42,8 @@ object OrdersProcess {
       )
        //hdfs:///pay_predict/
       import org.apache.spark.sql.functions._
-      //val hdfsPath="hdfs:///pay_predict/"
-      val hdfsPath=""
+      val hdfsPath="hdfs:///pay_predict/"
+      //val hdfsPath=""
       val orderRawPath=hdfsPath+"data/train/common/raw/orders/order*.txt"
       val orderProcessedPath=hdfsPath+"data/train/common/processed/orders"
       val df = spark.read
