@@ -3,14 +3,50 @@ package mam
 import java.text.SimpleDateFormat
 import java.util.Calendar
 
-import org.apache.spark.sql.functions.udf
+import org.apache.directory.shared.kerberos.codec.krbCredInfo.actions.StoreStartTime
+import org.apache.spark
+import org.apache.spark.sql
+import org.apache.spark.sql.{DataFrame, Dataset, Row}
+import org.apache.spark.sql.functions.{length, udf}
 
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
 
 object Utils {
+
+
+  def printDf(df_name:String, df:DataFrame) = {
+   /**
+    * @description dataframe信息输出
+    * @author wx
+    * @param [df_name]
+    * @param [df]
+    * @return {@link void }
+    **/
+    println("_____________________\n"*2)
+    println(df_name)
+    println("_____________________\n")
+    df.show(false)
+    println("_____________________\n")
+    df.printSchema()
+    println("_____________________\n"*2)
+
+  }
+
+  def printArray(array_name:String, array_self:Array[Row]) = {
+
+    println("_____________________\n"*2)
+    println(array_name)
+    println("_____________________\n")
+    array_self.take(10).foreach(println)
+    println("_____________________\n"*2)
+
+  }
+
+
+
   //orderProcess
-  def udfChangeDateFormat=udf(changeDateFormat _)
+  def udfChangeDateFormat=udf(changeDateFormat _)   //实名函数的注册 要在后面加 _(
   def changeDateFormat(date:String)= {
     /**
     *@author wj
@@ -36,6 +72,19 @@ object Utils {
     }
 
   }
+
+  def udfLongToDateTime = udf(longToDateTime _)
+  def longToDateTime(time: Long) = {
+    /**
+     * @description Long类型转换成时间格式
+     * @author wx
+     * @param [time]
+     * @return {@link java.lang.String }
+     **/
+    val newTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(time*1000)
+    newTime
+  }
+
 
   def udfLongToTimestamp=udf(longToTimestamp _)
   def longToTimestamp(time:String)={
@@ -96,7 +145,7 @@ object Utils {
   }
 
 
-
+  //工具函数，计算一个日期加上几天后的日期
   def calDate(date:String,days:Int):String={
     /**
     *@author wj
@@ -145,8 +194,59 @@ object Utils {
 
     }
 
+  }
+
+  //根据 time_validity 和 resource_type 填充order中 discount_description 为 null的数值
+  def udfFillDiscountDescription = udf(fillDiscountDescription _)
+  def fillDiscountDescription(resourceType:Double, timeValidity:Int):String={
+    /**
+     * @description 订单打折描述填充
+     * @author wx
+     * @param [resourceType] 订单资源类型
+     * @param [timeValidity] 订单有效时长
+     * @return {@link java.lang.String }
+     **/
+    var dis = ""
+    if (resourceType == 0.0){
+      dis = "单点"
+    }else{
+      if (timeValidity <= 31) {
+        dis = "包月"
+      }else if (timeValidity > 31 && timeValidity < 180) {
+        dis = "包季"
+      }else if(timeValidity >= 180 && timeValidity < 360 ){
+        dis =  "包半年"
+      }else if(timeValidity >= 360){
+        dis = "包年"
+      }
+    }
+    return dis
 
   }
+
+  def udfGetKeepSign = udf(getKeepSign _)
+  def getKeepSign(creationTime:String, startTime: String):Int={
+    /**
+     * @description 创建时间与生效时间的计算 返回是否保留的标记
+     * @author wx
+     * @param [creationTime] 订单创建时间
+     * @param [startTime] 订单开始生效时间
+     * @return {@link int }
+     **/
+    val sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:SS")
+    val d1 = sdf.parse(creationTime)
+    val d2 = sdf.parse(startTime)
+
+    if (d1.getTime() <= d2.getTime() + 60000){  //创建时间小于生效时间加1min
+       1
+    } else{
+       0
+    }
+
+  }
+
+
+
   //类似于计算wordcount
   def udfGetLabelAndCount=udf(getLabelAndCount _)
   def getLabelAndCount(array:mutable.WrappedArray[String])={
@@ -165,6 +265,7 @@ object Utils {
     //res
     ListMap(res.toSeq.sortWith(_._2 >_._2) :_ *)
   }
+
   def udfGetLabelAndCount2=udf(getLabelAndCount2 _)
   def getLabelAndCount2(array:mutable.WrappedArray[mutable.WrappedArray[String]])={
     /**
@@ -189,6 +290,5 @@ object Utils {
     //result
     ListMap(result.toSeq.sortWith(_._2 >_._2) :_ *)
   }
-  
 
 }
