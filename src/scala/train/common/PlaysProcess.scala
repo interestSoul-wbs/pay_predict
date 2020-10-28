@@ -1,7 +1,7 @@
 package train.common
 
 import mam.Dic
-import mam.Utils.udfAddSuffix
+import mam.Utils.{printDf, udfAddSuffix}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
 import org.apache.spark.sql.functions.udf
@@ -36,6 +36,8 @@ object PlaysProcess {
       .schema(schema)
       .csv(playRawPath)
 
+    printDf("df",df)
+
      val df1=df.withColumn(Dic.colPlayEndTime,substring(col(Dic.colPlayEndTime),0,10))
      val df2=df1.groupBy(col(Dic.colUserId),col(Dic.colVideoId),col(Dic.colPlayEndTime))
      val df3=df2.agg(sum(col(Dic.colBroadcastTime)) as Dic.colBroadcastTime)
@@ -44,6 +46,7 @@ object PlaysProcess {
      val df5=df4.orderBy(col(Dic.colUserId),col(Dic.colPlayEndTime))
      val df6=df5.withColumn(Dic.colPlayEndTime,udfAddSuffix(col(Dic.colPlayEndTime)))
      //df6.show()
+    printDf("df6",df6)
      df6.write.mode(SaveMode.Overwrite).format("parquet").save(playProcessedPath)
      println("播放数据处理完成！")
   }

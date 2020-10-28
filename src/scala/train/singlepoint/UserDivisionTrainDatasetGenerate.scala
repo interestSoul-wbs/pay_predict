@@ -1,7 +1,7 @@
 package train.singlepoint
 
 import mam.Dic
-import mam.Utils.{udfAddOrderStatus, udfGetString}
+import mam.Utils.{printDf, udfAddOrderStatus, udfGetString}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
 import org.apache.spark.sql.functions.udf
@@ -35,6 +35,11 @@ object UserDivisionTrainDatasetGenerate {
     val joinKeysUserId = Seq(Dic.colUserId)
     val temp=userProfilePlayPart.join(userProfilePreferencePart,joinKeysUserId,"left")
     val userProfiles=temp.join(userProfileOrderPart,joinKeysUserId,"left")
+
+    printDf("userProfilePlayPart",userProfilePlayPart)
+    printDf("userProfilePreferencePart",userProfilePreferencePart)
+    printDf("userProfileOrderPart",userProfileOrderPart)
+    printDf("orders",orders)
 
     //println(orders.count())
    // println(userProfiles.count())
@@ -106,6 +111,7 @@ object UserDivisionTrainDatasetGenerate {
 //    // rescale each feature to range [min, max].
 //    val scaledData = scaleModel.transform(allUsersConcat)
     val dataPath=hdfsPath+"data/train/singlepoint/userdivisiontraindata"
+    printDf("allUsersNotNull",allUsersNotNull)
     allUsersNotNull.write.mode(SaveMode.Overwrite).format("parquet").save(dataPath+args(0)+"-"+args(2))
     allUsersNotNull.write.mode(SaveMode.Overwrite).option("header","true").csv(dataPath+args(0)+"-"+args(2)+".csv")
 

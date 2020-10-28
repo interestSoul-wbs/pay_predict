@@ -4,7 +4,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 
 import mam.Dic
-import mam.Utils.{calDate, udfAddOrderStatus}
+import mam.Utils.{calDate, printDf, udfAddOrderStatus}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
 import org.apache.spark.sql.functions.{col, isnull, udf}
@@ -37,6 +37,7 @@ object UserSplit {
     val timeWindow=30
 
     val play = spark.read.format("parquet").load(playsProcessedPath)
+    printDf("plays",play)
     //所有用户id的列表
     val allUsersList=play.select(col(Dic.colUserId)).distinct().collect().map(_(0)).toList
     //所有用户id的dataframe
@@ -47,6 +48,7 @@ object UserSplit {
 
 
     val orderAll = spark.read.format("parquet").load(ordersProcessedPath)
+    printDf("orders",orderAll)
     // 选择套餐订单
     val orderPackage=orderAll
       .filter(
@@ -102,6 +104,7 @@ object UserSplit {
 
     //trainOldResult.show()
     println("老用户数据集生成完成！")
+    printDf("trainOldResult",trainOldResult)
     trainOldResult.write.mode(SaveMode.Overwrite).format("parquet").save(oldUserSavePath+"trainusersold"+args(0))
 
 
@@ -147,6 +150,7 @@ object UserSplit {
 
 
     println("新用户数据集生成完成！")
+    printDf("trainNewResult",trainNewResult)
     trainNewResult.write.mode(SaveMode.Overwrite).format("parquet").save(newUserSavePath+"trainusersnew"+args(0))
 
 

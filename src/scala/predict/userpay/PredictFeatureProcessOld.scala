@@ -1,6 +1,7 @@
 package predict.userpay
 
 import mam.Dic
+import mam.Utils.{printDf, udfFillPreference, udfFillPreferenceIndex}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
 import org.apache.spark.sql.{SaveMode, SparkSession}
@@ -40,6 +41,12 @@ object  PredictFeatureProcessOld {
     val userProfiles=temp.join(userProfileOrderPart,joinKeysUserId,"left")
     //    val orders = spark.read.format("parquet").load(orderProcessedPath).toDF()
     val userList=spark.read.format("parquet").load(userListPath)
+
+    printDf("userProfilePlayPart",userProfilePlayPart)
+    printDf("userProfilePreferencePart",userProfilePreferencePart)
+    printDf("userProfileOrderPart",userProfileOrderPart)
+    printDf("userList",userList)
+    
     val trainSet=userList.join(userProfiles,joinKeysUserId,"left")
     //trainSet.show()
     //println(trainSet.count())
@@ -100,21 +107,7 @@ object  PredictFeatureProcessOld {
 
     var tempDataFrame=trainSetNotNull
     //tempDataFrame.show()
-    def udfFillPreference=udf(fillPreference _)
-    def fillPreference(prefer:Map[String,Int],offset:Int)={
-      if(prefer==null){
-        null
-      }else{
-        val mapArray=prefer.toArray
-        if (mapArray.length>offset-1){
-          mapArray(offset-1)._1
-        }else{
-          null
-        }
 
-      }
-
-    }
 
     for(elem<-pre){
       tempDataFrame=tempDataFrame.withColumn(elem+"_1",udfFillPreference(col(elem),lit(1)))
@@ -123,18 +116,7 @@ object  PredictFeatureProcessOld {
     }
     // tempDataFrame.show()
     //tempDataFrame.filter(!isnull(col("video_one_level_preference_1"))).show()
-    def udfFillPreferenceIndex=udf(fillPreferenceIndex _)
-    def fillPreferenceIndex(prefer:String,mapLine:String)={
-      if(prefer==null){
-        null
-      }else{
-        var tempMap: Map[String, Int] = Map()
-        var lineIterator1 = mapLine.split(",")
-        //迭代打印所有行
-        lineIterator1.foreach(m=>tempMap += (m.split(" -> ")(0) -> m.split(" -> ")(1).toInt))
-        tempMap.get(prefer)
-      }
-    }
+
 
     for(elem<-pre){
       if(elem.contains(Dic.colVideoOneLevelPreference)){
@@ -167,6 +149,7 @@ object  PredictFeatureProcessOld {
     }
 
     val result=tempDataFrame.select(columnList.map(tempDataFrame.col(_)):_*)
+    printDf("result",result)
     //result.show()
     result.write.mode(SaveMode.Overwrite).format("parquet").save(predictSetSavePath+"predictsetold"+args(0))
     result.write.mode(SaveMode.Overwrite).option("header","true").csv(predictSetSavePath + "predictsetold" + args(0)+".csv")

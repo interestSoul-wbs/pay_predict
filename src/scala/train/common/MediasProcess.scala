@@ -8,7 +8,7 @@ import java.io.{File, PrintWriter}
 import java.text.SimpleDateFormat
 
 import mam.Dic
-import mam.Utils.udfLongToTimestamp
+import mam.Utils.{printArray, printDf, udfLongToTimestamp}
 import org.apache.log4j.{Level, Logger}
 import org.apache.parquet.schema.Types.ListBuilder
 import org.apache.spark.ml.feature.Imputer
@@ -70,6 +70,9 @@ object MediasProcess {
       .option("header", false)
       .schema(schema)
       .csv(mediasRawPath)
+
+    printDf("df",df)
+
     val df1=df.withColumn(Dic.colDirectorList,from_json(col(Dic.colDirectorList), ArrayType(StringType, containsNull = true)))
            .withColumn(Dic.colVideoTwoLevelClassificationList,from_json(col(Dic.colVideoTwoLevelClassificationList), ArrayType(StringType, containsNull = true)))
            .withColumn(Dic.colVideoTagList,from_json(col(Dic.colVideoTagList), ArrayType(StringType, containsNull = true)))
@@ -102,6 +105,10 @@ object MediasProcess {
     val result_2=df2.select(collect_list(Dic.colVideoTwoLevelClassificationList)).collect()
     val result_3=df2.select(collect_list(Dic.colVideoTagList)).collect()
     //result_1.show()
+//    printArray("result_1",result_1)
+//    printArray("result_2",result_2)
+//    printArray("result_3",result_3)
+
     val labelList=ListBuffer[String]()
     val firstList=ListBuffer[String]()
     val secondList=ListBuffer[String]()
@@ -174,6 +181,11 @@ object MediasProcess {
     var secondCsv = secondList.toDF("content")
     secondCsv.coalesce(1).write.mode(SaveMode.Overwrite).option("header","false").csv(videoSecondCategoryTempPath)
 
+    printDf("labelCsv",labelCsv)
+    printDf("firstCsv",firstCsv)
+    printDf("secondCsv",firstCsv)
+
+
     //score和VideoTime使用均值填充
     val cols=Array(Dic.colScore,Dic.colVideoTime)
     val imputer = new Imputer()
@@ -183,6 +195,7 @@ object MediasProcess {
 
     val df3=imputer.fit(df2).transform(df2)
      //df3.show()
+    printDf("df3",df3)
      df3.write.mode(SaveMode.Overwrite).format("parquet").save(mediasProcessedPath)
      println("媒资数据处理完成！")
 

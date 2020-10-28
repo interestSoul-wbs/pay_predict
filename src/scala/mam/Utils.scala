@@ -290,5 +290,58 @@ object Utils {
     //result
     ListMap(result.toSeq.sortWith(_._2 >_._2) :_ *)
   }
+  def udfBreak=udf(break _)
+  def break(array:Object,index:Int) ={
+    /**
+    *@author wj
+    *@param [array, index]
+    *@return double
+    *@description 将一个vector拆分成多个列
+    */
+    val vectorString=array.toString
+    vectorString.substring(1,vectorString.length-1).split(",")(index).toDouble
+    //(Vector)
+
+  }
+  def udfFillPreference=udf(fillPreference _)
+  def fillPreference(prefer:Map[String,Int],offset:Int)={
+    /**
+    *@author wj
+    *@param [prefer, offset]
+    *@return java.lang.String
+    *@description   新添加一列，将该列填充为prefer中的标签
+    */
+    if(prefer==null){
+      null
+    }else{
+      val mapArray=prefer.toArray
+      if (mapArray.length>offset-1){
+        mapArray(offset-1)._1
+      }else{
+        null
+      }
+
+    }
+
+  }
+  def udfFillPreferenceIndex=udf(fillPreferenceIndex _)
+  def fillPreferenceIndex(prefer:String,mapLine:String)={
+    /**
+    *@author wj
+    *@param [prefer, mapLine]
+    *@return scala.Option<java.lang.Object>
+    *@description  将udfFillPreference填充的标签，转化为标签对应的index
+    */
+    if(prefer==null){
+      null
+    }else{
+      var tempMap: Map[String, Int] = Map()
+      var lineIterator1 = mapLine.split(",")
+      //迭代打印所有行
+      lineIterator1.foreach(m=>tempMap += (m.split(" -> ")(0) -> m.split(" -> ")(1).toInt))
+      tempMap.get(prefer)
+    }
+  }
+
 
 }
