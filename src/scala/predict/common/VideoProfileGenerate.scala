@@ -1,7 +1,7 @@
 package predict.common
 
 import mam.Dic
-import mam.Utils.{calDate, udfGetDays}
+import mam.Utils.{calDate, printDf, udfGetDays}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
 import org.apache.spark.sql.{SaveMode, SparkSession}
@@ -24,6 +24,10 @@ object VideoProfileGenerate {
     val medias = spark.read.format("parquet").load(medias_path)
     val plays = spark.read.format("parquet").load(plays_path)
     val orders = spark.read.format("parquet").load(orders_path)
+
+    printDf("medias",medias)
+    printDf("plays",plays)
+    printDf("orders",orders)
 
 
     val pre_30 = calDate(now, -30)
@@ -163,6 +167,8 @@ object VideoProfileGenerate {
 
    // result10.show()
     //result11.show()
+
+    printDf("result",result)
 
     val videoProfilePath=hdfsPath+"data/predict/common/processed/videoprofile"+now.split(" ")(0)
    // val videoProfileSavePath="pay_predict/data/train/common/processed/videoprofile.csv"

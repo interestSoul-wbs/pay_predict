@@ -7,7 +7,7 @@ package predict.common
  */
 
 import mam.Dic
-import mam.Utils.udfLongToTimestamp
+import mam.Utils.{printDf, udfLongToTimestamp}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.ml.feature.Imputer
 import org.apache.spark.sql
@@ -67,6 +67,9 @@ object MediasProcess {
       .option("header", false)
       .schema(schema)
       .csv(mediasRawPath)
+
+    printDf("df",df)
+
     val df1=df.withColumn(Dic.colDirectorList,from_json(col(Dic.colDirectorList), ArrayType(StringType, containsNull = true)))
            .withColumn(Dic.colVideoTwoLevelClassificationList,from_json(col(Dic.colVideoTwoLevelClassificationList), ArrayType(StringType, containsNull = true)))
            .withColumn(Dic.colVideoTagList,from_json(col(Dic.colVideoTagList), ArrayType(StringType, containsNull = true)))
@@ -164,6 +167,10 @@ object MediasProcess {
     var secondCsv = secondList.toDF("content")
     secondCsv.coalesce(1).write.mode(SaveMode.Overwrite).option("header","false").csv(videoSecondCategoryTempPath)
 
+    printDf("labelCsv",labelCsv)
+    printDf("firstCsv",firstCsv)
+    printDf("secondCsv",firstCsv)
+
     //使用均值填充
     val cols=Array(Dic.colScore,Dic.colVideoTime)
     val imputer = new Imputer()
@@ -173,7 +180,7 @@ object MediasProcess {
 
     val df3=imputer.fit(df2).transform(df2)
 
-
+    printDf("df3",df3)
 
      df3.write.mode(SaveMode.Overwrite).format("parquet").save(mediasProcessedPath)
      println("预测阶段媒资数据处理完成！")

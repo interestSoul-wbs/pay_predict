@@ -1,6 +1,7 @@
 package predict.common
 
 import mam.Dic
+import mam.Utils.printDf
 import org.apache.avro.SchemaBuilder.array
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
@@ -25,7 +26,7 @@ object VideoVectorGenerate {
       .filter(col(Dic.colPlayEndTime).<(args(0)+" "+args(1)))
       .groupBy(col(Dic.colUserId))
       .agg(collect_list(col(Dic.colVideoId)).as("video_list"))
-
+    printDf("plays",plays)
     val vectorDimension=64
     val w2vModel=new Word2Vec()
       .setInputCol("video_list")
@@ -46,6 +47,7 @@ object VideoVectorGenerate {
     for(i <- 0 to vectorDimension-1)
       videoDict=videoDict.withColumn("v_"+i,udfBreak(col("vector"),lit(i))).withColumnRenamed("word",Dic.colVideoId)
 
+    printDf("videoDict",videoDict)
     val videoVectorPath=hdfsPath+"data/predict/common/processed/videovector"+args(0)
     videoDict.write.mode(SaveMode.Overwrite).format("parquet").save(videoVectorPath)
     //wordDict

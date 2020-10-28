@@ -1,6 +1,6 @@
 package train.common
 
-import mam.Utils.{calDate, udfGetDays}
+import mam.Utils.{calDate, printDf, udfGetDays}
 import mam.Dic
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
@@ -22,6 +22,9 @@ object UserProfileGenerateOrderPart {
     //val medias = spark.read.format("parquet").load(medias_path)
     val plays = spark.read.format("parquet").load(plays_path)
     val orders = spark.read.format("parquet").load(orders_path)
+
+    printDf("plays",plays)
+    printDf("orders",orders)
 
 
     var result = plays.select(col(Dic.colUserId)).distinct()
@@ -175,7 +178,7 @@ object UserProfileGenerateOrderPart {
     .join(order_part_12,joinKeysUserId, "left")
 
    // result49.show()
-
+    printDf("result",result)
     val userProfileOrderPartSavePath=hdfsPath+"data/train/common/processed/userprofileorderpart"+now.split(" ")(0)
     //大约有85万用户
     result.write.mode(SaveMode.Overwrite).format("parquet").save(userProfileOrderPartSavePath)

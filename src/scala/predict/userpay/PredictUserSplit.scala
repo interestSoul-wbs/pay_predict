@@ -1,7 +1,7 @@
 package predict.userpay
 
 import mam.Dic
-import mam.Utils.calDate
+import mam.Utils.{calDate, printDf}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
 import org.apache.spark.sql.{SaveMode, SparkSession}
@@ -31,6 +31,7 @@ object PredictUserSplit {
     val timeWindow=30
 
     val play = spark.read.format("parquet").load(playsProcessedPath)
+    printDf("plays",play)
     //所有用户id的列表
     val allUsersList=play.select(col(Dic.colUserId)).distinct().collect().map(_(0)).toList
     //所有用户id的dataframe
@@ -41,6 +42,7 @@ object PredictUserSplit {
 
 
     val orderAll = spark.read.format("parquet").load(ordersProcessedPath)
+    printDf("orders",orderAll)
     // 选择套餐订单
     val orderPackage=orderAll
       .filter(
@@ -72,6 +74,8 @@ object PredictUserSplit {
     //println("预测数据集生成完成！")
     println("需要预测的老用户的数量："+predictOld.count())
     println("需要预测的新用户的数量："+predictNew.count())
+    printDf("predictOld",predictOld)
+    printDf("predictNew",predictNew)
     predictOld.write.mode(SaveMode.Overwrite).format("parquet").save(oldUserSavePath+"predictusersold"+args(0))
     predictNew.write.mode(SaveMode.Overwrite).format("parquet").save(oldUserSavePath+"predictusersnew"+args(0))
 

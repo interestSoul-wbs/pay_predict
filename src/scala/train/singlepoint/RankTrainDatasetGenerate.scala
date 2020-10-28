@@ -2,7 +2,7 @@ package train.singlepoint
 
 import mam.Dic
 import mam.Utils
-import mam.Utils.{calDate, udfAddOrderStatus}
+import mam.Utils.{calDate, printDf, udfAddOrderStatus}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
 import org.apache.spark.sql.{SaveMode, SparkSession}
@@ -38,6 +38,12 @@ object RankTrainDatasetGenerate {
     val userProfileOrderPart = spark.read.format("parquet").load(userProfileOrderPartPath)
     val videoProfile=spark.read.format("parquet").load(videoProfilePath)
     val videoVector=spark.read.format("parquet").load(videoVectorPath)
+
+    printDf("userProfilePlayPart",userProfilePlayPart)
+    printDf("userProfilePreferencePart",userProfilePreferencePart)
+    printDf("userProfileOrderPart",userProfileOrderPart)
+    printDf("videoProfile",videoProfile)
+    printDf("videoVector",videoVector)
 
 
 
@@ -362,6 +368,8 @@ object RankTrainDatasetGenerate {
     result=result.na.fill(0)
     //result.show()
     println("总样本的条数"+result.count())
+
+    printDf("result",result)
 
     val resultSavePath=hdfsPath+"data/train/singlepoint/ranktraindata"
     result.write.mode(SaveMode.Overwrite).format("parquet").save(resultSavePath+args(0)+"-"+args(2))

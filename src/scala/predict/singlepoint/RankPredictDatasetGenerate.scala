@@ -1,6 +1,7 @@
 package predict.singlepoint
 
 import mam.Dic
+import mam.Utils.printDf
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
 import org.apache.spark.sql.{SaveMode, SparkSession}
@@ -38,6 +39,14 @@ object RankPredictDatasetGenerate {
     val userDivisionResult=spark.read.format("parquet").load(userDivisionResultPath)
     val videoProfile=spark.read.format("parquet").load(videoProfilePath)
     val videoVector=spark.read.format("parquet").load(videoVectorPath)
+
+    printDf("userDivisionResult",userDivisionResult)
+    printDf("userProfilePlayPart",userProfilePlayPart)
+    printDf("userProfilePreferencePart",userProfilePreferencePart)
+    printDf("userProfileOrderPart",userProfileOrderPart)
+    printDf("videoProfile",videoProfile)
+    printDf("videoVector",videoVector)
+    printDf("orders",orders)
 
 
     val joinKeysUserId=Seq(Dic.colUserId)
@@ -93,6 +102,8 @@ object RankPredictDatasetGenerate {
     result=result.na.fill(0)
     //result.show()
     println("总样本的条数"+result.count())
+
+    printDf("result",result)
 
     val resultSavePath=hdfsPath+"data/predict/singlepoint/rankpredictdata"
     result.write.mode(SaveMode.Overwrite).format("parquet").save(resultSavePath+args(0)+"-"+args(2))
