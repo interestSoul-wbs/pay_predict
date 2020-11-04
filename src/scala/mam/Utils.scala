@@ -61,7 +61,7 @@ object Utils {
       try{
         val sdf=new SimpleDateFormat("yyyyMMddHHmmSS")
         val dt:Long=sdf.parse(date).getTime()
-        val new_time: String = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(dt)
+        val new_time: String = new SimpleDateFormat("yyyy-MM-dd HH:mm:SS").format(dt)
         new_time
       }
       catch{
