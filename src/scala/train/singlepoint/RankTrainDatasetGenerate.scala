@@ -39,11 +39,11 @@ object RankTrainDatasetGenerate {
     val videoProfile=spark.read.format("parquet").load(videoProfilePath)
     val videoVector=spark.read.format("parquet").load(videoVectorPath)
 
-    printDf("userProfilePlayPart",userProfilePlayPart)
-    printDf("userProfilePreferencePart",userProfilePreferencePart)
-    printDf("userProfileOrderPart",userProfileOrderPart)
-    printDf("videoProfile",videoProfile)
-    printDf("videoVector",videoVector)
+    printDf("输入  userProfilePlayPart",userProfilePlayPart)
+    printDf("输入  userProfilePreferencePart",userProfilePreferencePart)
+    printDf("输入  userProfileOrderPart",userProfileOrderPart)
+    printDf("输入  videoProfile",videoProfile)
+    printDf("输入  videoVector",videoVector)
 
 
 
@@ -369,7 +369,7 @@ object RankTrainDatasetGenerate {
     //result.show()
     println("总样本的条数"+result.count())
 
-    printDf("result",result)
+    printDf("输出  rankTrainData",result)
 
     val resultSavePath=hdfsPath+"data/train/singlepoint/ranktraindata"
     result.write.mode(SaveMode.Overwrite).format("parquet").save(resultSavePath+args(0)+"-"+args(2))

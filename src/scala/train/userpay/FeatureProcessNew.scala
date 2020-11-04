@@ -47,10 +47,10 @@ object FeatureProcessNew {
 //    val orders = spark.read.format("parquet").load(orderProcessedPath).toDF()
     val userList=spark.read.format("parquet").load(userListPath)
 
-    printDf("userProfilePlayPart",userProfilePlayPart)
-    printDf("userProfilePreferencePart",userProfilePreferencePart)
-    printDf("userProfileOrderPart",userProfileOrderPart)
-    printDf("userList",userList)
+    printDf("输入  userProfilePlayPart",userProfilePlayPart)
+    printDf("输入  userProfilePreferencePart",userProfilePreferencePart)
+    printDf("输入  userProfileOrderPart",userProfileOrderPart)
+    printDf("输入  userList",userList)
 
     val trainSet=userList.join(userProfiles,joinKeysUserId,"left")
     //trainSet.show()
@@ -154,7 +154,7 @@ object FeatureProcessNew {
     }
 
     val result=tempDataFrame.select(columnList.map(tempDataFrame.col(_)):_*)
-    printDf("result",result)
+    printDf("输出  trainsetNew",result)
     result.write.mode(SaveMode.Overwrite).format("parquet").save(trainSetSavePath+"trainsetnew"+args(0))
     result.write.mode(SaveMode.Overwrite).option("header","true").csv(trainSetSavePath + "trainsetnew" + args(0)+".csv")
 

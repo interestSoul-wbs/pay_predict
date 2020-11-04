@@ -30,9 +30,9 @@ object VideoProfileGenerate {
     val orders = spark.read.format("parquet").load(orders_path)
 
 
-    printDf("medias",medias)
-    printDf("plays",plays)
-    printDf("orders",orders)
+    printDf("输入  medias",medias)
+    printDf("输入  plays",plays)
+    printDf("输入  orders",orders)
 
 
     val pre_30 = calDate(now, -30)
@@ -171,7 +171,7 @@ object VideoProfileGenerate {
     //result.na.fill(0,numColumns)
 
 
-    printDf("result",result)
+    printDf("输出  videoProfile",result)
     val videoProfilePath=hdfsPath+"data/train/common/processed/videoprofile"+now.split(" ")(0)
    // val videoProfileSavePath="pay_predict/data/train/common/processed/videoprofile.csv"
     result.write.mode(SaveMode.Overwrite).format("parquet").save(videoProfilePath)

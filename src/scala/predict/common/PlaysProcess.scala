@@ -40,8 +40,9 @@ object PlaysProcess {
      val df1=df.withColumn(Dic.colPlayEndTime,substring(col(Dic.colPlayEndTime),0,10))
      val df2=df1.groupBy(col(Dic.colUserId),col(Dic.colVideoId),col(Dic.colPlayEndTime))
      val df3=df2.agg(sum(col(Dic.colBroadcastTime)) as Dic.colBroadcastTime)
-     val time_limit=43200
-     val df4=df3.where(col(Dic.colBroadcastTime)<time_limit)
+     val time_max_limit=43200
+     val time_min_limit=30
+     val df4=df3.filter(col(Dic.colBroadcastTime)<time_max_limit && col(Dic.colBroadcastTime)>time_min_limit)
      val df5=df4.orderBy(col(Dic.colUserId),col(Dic.colPlayEndTime))
      val df6=df5.withColumn(Dic.colPlayEndTime,udfAddSuffix(col(Dic.colPlayEndTime)))
      //df6.show()

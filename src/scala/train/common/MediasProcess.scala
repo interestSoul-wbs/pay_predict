@@ -8,17 +8,19 @@ import java.io.{File, PrintWriter}
 import java.text.SimpleDateFormat
 
 import mam.Dic
-import mam.Utils.{printArray, printDf, udfLongToTimestamp}
+import mam.Utils.{printArray, printDf, udfLongToTimestamp, udfLongToTimestampV2}
 import org.apache.log4j.{Level, Logger}
 import org.apache.parquet.schema.Types.ListBuilder
 import org.apache.spark.ml.feature.Imputer
 import org.apache.spark.{SparkConf, SparkContext, sql}
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{SaveMode, SparkSession}
+import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.ml.feature.Imputer
+import org.apache.spark.sql.expressions.Window
 
 import scala.collection.mutable
-import scala.collection.mutable.{ListBuffer, Set} // 可以在任何地方引入 可变集合
+import scala.collection.mutable.{ListBuffer, Set}
+import org.apache.spark.sql.functions._
 
 object MediasProcess {
 
@@ -32,6 +34,47 @@ object MediasProcess {
       //.master("local[6]")
       .getOrCreate()
 
+
+    val hdfsPath="hdfs:///pay_predict/"
+    //val hdfsPath=""
+    val mediasRawPath=hdfsPath+"data/train/common/raw/medias/medias.txt"
+    val mediasProcessedPath=hdfsPath+"data/train/common/processed/mediastemp"
+    val videoFirstCategoryTempPath=hdfsPath+"data/train/common/processed/videofirstcategorytemp.txt"
+    val videoSecondCategoryTempPath=hdfsPath+"data/train/common/processed/videosecondcategorytemp.txt"
+    val labelTempPath=hdfsPath+"data/train/common/processed/labeltemp.txt"///pay_predict/data/train/common/processed
+    //1.获取原始数据
+    var dfRawMedias=getRawMedias(spark,mediasRawPath)
+
+    printDf("输入 mediasRaw",dfRawMedias)
+    //2、对数据进行处理
+    var dfModifiedFormat=mediasProcess(dfRawMedias)
+
+    //3、对特定的列进行均值填充
+    val cols = Array(Dic.colScore, Dic.colVideoTime)
+    var dfMeanFill=meanFill(dfModifiedFormat,cols)
+
+    //4、保存标签
+    getSingleStrColLabelAndSave(dfMeanFill,Dic.colVideoOneLevelClassification,videoFirstCategoryTempPath)
+    getArrayStrColLabelAndSave(dfMeanFill,Dic.colVideoTwoLevelClassificationList,videoSecondCategoryTempPath)
+    getArrayStrColLabelAndSave(dfMeanFill,Dic.colVideoTagList,labelTempPath)
+
+    //5、保存处理好的数据
+    saveProcessedData(dfMeanFill,mediasProcessedPath)
+    printDf("输出  mediasProcessed",dfMeanFill)
+     println("媒资数据处理完成！")
+
+
+
+  }
+
+
+  def getRawMedias(spark:SparkSession,rawMediasPath:String)={
+    /**
+    *@author wj
+    *@param [spark, rawMediasPath]
+    *@return org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
+    *@description  读取原始文件
+    */
     val schema= StructType(
       List(
         StructField(Dic.colVideoId, StringType),
@@ -57,39 +100,35 @@ object MediasProcess {
         StructField(Dic.colIntroduction, StringType)
       )
     )
-    val hdfsPath="hdfs:///pay_predict/"
-    //val hdfsPath=""
-    import org.apache.spark.sql.functions._
-    val mediasRawPath=hdfsPath+"data/train/common/raw/medias/medias.txt"
-    val mediasProcessedPath=hdfsPath+"data/train/common/processed/mediastemp"
-    val videoFirstCategoryTempPath=hdfsPath+"data/train/common/processed/videofirstcategorytemp.txt"
-    val videoSecondCategoryTempPath=hdfsPath+"data/train/common/processed/videosecondcategorytemp.txt"
-    val labelTempPath=hdfsPath+"data/train/common/processed/labeltemp.txt"///pay_predict/data/train/common/processed
-    val df = spark.read
+    val dfRawMedias = spark.read
       .option("delimiter", "\t")
       .option("header", false)
       .schema(schema)
-      .csv(mediasRawPath)
+      .csv(rawMediasPath)
 
-    printDf("df",df)
+    dfRawMedias
+  }
 
-    val df1=df.withColumn(Dic.colDirectorList,from_json(col(Dic.colDirectorList), ArrayType(StringType, containsNull = true)))
-           .withColumn(Dic.colVideoTwoLevelClassificationList,from_json(col(Dic.colVideoTwoLevelClassificationList), ArrayType(StringType, containsNull = true)))
-           .withColumn(Dic.colVideoTagList,from_json(col(Dic.colVideoTagList), ArrayType(StringType, containsNull = true)))
-           .withColumn(Dic.colActorList,from_json(col(Dic.colActorList), ArrayType(StringType, containsNull = true)))
-           .withColumn(Dic.colStorageTime,udfLongToTimestamp(col(Dic.colStorageTime)))
-    val df2=df1.select(
+
+  def mediasProcess(rawMediasData:DataFrame)={
+    /**
+    *@author wj
+    *@param [rawMediasData]
+    *@return org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
+    *@description  更改数据格式，主要将NULL字符串转化为null或者NaN
+    */
+    var dfModifiedFormat=rawMediasData.select(
       when(col(Dic.colVideoId)==="NULL",null).otherwise(col(Dic.colVideoId)).as(Dic.colVideoId),
       when(col(Dic.colVideoTitle)==="NULL",null).otherwise(col(Dic.colVideoTitle)).as(Dic.colVideoTitle),
       when(col(Dic.colVideoOneLevelClassification)==="NULL",null).otherwise(col(Dic.colVideoOneLevelClassification)).as(Dic.colVideoOneLevelClassification),
-      col(Dic.colVideoTwoLevelClassificationList),
-      col(Dic.colVideoTagList),
-      col(Dic.colDirectorList),
-      col(Dic.colActorList),
+      from_json(col(Dic.colVideoTwoLevelClassificationList), ArrayType(StringType, containsNull = true)).as(Dic.colVideoTwoLevelClassificationList),
+      from_json(col(Dic.colVideoTagList), ArrayType(StringType, containsNull = true)).as(Dic.colVideoTagList),
+      from_json(col(Dic.colDirectorList), ArrayType(StringType, containsNull = true)).as(Dic.colDirectorList),
+      from_json(col(Dic.colActorList), ArrayType(StringType, containsNull = true)).as(Dic.colActorList),
       when(col(Dic.colCountry)==="NULL",null).otherwise(col(Dic.colCountry)).as(Dic.colCountry),
       when(col(Dic.colLanguage)==="NULL",null).otherwise(col(Dic.colLanguage)).as(Dic.colLanguage),
       when(col(Dic.colReleaseDate)==="NULL",null).otherwise(col(Dic.colReleaseDate) ).as(Dic.colReleaseDate),
-      when(col(Dic.colStorageTime)==="NULL",null).otherwise(col(Dic.colStorageTime )).as(Dic.colStorageTime),
+      when(col(Dic.colStorageTime)==="NULL",null).otherwise(udfLongToTimestampV2(col(Dic.colStorageTime ))).as(Dic.colStorageTime),
       when(col(Dic.colVideoTime)==="NULL",Double.NaN).otherwise(col(Dic.colVideoTime) cast DoubleType).as(Dic.colVideoTime),
       when(col(Dic.colScore)==="NULL",Double.NaN).otherwise(col(Dic.colScore) cast DoubleType).as(Dic.colScore),
       when(col(Dic.colIsPaid)==="NULL",Double.NaN).otherwise(col(Dic.colIsPaid) cast DoubleType).as(Dic.colIsPaid),
@@ -99,108 +138,63 @@ object MediasProcess {
       when(col(Dic.colSupplier)==="NULL",null).otherwise(col(Dic.colSupplier)).as(Dic.colSupplier),
       when(col(Dic.colIntroduction)==="NULL",null).otherwise(col(Dic.colIntroduction)).as(Dic.colIntroduction)
     )
+    dfModifiedFormat
 
+  }
 
-    val result_1=df2.select(collect_list(Dic.colVideoOneLevelClassification)).collect()
-    val result_2=df2.select(collect_list(Dic.colVideoTwoLevelClassificationList)).collect()
-    val result_3=df2.select(collect_list(Dic.colVideoTagList)).collect()
-    //result_1.show()
-//    printArray("result_1",result_1)
-//    printArray("result_2",result_2)
-//    printArray("result_3",result_3)
-
-    val labelList=ListBuffer[String]()
-    val firstList=ListBuffer[String]()
-    val secondList=ListBuffer[String]()
-    result_3.foreach(row=>{
-      //println(row.get(0))
-      val rs = row.getList(0)
-      val mutableset = Set[String]()
-      for (i <- 0 to rs.size() - 1) {
-        val temp:mutable.WrappedArray[String]=rs.get(i)
-        for(j<-0 to temp.length-1)
-          mutableset.add(temp(j))
-      }
-      var label: Array[String] = mutableset.mkString(",").split(",")
-      //val  file=new File()
-      //val out = new PrintWriter(labelTempPath)
-      for (i<-0 to label.length-1) {
-          //out.println(i+"\t"+label(i))
-        labelList.append(i+"\t"+label(i))
-      }
-      //out.close()
-
-    })
-    //val rs=mutable.WrappedArray[String]
-    result_2.foreach(row=>{
-     // println(row.get(0))
-      val rs = row.getList(0)
-      val mutableset = Set[String]()
-      for (i <- 0 to rs.size() - 1) {
-        val temp:mutable.WrappedArray[String]=rs.get(i)
-        for(j<-0 to temp.length-1)
-              mutableset.add(temp(j))
-      }
-      var level_two: Array[String] = mutableset.mkString(",").split(",")
-      //val  file=new File(videoSecondCategoryTempPath)
-     // val out = new PrintWriter(videoSecondCategoryTempPath)
-      for (i<-0 to level_two.length-1) {
-        //  out.println(i+"\t"+level_two(i))
-        secondList.append(i+"\t"+level_two(i))
-
-      }
-      //out.close()
-
-    })
-
-    result_1.foreach(row=> {
-      val rs = row.getList(0)
-      val mutableSet = Set[String]()
-      for (i <- 0 to rs.size() - 1) {
-        if(!rs.get(i).asInstanceOf[String].contains("\""))
-          mutableSet.add(rs.get(i))
-      }
-      //mutableSet.foreach(println)
-      var level_one: Array[String] = mutableSet.mkString(",").split(",")
-      //println(mutableSet.mkString(","))
-      for (i<-0 to level_one.length-1) {
-         // out.println(i+"\t"+level_one(i))
-        firstList.append(i+"\t"+level_one(i))
-        //println(level_one(i))
-      }
-      //out.close()
-    })
-
-
-
-    import spark.implicits._
-    var labelCsv = labelList.toDF("content")
-    labelCsv.coalesce(1).write.mode(SaveMode.Overwrite).option("header","false").csv(labelTempPath)
-    var firstCsv = firstList.toDF("content")
-    firstCsv.coalesce(1).write.mode(SaveMode.Overwrite).option("header","false").csv(videoFirstCategoryTempPath)
-    var secondCsv = secondList.toDF("content")
-    secondCsv.coalesce(1).write.mode(SaveMode.Overwrite).option("header","false").csv(videoSecondCategoryTempPath)
-
-    printDf("labelCsv",labelCsv)
-    printDf("firstCsv",firstCsv)
-    printDf("secondCsv",firstCsv)
-
-
-    //score和VideoTime使用均值填充
-    val cols=Array(Dic.colScore,Dic.colVideoTime)
+  def meanFill(dfModifiedFormat:DataFrame, cols: Array[String])={
+    /**
+    *@author wj
+    *@param [dfModifiedFormat]
+    *@return org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
+    *@description  将指定的列使用均值进行填充
+    */
     val imputer = new Imputer()
       .setInputCols(cols)
       .setOutputCols(cols)
       .setStrategy("mean")
 
-    val df3=imputer.fit(df2).transform(df2)
-     //df3.show()
-    printDf("df3",df3)
-     df3.write.mode(SaveMode.Overwrite).format("parquet").save(mediasProcessedPath)
-     println("媒资数据处理完成！")
+    val dfMeanFill=imputer.fit(dfModifiedFormat).transform(dfModifiedFormat)
+    dfMeanFill
+  }
+  def getArrayStrColLabelAndSave(dfMedias: DataFrame, colName: String, labelSavedPath:String) = {
 
-    //开始修改
+    val df_label = dfMedias
+      .select(
+        explode(
+          col(colName)).as(colName))
+      .dropDuplicates()
+      .withColumn(Dic.colRank, row_number().over(Window.orderBy(col(colName))) - 1)
+      .select(
+        concat_ws("\t", col(Dic.colRank), col(colName)).cast(StringType).as(Dic.colContent))
 
+    printDf("输出  df_label", df_label)
+
+    saveLabel(df_label,labelSavedPath)
   }
 
+  def getSingleStrColLabelAndSave(dfMedias: DataFrame, colName: String,labelSavedPath:String) = {
+
+    val dfLabel = dfMedias
+      .select(col(colName))
+      .dropDuplicates()
+      .filter(!col(colName).cast("String").contains("]"))
+      .withColumn(Dic.colRank, row_number().over(Window.orderBy(col(colName))) - 1)
+      .select(
+        concat_ws("\t", col(Dic.colRank), col(colName)).as(Dic.colContent))
+
+    printDf("输出  df_label", dfLabel)
+
+    saveLabel(dfLabel,labelSavedPath)
+  }
+
+  def saveLabel(dfLabel: DataFrame,labelSavedPath:String) = {
+
+    dfLabel.coalesce(1).write.mode(SaveMode.Overwrite).option("header","false").csv(labelSavedPath)
+  }
+
+  def saveProcessedData(dfMediasProcessed: DataFrame,mediasProcessedPath:String) = {
+
+    dfMediasProcessed.write.mode(SaveMode.Overwrite).format("parquet").save(mediasProcessedPath)
+  }
 }

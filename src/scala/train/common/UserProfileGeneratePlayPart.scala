@@ -24,8 +24,8 @@ object UserProfileGeneratePlayPart {
     val medias = spark.read.format("parquet").load(medias_path)
     val plays = spark.read.format("parquet").load(plays_path)
     //val orders = spark.read.format("parquet").load(orders_path)
-    printDf("medias",medias)
-    printDf("plays",plays)
+    printDf("输入 medias",medias)
+    printDf("输入 plays",plays)
 
 
     var result=plays.select(col(Dic.colUserId)).distinct()
@@ -293,7 +293,7 @@ object UserProfileGeneratePlayPart {
 
 
 
-    printDf("result",result)
+    printDf("输出  userprofilePlayPart",result)
 
     val userProfilePlayPartSavePath=hdfsPath+"data/train/common/processed/userprofileplaypart"+now.split(" ")(0)
     //大约有85万用户

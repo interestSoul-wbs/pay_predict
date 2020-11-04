@@ -42,7 +42,7 @@ object VideoVectorGenerate {
     for(i <- 0 to vectorDimension-1)
       videoDict=videoDict.withColumn("v_"+i,udfBreak(col("vector"),lit(i))).withColumnRenamed("word",Dic.colVideoId)
 
-    printDf("videoDict",videoDict)
+    printDf("videoVector",videoDict)
     val videoVectorPath=hdfsPath+"data/train/common/processed/videovector"+args(0)
     videoDict.write.mode(SaveMode.Overwrite).format("parquet").save(videoVectorPath)
     //wordDict
