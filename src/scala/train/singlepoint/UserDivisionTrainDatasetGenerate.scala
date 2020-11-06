@@ -36,10 +36,10 @@ object UserDivisionTrainDatasetGenerate {
     val temp=userProfilePlayPart.join(userProfilePreferencePart,joinKeysUserId,"left")
     val userProfiles=temp.join(userProfileOrderPart,joinKeysUserId,"left")
 
-    printDf("userProfilePlayPart",userProfilePlayPart)
-    printDf("userProfilePreferencePart",userProfilePreferencePart)
-    printDf("userProfileOrderPart",userProfileOrderPart)
-    printDf("orders",orders)
+    printDf("输入  userProfilePlayPart",userProfilePlayPart)
+    printDf("输入  userProfilePreferencePart",userProfilePreferencePart)
+    printDf("输入  userProfileOrderPart",userProfileOrderPart)
+    printDf("输入  orders",orders)
 
     //println(orders.count())
    // println(userProfiles.count())
@@ -111,7 +111,7 @@ object UserDivisionTrainDatasetGenerate {
 //    // rescale each feature to range [min, max].
 //    val scaledData = scaleModel.transform(allUsersConcat)
     val dataPath=hdfsPath+"data/train/singlepoint/userdivisiontraindata"
-    printDf("allUsersNotNull",allUsersNotNull)
+    printDf("输出  allUsersNotNull",allUsersNotNull)
     allUsersNotNull.write.mode(SaveMode.Overwrite).format("parquet").save(dataPath+args(0)+"-"+args(2))
     allUsersNotNull.write.mode(SaveMode.Overwrite).option("header","true").csv(dataPath+args(0)+"-"+args(2)+".csv")
 

@@ -55,6 +55,10 @@ object Dic {
   val colSupplier="supplier"
   val colIntroduction="introduction"
 
+  //在处理medias过程中构造的属性
+  val colRank="rank"
+  val colContent="content"
+
   /**
    * order中的属性
    */
@@ -251,6 +255,10 @@ object Dic {
   val colItemType="itemtype"
   val colItemId="itemid"
   val colPartitionDate="partitiondate"
+
+
+
+
 
 
 

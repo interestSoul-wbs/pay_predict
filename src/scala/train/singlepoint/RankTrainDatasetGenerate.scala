@@ -17,14 +17,14 @@ object RankTrainDatasetGenerate {
 
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("RankTrainDatasetGenerate")
-      //.master("local[6]")
+      .master("local[6]")
       .config("spark.sql.crossJoin.enabled","true")  //spark2.x默认不能进行笛卡尔积的操作需要进行设置
       .getOrCreate()
     import spark.implicits._
     import org.apache.spark.sql.functions._
 
-    val hdfsPath="hdfs:///pay_predict/"
-    //val hdfsPath=""
+    //val hdfsPath="hdfs:///pay_predict/"
+    val hdfsPath=""
     val ordersProcessedPath=hdfsPath+"data/train/common/processed/orders"
     val orders=spark.read.format("parquet").load(ordersProcessedPath)
 
@@ -39,11 +39,11 @@ object RankTrainDatasetGenerate {
     val videoProfile=spark.read.format("parquet").load(videoProfilePath)
     val videoVector=spark.read.format("parquet").load(videoVectorPath)
 
-    printDf("userProfilePlayPart",userProfilePlayPart)
-    printDf("userProfilePreferencePart",userProfilePreferencePart)
-    printDf("userProfileOrderPart",userProfileOrderPart)
-    printDf("videoProfile",videoProfile)
-    printDf("videoVector",videoVector)
+    printDf("输入  userProfilePlayPart",userProfilePlayPart)
+    printDf("输入  userProfilePreferencePart",userProfilePreferencePart)
+    printDf("输入  userProfileOrderPart",userProfileOrderPart)
+    printDf("输入  videoProfile",videoProfile)
+    printDf("输入  videoVector",videoVector)
 
 
 
@@ -109,192 +109,195 @@ object RankTrainDatasetGenerate {
     dataset3=dataset3.join(videoProfile,joinKeysVideoId,"inner")
     //dataset3.show()
     var result=dataset1.union(dataset2)//.union(dataset3)
+
     result=result.join(videoVector,joinKeysVideoId,"left")
 
 
+
+//使用标签
 //    val seq=mapColList.toSeq
 //    result.select(seq.map(result.col(_)):_*).show()
 
-    val videoFirstCategoryTempPath=hdfsPath+"data/train/common/processed/videofirstcategorytemp.txt"
-    val videoSecondCategoryTempPath=hdfsPath+"data/train/common/processed/videosecondcategorytemp.txt"
-    val labelTempPath=hdfsPath+"data/train/common/processed/labeltemp.txt"
-    var videoFirstCategoryMap: Map[String, Int] = Map()
-    var videoSecondCategoryMap: Map[String, Int] = Map()
-    var labelMap: Map[String, Int] = Map()
-
-
-
-    var videoFirstCategory =spark.read.format("csv").load(videoFirstCategoryTempPath)
-    var conList=videoFirstCategory.collect()
-    for(elem <- conList){
-      var s=elem.toString()
-      videoFirstCategoryMap+=(s.substring(1,s.length-1).split("\t")(1) -> s.substring(1,s.length-1).split("\t")(0).toInt)
-
-    }
-    //println(videoFirstCategoryMap)
-    var videoSecondCategory =spark.read.format("csv").load(videoSecondCategoryTempPath)
-    conList=videoSecondCategory.collect()
-    for(elem <- conList){
-      var s=elem.toString()
-      videoSecondCategoryMap+=(s.substring(1,s.length-1).split("\t")(1) -> s.substring(1,s.length-1).split("\t")(0).toInt)
-
-    }
-    //println(videoSecondCategoryMap)
-    var label=spark.read.format("csv").load(labelTempPath)
-    conList=label.collect()
-    for(elem <- conList){
-      var s=elem.toString()
-      labelMap+=(s.substring(1,s.length-1).split("\t")(1) -> s.substring(1,s.length-1).split("\t")(0).toInt)
-
-    }
-
-//    val aMap:Map[String,Int]=Map()
-//    for(elem<-mapString.split(",")){
-//      aMap+=(elem.split(" -> ")(0) -> elem.split(" -> ")(1).toInt)
+//    val videoFirstCategoryTempPath=hdfsPath+"data/train/common/processed/videofirstcategorytemp.txt"
+//    val videoSecondCategoryTempPath=hdfsPath+"data/train/common/processed/videosecondcategorytemp.txt"
+//    val labelTempPath=hdfsPath+"data/train/common/processed/labeltemp.txt"
+//    var videoFirstCategoryMap: Map[String, Int] = Map()
+//    var videoSecondCategoryMap: Map[String, Int] = Map()
+//    var labelMap: Map[String, Int] = Map()
+//
+//
+//
+//    var videoFirstCategory =spark.read.format("csv").load(videoFirstCategoryTempPath)
+//    var conList=videoFirstCategory.collect()
+//    for(elem <- conList){
+//      var s=elem.toString()
+//      videoFirstCategoryMap+=(s.substring(1,s.length-1).split("\t")(1) -> s.substring(1,s.length-1).split("\t")(0).toInt)
+//
 //    }
-//    //mapString.split(",").foreach(item=>labelMap+=(item.split(" -> ")(0) -> item.split(" -> ")(1).toInt))
-//    println(aMap)
-
-
-    def module(vec:ArrayBuffer[Int]): Double ={
-      // math.sqrt( vec.map(x=>x*x).sum )
-      math.sqrt(vec.map(math.pow(_,2)).sum)
-    }
-
-    /**
-     * 求两个向量的内积
-     * @param v1
-     * @param v2
-     */
-    def innerProduct(v1:ArrayBuffer[Int],v2:ArrayBuffer[Int]): Double ={
-      val arrayBuffer=ArrayBuffer[Double]()
-      for(i<- 0 until v1.length-1){
-          arrayBuffer.append( v1(i)*v2(i) )
-      }
-      arrayBuffer.sum
-    }
-
-    /**
-     * 求两个向量的余弦值
-     * @param v1
-     * @param v2
-     */
-    def cosvec(v1:ArrayBuffer[Int],v2:ArrayBuffer[Int]):Double ={
-      val cos=innerProduct(v1,v2) / (module(v1)* module(v2))
-      if (cos <= 1) cos else 1.0
-    }
-
-    def udfCalFirstCategorySimilarity=udf(calFirstCategorySimilarity _)
-    def calFirstCategorySimilarity(category:String,preference:Map[String,Int],videoFirstCategoryString:String)={
-      var videoFirstCategoryMap: Map[String, Int] = Map()
-      for(elem<-videoFirstCategoryString.split(",")){
-        videoFirstCategoryMap+=(elem.split(" -> ")(0) -> elem.split(" -> ")(1).toInt)
-      }
-
-      if(category==null || preference==null){
-        0.0
-      }else {
-        var categoryArray = new ArrayBuffer[Int](videoFirstCategoryMap.size)
-        var preferenceArray = new ArrayBuffer[Int](videoFirstCategoryMap.size)
-        for (i <- 0 to videoFirstCategoryMap.size - 1) {
-          categoryArray.append(0)
-          preferenceArray.append(0)
-        }
-        for (elem<- preference.keys.toList) {
-          var index=videoFirstCategoryMap.getOrElse(elem, 0)
-          if(index>=preferenceArray.length) {
-
-          }else{
-            preferenceArray(index) = preference.getOrElse(elem, 0)
-          }
-        }
-
-        var index2=videoFirstCategoryMap.getOrElse(category, 0)
-        if(index2>=preferenceArray.length) {
-
-        }else{
-          categoryArray(index2) = 1
-        }
-
-        cosvec(categoryArray, preferenceArray)
-      }
-
-    }
-    def udfCalSecondCategorySimilarity=udf(calSecondCategorySimilarity _)
-    def calSecondCategorySimilarity(category:mutable.WrappedArray[String], preference:Map[String,Int],videoSecondCategoryString:String)={
-      var videoSecondCategoryMap: Map[String, Int] = Map()
-      for(elem<-videoSecondCategoryString.split(",")){
-        videoSecondCategoryMap+=(elem.split(" -> ")(0) -> elem.split(" -> ")(1).toInt)
-      }
-      if(category==null || preference==null){
-        0.0
-      }else {
-        var categoryArray = new ArrayBuffer[Int](videoSecondCategoryMap.size)
-        var preferenceArray = new ArrayBuffer[Int](videoSecondCategoryMap.size)
-        for (i <- 0 to videoSecondCategoryMap.size - 1) {
-          categoryArray.append(0)
-          preferenceArray.append(0)
-        }
-        for (elem<- preference.keys.toList) {
-          var index=videoSecondCategoryMap.getOrElse(elem, 0)
-          if(index>=preferenceArray.length) {
-
-          }else{
-            preferenceArray(index) = preference.getOrElse(elem, 0)
-          }
-        }
-
-        for (elem<- category) {
-          var index=videoSecondCategoryMap.getOrElse(elem, 0)
-          if(index>=preferenceArray.length) {
-
-          }else{
-            categoryArray(index) = 1
-          }
-        }
-        cosvec(categoryArray, preferenceArray)
-      }
-
-    }
-    def udfCalLabelSimilarity=udf(calLabelSimilarity _)
-    def calLabelSimilarity(category:mutable.WrappedArray[String], preference:Map[String,Int],labelString:String)={
-      var labelMap: Map[String, Int] = Map()
-      for(elem<-labelString.split(",")){
-        labelMap+=(elem.split(" -> ")(0) -> elem.split(" -> ")(1).toInt)
-      }
-      if(category==null || preference==null){
-        0.0
-      }else {
-        var categoryArray = new ArrayBuffer[Int](labelMap.size)
-        var preferenceArray = new ArrayBuffer[Int](labelMap.size)
-        for (i <- 0 to labelMap.size - 1) {
-          categoryArray.append(0)
-          preferenceArray.append(0)
-        }
-        //println(categoryArray.length+" "+preferenceArray.length)
-        for (elem<- preference.keys.toList) {
-          var index=labelMap.getOrElse(elem, 0)
-          if(index>=preferenceArray.length) {
-
-          }else{
-            preferenceArray(index) = preference.getOrElse(elem, 0)
-          }
-        }
-
-        for (elem<- category) {
-          var index=labelMap.getOrElse(elem, 0)
-          if(index>=preferenceArray.length) {
-
-          }else{
-            categoryArray(index) = 1
-          }
-        }
-       // println(categoryArray)
-       // println(preferenceArray)
-        cosvec(categoryArray, preferenceArray)
-      }
-
-    }
+//    //println(videoFirstCategoryMap)
+//    var videoSecondCategory =spark.read.format("csv").load(videoSecondCategoryTempPath)
+//    conList=videoSecondCategory.collect()
+//    for(elem <- conList){
+//      var s=elem.toString()
+//      videoSecondCategoryMap+=(s.substring(1,s.length-1).split("\t")(1) -> s.substring(1,s.length-1).split("\t")(0).toInt)
+//
+//    }
+//    //println(videoSecondCategoryMap)
+//    var label=spark.read.format("csv").load(labelTempPath)
+//    conList=label.collect()
+//    for(elem <- conList){
+//      var s=elem.toString()
+//      labelMap+=(s.substring(1,s.length-1).split("\t")(1) -> s.substring(1,s.length-1).split("\t")(0).toInt)
+//
+//    }
+//
+////    val aMap:Map[String,Int]=Map()
+////    for(elem<-mapString.split(",")){
+////      aMap+=(elem.split(" -> ")(0) -> elem.split(" -> ")(1).toInt)
+////    }
+////    //mapString.split(",").foreach(item=>labelMap+=(item.split(" -> ")(0) -> item.split(" -> ")(1).toInt))
+////    println(aMap)
+//
+//
+//    def module(vec:ArrayBuffer[Int]): Double ={
+//      // math.sqrt( vec.map(x=>x*x).sum )
+//      math.sqrt(vec.map(math.pow(_,2)).sum)
+//    }
+//
+//    /**
+//     * 求两个向量的内积
+//     * @param v1
+//     * @param v2
+//     */
+//    def innerProduct(v1:ArrayBuffer[Int],v2:ArrayBuffer[Int]): Double ={
+//      val arrayBuffer=ArrayBuffer[Double]()
+//      for(i<- 0 until v1.length-1){
+//          arrayBuffer.append( v1(i)*v2(i) )
+//      }
+//      arrayBuffer.sum
+//    }
+//
+//    /**
+//     * 求两个向量的余弦值
+//     * @param v1
+//     * @param v2
+//     */
+//    def cosvec(v1:ArrayBuffer[Int],v2:ArrayBuffer[Int]):Double ={
+//      val cos=innerProduct(v1,v2) / (module(v1)* module(v2))
+//      if (cos <= 1) cos else 1.0
+//    }
+//
+//    def udfCalFirstCategorySimilarity=udf(calFirstCategorySimilarity _)
+//    def calFirstCategorySimilarity(category:String,preference:Map[String,Int],videoFirstCategoryString:String)={
+//      var videoFirstCategoryMap: Map[String, Int] = Map()
+//      for(elem<-videoFirstCategoryString.split(",")){
+//        videoFirstCategoryMap+=(elem.split(" -> ")(0) -> elem.split(" -> ")(1).toInt)
+//      }
+//
+//      if(category==null || preference==null){
+//        0.0
+//      }else {
+//        var categoryArray = new ArrayBuffer[Int](videoFirstCategoryMap.size)
+//        var preferenceArray = new ArrayBuffer[Int](videoFirstCategoryMap.size)
+//        for (i <- 0 to videoFirstCategoryMap.size - 1) {
+//          categoryArray.append(0)
+//          preferenceArray.append(0)
+//        }
+//        for (elem<- preference.keys.toList) {
+//          var index=videoFirstCategoryMap.getOrElse(elem, 0)
+//          if(index>=preferenceArray.length) {
+//
+//          }else{
+//            preferenceArray(index) = preference.getOrElse(elem, 0)
+//          }
+//        }
+//
+//        var index2=videoFirstCategoryMap.getOrElse(category, 0)
+//        if(index2>=preferenceArray.length) {
+//
+//        }else{
+//          categoryArray(index2) = 1
+//        }
+//
+//        cosvec(categoryArray, preferenceArray)
+//      }
+//
+//    }
+//    def udfCalSecondCategorySimilarity=udf(calSecondCategorySimilarity _)
+//    def calSecondCategorySimilarity(category:mutable.WrappedArray[String], preference:Map[String,Int],videoSecondCategoryString:String)={
+//      var videoSecondCategoryMap: Map[String, Int] = Map()
+//      for(elem<-videoSecondCategoryString.split(",")){
+//        videoSecondCategoryMap+=(elem.split(" -> ")(0) -> elem.split(" -> ")(1).toInt)
+//      }
+//      if(category==null || preference==null){
+//        0.0
+//      }else {
+//        var categoryArray = new ArrayBuffer[Int](videoSecondCategoryMap.size)
+//        var preferenceArray = new ArrayBuffer[Int](videoSecondCategoryMap.size)
+//        for (i <- 0 to videoSecondCategoryMap.size - 1) {
+//          categoryArray.append(0)
+//          preferenceArray.append(0)
+//        }
+//        for (elem<- preference.keys.toList) {
+//          var index=videoSecondCategoryMap.getOrElse(elem, 0)
+//          if(index>=preferenceArray.length) {
+//
+//          }else{
+//            preferenceArray(index) = preference.getOrElse(elem, 0)
+//          }
+//        }
+//
+//        for (elem<- category) {
+//          var index=videoSecondCategoryMap.getOrElse(elem, 0)
+//          if(index>=preferenceArray.length) {
+//
+//          }else{
+//            categoryArray(index) = 1
+//          }
+//        }
+//        cosvec(categoryArray, preferenceArray)
+//      }
+//
+//    }
+//    def udfCalLabelSimilarity=udf(calLabelSimilarity _)
+//    def calLabelSimilarity(category:mutable.WrappedArray[String], preference:Map[String,Int],labelString:String)={
+//      var labelMap: Map[String, Int] = Map()
+//      for(elem<-labelString.split(",")){
+//        labelMap+=(elem.split(" -> ")(0) -> elem.split(" -> ")(1).toInt)
+//      }
+//      if(category==null || preference==null){
+//        0.0
+//      }else {
+//        var categoryArray = new ArrayBuffer[Int](labelMap.size)
+//        var preferenceArray = new ArrayBuffer[Int](labelMap.size)
+//        for (i <- 0 to labelMap.size - 1) {
+//          categoryArray.append(0)
+//          preferenceArray.append(0)
+//        }
+//        //println(categoryArray.length+" "+preferenceArray.length)
+//        for (elem<- preference.keys.toList) {
+//          var index=labelMap.getOrElse(elem, 0)
+//          if(index>=preferenceArray.length) {
+//
+//          }else{
+//            preferenceArray(index) = preference.getOrElse(elem, 0)
+//          }
+//        }
+//
+//        for (elem<- category) {
+//          var index=labelMap.getOrElse(elem, 0)
+//          if(index>=preferenceArray.length) {
+//
+//          }else{
+//            categoryArray(index) = 1
+//          }
+//        }
+//       // println(categoryArray)
+//       // println(preferenceArray)
+//        cosvec(categoryArray, preferenceArray)
+//      }
+//
+//    }
 //    val testUser=userProfile
 //      .filter(
 //        !isnull(col(Dic.colVideoOneLevelPreference))
@@ -369,12 +372,12 @@ object RankTrainDatasetGenerate {
     //result.show()
     println("总样本的条数"+result.count())
 
-    printDf("result",result)
+    printDf("输出  rankTrainData",result)
 
     val resultSavePath=hdfsPath+"data/train/singlepoint/ranktraindata"
-    result.write.mode(SaveMode.Overwrite).format("parquet").save(resultSavePath+args(0)+"-"+args(2))
-    val csvData=spark.read.format("parquet").load(resultSavePath+args(0)+"-"+args(2))
-    csvData.write.mode(SaveMode.Overwrite).option("header","true").csv(resultSavePath+args(0)+"-"+args(2)+".csv")
+    //result.write.mode(SaveMode.Overwrite).format("parquet").save(resultSavePath+args(0)+"-"+args(2))
+    //val csvData=spark.read.format("parquet").load(resultSavePath+args(0)+"-"+args(2))
+    //csvData.write.mode(SaveMode.Overwrite).option("header","true").csv(resultSavePath+args(0)+"-"+args(2)+".csv")
     //result.write.mode(SaveMode.Overwrite).format("tfrecords").option("recordType", "Example").save(resultSavePath+args(0)+"-"+args(2)+".tfrecords")
 
 

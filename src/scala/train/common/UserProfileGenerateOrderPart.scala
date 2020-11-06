@@ -23,8 +23,8 @@ object UserProfileGenerateOrderPart {
     val plays = spark.read.format("parquet").load(plays_path)
     val orders = spark.read.format("parquet").load(orders_path)
 
-    printDf("plays",plays)
-    printDf("orders",orders)
+    printDf("输入 plays",plays)
+    printDf("输入 orders",orders)
 
 
     var result = plays.select(col(Dic.colUserId)).distinct()
@@ -178,7 +178,7 @@ object UserProfileGenerateOrderPart {
     .join(order_part_12,joinKeysUserId, "left")
 
    // result49.show()
-    printDf("result",result)
+    printDf("输出  userprofileOrderPart",result)
     val userProfileOrderPartSavePath=hdfsPath+"data/train/common/processed/userprofileorderpart"+now.split(" ")(0)
     //大约有85万用户
     result.write.mode(SaveMode.Overwrite).format("parquet").save(userProfileOrderPartSavePath)
