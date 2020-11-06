@@ -1,7 +1,7 @@
 package predict.common
 
 import mam.Dic
-import mam.Utils.printDf
+import mam.Utils.{printDf, udfBreak}
 import org.apache.avro.SchemaBuilder.array
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
@@ -40,19 +40,14 @@ object VideoVectorGenerate {
     printDf("plays_list",playsList)
     var videoDict=getVector(playsList)
 
-    def break(array:Object,index:Int) ={
-      val vectorString=array.toString
-      vectorString.substring(1,vectorString.length-1).split(",")(index).toDouble
-      //(Vector)
 
-    }
     //将嵌入向量分成多列，便于后续模型的输入
     val vectorDimension=64
-    def udfBreak=udf(break _)
     for(i <- 0 to vectorDimension-1)
       videoDict=videoDict.withColumn("v_"+i,udfBreak(col("vector"),lit(i))).withColumnRenamed("word",Dic.colVideoId)
 
     printDf("videoDict",videoDict)
+
     val videoVectorPath=hdfsPath+"data/predict/common/processed/videovector"+args(0)
     videoDict.write.mode(SaveMode.Overwrite).format("parquet").save(videoVectorPath)
     //wordDict
