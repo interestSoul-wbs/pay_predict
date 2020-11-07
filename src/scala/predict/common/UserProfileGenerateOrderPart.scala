@@ -1,52 +1,64 @@
 package predict.common
 
+import com.github.nscala_time.time.Imports.DateTime
 import mam.Dic
-import mam.Utils.{calDate, udfGetDays}
-import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql
-import org.apache.spark.sql.{SaveMode, SparkSession}
-import mam.Utils.printDf
+import mam.Utils.{calDate, printDf, udfGetDays}
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 object UserProfileGenerateOrderPart {
 
-  def userProfileGenerateOrderPart(now:String,timeWindow:Int,medias_path:String,plays_path:String,orders_path:String,hdfsPath:String): Unit = {
-    import org.apache.spark.sql.functions._
+  var tempTable = "temp_table"
+  var partitiondate: String = _
+  var license: String = _
 
-    System.setProperty("hadoop.home.dir", "c:\\winutils")
-    Logger.getLogger("org").setLevel(Level.ERROR)
-    val spark: SparkSession = new sql.SparkSession.Builder()
-      .appName("PredictUserProfileGenerateOrderPart")
-      //.master("local[6]")
-      .getOrCreate()
-    //设置shuffle过程中分区数
-    // spark.sqlContext.setConf("spark.sql.shuffle.partitions", "1000")
+  def main(args: Array[String]): Unit = {
 
-    //val medias = spark.read.format("parquet").load(medias_path)
-    val plays = spark.read.format("parquet").load(plays_path)
+    partitiondate = args(0)
+    license = args(1)
 
-    printDf("plays", plays)
+    val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
 
-    val orders = spark.read.format("parquet").load(orders_path)
+    // 训练集的划分时间点 - 2020-06-01 00:00:00
+    val now = "2020-07-01 00:00:00"
 
-    printDf("orders", orders)
+    // 1 - get play data.
+    val df_plays = getPlay(spark)
 
-    var result = plays.select(col(Dic.colUserId)).distinct()
+    printDf("df_plays", df_plays)
 
-    printDf("result", result)
+    // 2 - get order data.
+    val df_orders = getOrder(spark)
+
+    printDf("df_orders", df_orders)
+
+    // 3 - data process
+    val df_result = userProfileGenerateOrderPart(now, 30, df_plays, df_orders)
+
+    printDf("df_result", df_result)
+
+    // 4 - save
+    saveData(spark, df_result)
+  }
+
+  def userProfileGenerateOrderPart(now: String, timeWindow: Int, df_plays: DataFrame, df_orders: DataFrame) = {
+
+    val df_user_id = df_plays
+      .select(col(Dic.colUserId)).distinct()
+
+    printDf("df_user_id", df_user_id)
 
     val pre_30 = calDate(now, -30)
-    val pre_14 = calDate(now, days = -14)
-    val pre_7 = calDate(now, -7)
-    val pre_3 = calDate(now, -3)
-    val pre_1 = calDate(now, -1)
+
     val joinKeysUserId = Seq(Dic.colUserId)
 
-    val user_order=orders.filter(col(Dic.colCreationTime).<(now))
-    val order_part_1=user_order
+    val user_order = df_orders
+      .filter(col(Dic.colCreationTime).<(now))
+
+    val order_part_1 = user_order
       .filter(
         col(Dic.colResourceType).>(0)
-          && col(Dic.colOrderStatus).>(1)
-      )
+          && col(Dic.colOrderStatus).>(1))
       .groupBy(col(Dic.colUserId))
       .agg(
         count(col(Dic.colUserId)).as(Dic.colNumberPackagesPurchased),
@@ -54,152 +66,247 @@ object UserProfileGenerateOrderPart {
         max(col(Dic.colMoney)).as(Dic.colMaxMoneyPackagePurchased),
         min(col(Dic.colMoney)).as(Dic.colMinMoneyPackagePurchased),
         avg(col(Dic.colMoney)).as(Dic.colAvgMoneyPackagePurchased),
-        stddev(col(Dic.colMoney)).as(Dic.colVarMoneyPackagePurchased)
-      )
-    val order_part_2=user_order
+        stddev(col(Dic.colMoney)).as(Dic.colVarMoneyPackagePurchased))
+
+    val order_part_2 = user_order
       .filter(
         col(Dic.colResourceType).===(0)
-          && col(Dic.colOrderStatus).>(1)
-      )
+          && col(Dic.colOrderStatus).>(1))
       .groupBy(col(Dic.colUserId))
       .agg(
         count(col(Dic.colUserId)).as(Dic.colNumberSinglesPurchased),
-        sum(col(Dic.colMoney)).as(Dic.colTotalMoneySinglesPurchased)
-      )
-    val order_part_3=user_order
+        sum(col(Dic.colMoney)).as(Dic.colTotalMoneySinglesPurchased))
+
+    val order_part_3 = user_order
       .filter(
-        col(Dic.colOrderStatus).>(1)
-      )
+        col(Dic.colOrderStatus).>(1))
       .groupBy(col(Dic.colUserId))
       .agg(
-        sum(col(Dic.colMoney)).as(Dic.colTotalMoneyConsumption)
-      )
-    val order_part_4=user_order
+        sum(col(Dic.colMoney)).as(Dic.colTotalMoneyConsumption))
+
+    val order_part_4 = user_order
       .filter(
         col(Dic.colResourceType).>(0)
-          && col(Dic.colOrderStatus).<=(1)
-      )
+          && col(Dic.colOrderStatus).<=(1))
       .groupBy(col(Dic.colUserId))
       .agg(
         count(col(Dic.colUserId)).as(Dic.colNumberPackagesUnpurchased),
-        sum(col(Dic.colMoney)).as(Dic.colMoneyPackagesUnpurchased)
-      )
+        sum(col(Dic.colMoney)).as(Dic.colMoneyPackagesUnpurchased))
 
-    val order_part_5=user_order
+    val order_part_5 = user_order
       .filter(
         col(Dic.colResourceType).===(0)
-          && col(Dic.colOrderStatus).<=(1)
-      )
+          && col(Dic.colOrderStatus).<=(1))
       .groupBy(col(Dic.colUserId))
       .agg(
         count(col(Dic.colUserId)).as(Dic.colNumberSinglesUnpurchased),
-        sum(col(Dic.colMoney)).as(Dic.colMoneySinglesUnpurchased)
-      )
-    val order_part_6=user_order
+        sum(col(Dic.colMoney)).as(Dic.colMoneySinglesUnpurchased))
+
+    val order_part_6 = user_order
       .filter(
         col(Dic.colResourceType).>(0)
-          && col(Dic.colOrderStatus).>(1)
-      )
+          && col(Dic.colOrderStatus).>(1))
       .groupBy(col(Dic.colUserId))
       .agg(
-        udfGetDays(max(col(Dic.colCreationTime)),lit(now)).as(Dic.colDaysSinceLastPurchasePackage)
-      )
+        udfGetDays(max(col(Dic.colCreationTime)), lit(now)).as(Dic.colDaysSinceLastPurchasePackage))
 
-    val order_part_7=user_order
+    val order_part_7 = user_order
       .filter(
-        col(Dic.colResourceType).>(0)
-      )
+        col(Dic.colResourceType).>(0))
       .groupBy(col(Dic.colUserId))
       .agg(
-        udfGetDays(max(col(Dic.colCreationTime)),lit(now)).as(Dic.colDaysSinceLastClickPackage)
-      )
+        udfGetDays(max(col(Dic.colCreationTime)), lit(now)).as(Dic.colDaysSinceLastClickPackage))
 
-    val order_part_8=user_order
+    val order_part_8 = user_order
       .filter(
-        col(Dic.colCreationTime).>=(pre_30)
-      )
+        col(Dic.colCreationTime).>=(pre_30))
       .groupBy(col(Dic.colUserId))
       .agg(
-        count(col(Dic.colUserId)).as(Dic.colNumbersOrdersLast30Days)
-      )
+        count(col(Dic.colUserId)).as(Dic.colNumbersOrdersLast30Days))
 
-    val order_part_9=user_order
+    val order_part_9 = user_order
       .filter(
         col(Dic.colCreationTime).>=(pre_30)
-        && col(Dic.colOrderStatus).>(1)
-      )
+          && col(Dic.colOrderStatus).>(1))
       .groupBy(col(Dic.colUserId))
       .agg(
-        count(col(Dic.colUserId)).as(Dic.colNumberPaidOrdersLast30Days)
-      )
-    val order_part_10=user_order
+        count(col(Dic.colUserId)).as(Dic.colNumberPaidOrdersLast30Days))
+
+    val order_part_10 = user_order
       .filter(
         col(Dic.colCreationTime).>=(pre_30)
           && col(Dic.colOrderStatus).>(1)
-        && col(Dic.colResourceType).>(0)
-      )
+          && col(Dic.colResourceType).>(0))
       .groupBy(col(Dic.colUserId))
       .agg(
-        count(col(Dic.colUserId)).as(Dic.colNumberPaidPackageLast30Days)
-      )
-    val order_part_11=user_order
+        count(col(Dic.colUserId)).as(Dic.colNumberPaidPackageLast30Days))
+
+    val order_part_11 = user_order
       .filter(
         col(Dic.colCreationTime).>=(pre_30)
           && col(Dic.colOrderStatus).>(1)
-          && col(Dic.colResourceType).===(0)
-      )
+          && col(Dic.colResourceType).===(0))
       .groupBy(col(Dic.colUserId))
       .agg(
-        count(col(Dic.colUserId)).as(Dic.colNumberPaidSingleLast30Days)
-      )
+        count(col(Dic.colUserId)).as(Dic.colNumberPaidSingleLast30Days))
 
-    val order_part_12=user_order
+    val order_part_12 = user_order
       .filter(
         col(Dic.colOrderEndTime).>(now)
-        && col(Dic.colResourceType).>(0)
-        && col(Dic.colOrderStatus).>(1)
-      )
+          && col(Dic.colResourceType).>(0)
+          && col(Dic.colOrderStatus).>(1))
       .groupBy(col(Dic.colUserId))
       .agg(
-        udfGetDays(max(col(Dic.colOrderEndTime)),lit(now)).as(Dic.colDaysRemainingPackage)
-      )
+        udfGetDays(max(col(Dic.colOrderEndTime)), lit(now)).as(Dic.colDaysRemainingPackage))
 
-     result=result.join(order_part_1,joinKeysUserId,"left")
-     .join(order_part_2,joinKeysUserId, "left")
-     .join(order_part_3,joinKeysUserId,"left")
-     .join(order_part_4,joinKeysUserId, "left")
-     .join(order_part_5,joinKeysUserId, "left")
-     .join(order_part_6,joinKeysUserId, "left")
-     .join(order_part_7,joinKeysUserId, "left")
-     .join(order_part_8,joinKeysUserId,"left")
-     .join(order_part_9,joinKeysUserId, "left")
-     .join(order_part_10,joinKeysUserId, "left")
-     .join(order_part_11,joinKeysUserId, "left")
-     .join(order_part_12,joinKeysUserId, "left")
+    val df_result = df_user_id
+      .join(order_part_1, joinKeysUserId, "left")
+      .join(order_part_2, joinKeysUserId, "left")
+      .join(order_part_3, joinKeysUserId, "left")
+      .join(order_part_4, joinKeysUserId, "left")
+      .join(order_part_5, joinKeysUserId, "left")
+      .join(order_part_6, joinKeysUserId, "left")
+      .join(order_part_7, joinKeysUserId, "left")
+      .join(order_part_8, joinKeysUserId, "left")
+      .join(order_part_9, joinKeysUserId, "left")
+      .join(order_part_10, joinKeysUserId, "left")
+      .join(order_part_11, joinKeysUserId, "left")
+      .join(order_part_12, joinKeysUserId, "left")
 
-    printDf("result", result)
-
-    val userProfileOrderPartSavePath=hdfsPath+"data/predict/common/processed/userprofileorderpart"+now.split(" ")(0)
-    //大约有85万用户
-    result.write.mode(SaveMode.Overwrite).format("parquet").save(userProfileOrderPartSavePath)
-
+    df_result
   }
 
+  /**
+    * Get user play data.
+    *
+    * @param spark
+    * @return
+    */
+  def getPlay(spark: SparkSession) = {
 
-    def main(args:Array[String]): Unit ={
-      val hdfsPath="hdfs:///pay_predict/"
-      //val hdfsPath=""
-      val mediasProcessedPath=hdfsPath+"data/predict/common/processed/mediastemp"
+    // 1 - 获取用户播放记录
+    val user_play_sql =
+      s"""
+         |SELECT
+         |    user_id,
+         |    video_id,
+         |    play_end_time,
+         |    broadcast_time
+         |FROM
+         |    vodrs.t_sdu_user_play_history_paypredict
+         |WHERE
+         |    partitiondate='$partitiondate' and license='$license'
+      """.stripMargin
 
-      val playsProcessedPath=hdfsPath+"data/predict/common/processed/plays"
+    val df_play = spark.sql(user_play_sql)
 
-      val ordersProcessedPath=hdfsPath+"data/predict/common/processed/orders"
-
-      // 【Q】 What are the args?
-      val now=args(0)+" "+args(1)
-
-      userProfileGenerateOrderPart(now,30,mediasProcessedPath,playsProcessedPath,ordersProcessedPath,hdfsPath)
-
+    df_play
   }
 
+  /**
+    * Get user order data.
+    *
+    * @param spark
+    * @return
+    */
+  def getOrder(spark: SparkSession) = {
+
+    // 1 - 获取用户购买记录
+    val user_order_sql =
+      s"""
+         |SELECT
+         |    user_id,
+         |    money,
+         |    resource_type,
+         |    resource_id,
+         |    resource_title,
+         |    creation_time,
+         |    discount_description,
+         |    order_status,
+         |    order_start_time,
+         |    order_end_time
+         |FROM
+         |    vodrs.t_sdu_user_order_history_paypredict
+         |WHERE
+         |    partitiondate='$partitiondate' and license='$license'
+      """.stripMargin
+
+    val df_order = spark.sql(user_order_sql)
+
+    df_order
+  }
+
+  /**
+    * Save data to hive.
+    *
+    * @param spark
+    * @param df_result
+    */
+  def saveData(spark: SparkSession, df_result: DataFrame) = {
+
+    spark.sql(
+      """
+        |CREATE TABLE IF NOT EXISTS
+        |     vodrs.t_sdu_user_profile_order_paypredict(
+        |         user_id string,
+        |         number_packages_purchased long,
+        |         total_money_packages_purchased double,
+        |         max_money_package_purchased double,
+        |         min_money_package_purchased double,
+        |         avg_money_package_purchased double,
+        |         var_money_package_purchased double,
+        |         number_singles_purchased long,
+        |         total_money_singles_purchased double,
+        |         total_money_consumption double,
+        |         number_packages_unpurchased long,
+        |         money_packages_unpurchased double,
+        |         number_singles_unpurchased long,
+        |         money_singles_unpurchased double,
+        |         days_since_last_purchase_package int,
+        |         days_since_last_click_package int,
+        |         number_orders_last_30_days long,
+        |         number_paid_orders_last_30_days long,
+        |         number_paid_package_last_30_days long,
+        |         number_paid_single_last_30_days long,
+        |         days_remaining_package int)
+        |PARTITIONED BY
+        |    (partitiondate string, license string)
+      """.stripMargin)
+
+    println("save data to hive........... \n" * 4)
+    df_result.createOrReplaceTempView(tempTable)
+    val insert_sql =
+      s"""
+         |INSERT OVERWRITE TABLE
+         |    vodrs.t_sdu_user_profile_order_paypredict
+         |PARTITION
+         |    (partitiondate = '$partitiondate', license = '$license')
+         |SELECT
+         |    user_id,
+         |    number_packages_purchased,
+         |    total_money_packages_purchased,
+         |    max_money_package_purchased,
+         |    min_money_package_purchased,
+         |    avg_money_package_purchased,
+         |    var_money_package_purchased,
+         |    number_singles_purchased,
+         |    total_money_singles_purchased,
+         |    total_money_consumption,
+         |    number_packages_unpurchased,
+         |    money_packages_unpurchased,
+         |    number_singles_unpurchased,
+         |    money_singles_unpurchased,
+         |    days_since_last_purchase_package,
+         |    days_since_last_click_package,
+         |    number_orders_last_30_days,
+         |    number_paid_orders_last_30_days,
+         |    number_paid_package_last_30_days,
+         |    number_paid_single_last_30_days,
+         |    days_remaining_package
+         |FROM
+         |    $tempTable
+      """.stripMargin
+    spark.sql(insert_sql)
+    println("over over........... \n" * 4)
+  }
 }

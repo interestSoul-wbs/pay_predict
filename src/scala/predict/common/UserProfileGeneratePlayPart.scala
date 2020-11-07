@@ -1,34 +1,52 @@
 package predict.common
 
 import mam.Dic
-import mam.Utils.{calDate, udfGetDays}
+import mam.Utils.{calDate, printDf, udfGetDays}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql
-import org.apache.spark.sql.{SaveMode, SparkSession}
+import org.apache.spark.sql._
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
-import scala.collection.mutable.ListBuffer
 
 object UserProfileGeneratePlayPart {
 
-  def userProfileGeneratePlayPart(now:String,timeWindow:Int,medias_path:String,plays_path:String,orders_path:String,hdfsPath:String): Unit = {
-    System.setProperty("hadoop.home.dir", "c:\\winutils")
-    Logger.getLogger("org").setLevel(Level.ERROR)
-    val spark: SparkSession = new sql.SparkSession.Builder()
-      .appName("PredictUserProfileGeneratePlayPart")
-      //.master("local[6]")
-      .getOrCreate()
-    //设置shuffle过程中分区数
-   // spark.sqlContext.setConf("spark.sql.shuffle.partitions", "1000")
-    import org.apache.spark.sql.functions._
+  var tempTable = "temp_table"
+  var partitiondate: String = _
+  var license: String = _
 
-    val medias = spark.read.format("parquet").load(medias_path)
-    val plays = spark.read.format("parquet").load(plays_path)
-   // val orders = spark.read.format("parquet").load(orders_path)
+  def main(args: Array[String]): Unit = {
 
+    partitiondate = args(0)
+    license = args(1)
 
-    var result=plays.select(col(Dic.colUserId)).distinct()
+    val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
 
-    //val result = users.toDF("user_id")
+    // 训练集的划分时间点 - 2020-06-01 00:00:00
+    val now = "2020-07-01 00:00:00"
+
+    // 1 - processed medias - meida的数据处理相对固定，目前取固定分区 - 2020-10-28，wasu - Konverse - 2020-11-2
+    val df_medias = getMedias(spark)
+
+    printDf("df_medias", df_medias)
+
+    // 2 - processed play data
+    val df_plays = getPlay(spark)
+
+    printDf("df_plays", df_plays)
+
+    // 3 - data process
+    val df_result = userProfileGeneratePlayPart(now, 30, df_medias, df_plays)
+
+    printDf("df_result", df_result)
+
+    // 4 - save data
+//    saveData(spark, df_result)
+  }
+
+  def userProfileGeneratePlayPart(now: String, timeWindow: Int, df_medias: DataFrame, df_plays: DataFrame) = {
+
+    val df_user_id = df_plays
+      .select(col(Dic.colUserId)).distinct()
 
     val pre_30 = calDate(now, -30)
     val pre_14 = calDate(now, days = -14)
@@ -36,11 +54,7 @@ object UserProfileGeneratePlayPart {
     val pre_3 = calDate(now, -3)
     val pre_1 = calDate(now, -1)
 
-    //设置DataFrame列表
-    val dataFrameList=ListBuffer()
-
-
-    val play_part_1 = plays
+    val df_play_part_1 = df_plays
       .filter(
         col(Dic.colPlayEndTime).<(now)
           && col(Dic.colPlayEndTime).>=(pre_30))
@@ -51,107 +65,100 @@ object UserProfileGeneratePlayPart {
         udfGetDays(max(col(Dic.colPlayEndTime)), lit(now)).as(Dic.colDaysFromLastActive),
         udfGetDays(min(col(Dic.colPlayEndTime)), lit(now)).as(Dic.colDaysSinceFirstActiveInTimewindow))
 
-
-    val play_part_2 = plays
+    val df_play_part_2 = df_plays
       .filter(
         col(Dic.colPlayEndTime).<(now)
           && col(Dic.colPlayEndTime).>=(pre_14))
       .groupBy(col(Dic.colUserId))
       .agg(
         countDistinct(col(Dic.colPlayEndTime)).as(Dic.colActiveDaysLast14Days),
-        sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimeLast14Days)
-      )
+        sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimeLast14Days))
 
-
-    val play_part_3 = plays
+    val df_play_part_3 = df_plays
       .filter(
         col(Dic.colPlayEndTime).<(now)
           && col(Dic.colPlayEndTime).>=(pre_7))
       .groupBy(col(Dic.colUserId))
       .agg(
         countDistinct(col(Dic.colPlayEndTime)).as(Dic.colActiveDaysLast7Days),
-        sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimeLast7Days)
-      )
-    val play_part_4 = plays
+        sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimeLast7Days))
+
+    val df_play_part_4 = df_plays
       .filter(
         col(Dic.colPlayEndTime).<(now)
           && col(Dic.colPlayEndTime).>=(pre_3))
       .groupBy(col(Dic.colUserId))
       .agg(
         countDistinct(col(Dic.colPlayEndTime)).as(Dic.colActiveDaysLast3Days),
-        sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimeLast3Days)
-      )
-
+        sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimeLast3Days))
 
     val joinKeysUserId = Seq(Dic.colUserId)
-    result=result.join(play_part_1,joinKeysUserId,"left")
-    .join(play_part_2, joinKeysUserId, "left")
-    .join(play_part_3, joinKeysUserId, "left")
-    .join(play_part_4, joinKeysUserId, "left")
 
-    val joinKeyVideoId=Seq(Dic.colVideoId)
-    val user_medias=plays.join(medias,joinKeyVideoId,"inner")
+    val df_result_tmp_1 = df_user_id
+      .join(df_play_part_1, joinKeysUserId, "left")
+      .join(df_play_part_2, joinKeysUserId, "left")
+      .join(df_play_part_3, joinKeysUserId, "left")
+      .join(df_play_part_4, joinKeysUserId, "left")
 
-    val play_medias_part_11=user_medias
+    val joinKeyVideoId = Seq(Dic.colVideoId)
+
+    val df_user_medias = df_plays.join(df_medias, joinKeyVideoId, "inner")
+
+    val df_play_medias_part_11 = df_user_medias
       .filter(
         col(Dic.colPlayEndTime).<(now)
           && col(Dic.colPlayEndTime).>=(pre_30)
           && col(Dic.colIsPaid).===(1))
       .groupBy(col(Dic.colUserId))
       .agg(
-        sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimePaidVideosLast30Days)
-      )
+        sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimePaidVideosLast30Days))
 
-    val play_medias_part_12=user_medias
+    val df_play_medias_part_12 = df_user_medias
       .filter(
         col(Dic.colPlayEndTime).<(now)
           && col(Dic.colPlayEndTime).>=(pre_14)
           && col(Dic.colIsPaid).===(1))
       .groupBy(col(Dic.colUserId))
       .agg(
-        sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimePaidVideosLast14Days)
-      )
+        sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimePaidVideosLast14Days))
 
-    val play_medias_part_13=user_medias
+    val df_play_medias_part_13 = df_user_medias
       .filter(
         col(Dic.colPlayEndTime).<(now)
           && col(Dic.colPlayEndTime).>=(pre_7)
           && col(Dic.colIsPaid).===(1))
       .groupBy(col(Dic.colUserId))
       .agg(
-        sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimePaidVideosLast7Days)
-      )
+        sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimePaidVideosLast7Days))
 
-    val play_medias_part_14=user_medias
+    val df_play_medias_part_14 = df_user_medias
       .filter(
         col(Dic.colPlayEndTime).<(now)
           && col(Dic.colPlayEndTime).>=(pre_3)
           && col(Dic.colIsPaid).===(1))
       .groupBy(col(Dic.colUserId))
       .agg(
-        sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimePaidVideosLast3Days)
-      )
+        sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimePaidVideosLast3Days))
 
-    val play_medias_part_15=user_medias
+    val df_play_medias_part_15 = df_user_medias
       .filter(
         col(Dic.colPlayEndTime).<(now)
           && col(Dic.colPlayEndTime).>=(pre_1)
           && col(Dic.colIsPaid).===(1))
       .groupBy(col(Dic.colUserId))
       .agg(
-        sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimePaidVideosLast1Days)
-      )
+        sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimePaidVideosLast1Days))
 
-     result=result.join(play_medias_part_11,joinKeysUserId,"left")
-    .join(play_medias_part_12,joinKeysUserId, "left")
-    .join(play_medias_part_13,joinKeysUserId,"left")
-    .join(play_medias_part_14,joinKeysUserId, "left")
-    .join(play_medias_part_15,joinKeysUserId, "left")
+    val df_result_tmp_2 = df_result_tmp_1
+      .join(df_play_medias_part_11, joinKeysUserId, "left")
+      .join(df_play_medias_part_12, joinKeysUserId, "left")
+      .join(df_play_medias_part_13, joinKeysUserId, "left")
+      .join(df_play_medias_part_14, joinKeysUserId, "left")
+      .join(df_play_medias_part_15, joinKeysUserId, "left")
 
+    df_result_tmp_1.unpersist()
 
-
-
-    val play_medias_part_21=user_medias
+    val df_play_medias_part_21 = df_user_medias
       .filter(
         col(Dic.colPlayEndTime).<(now)
           && col(Dic.colPlayEndTime).>=(pre_30)
@@ -160,10 +167,9 @@ object UserProfileGeneratePlayPart {
       .agg(
         sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimeInPackageVideosLast30Days),
         stddev(col(Dic.colBroadcastTime)).as(Dic.colVarTimeInPackageVideosLast30Days),
-        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberInPackagesVideosLast30Days)
-      )
+        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberInPackagesVideosLast30Days))
 
-    val play_medias_part_22=user_medias
+    val df_play_medias_part_22 = df_user_medias
       .filter(
         col(Dic.colPlayEndTime).<(now)
           && col(Dic.colPlayEndTime).>=(pre_14)
@@ -172,10 +178,9 @@ object UserProfileGeneratePlayPart {
       .agg(
         sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimeInPackageVideosLast14Days),
         stddev(col(Dic.colBroadcastTime)).as(Dic.colVarTimeInPackageVideosLast14Days),
-        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberInPackagesVideosLast14Days)
-      )
+        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberInPackagesVideosLast14Days))
 
-    val play_medias_part_23=user_medias
+    val df_play_medias_part_23 = df_user_medias
       .filter(
         col(Dic.colPlayEndTime).<(now)
           && col(Dic.colPlayEndTime).>=(pre_7)
@@ -184,10 +189,9 @@ object UserProfileGeneratePlayPart {
       .agg(
         sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimeInPackageVideosLast7Days),
         stddev(col(Dic.colBroadcastTime)).as(Dic.colVarTimeInPackageVideosLast7Days),
-        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberInPackagesVideosLast7Days)
-      )
+        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberInPackagesVideosLast7Days))
 
-    val play_medias_part_24=user_medias
+    val df_play_medias_part_24 = df_user_medias
       .filter(
         col(Dic.colPlayEndTime).<(now)
           && col(Dic.colPlayEndTime).>=(pre_3)
@@ -196,10 +200,9 @@ object UserProfileGeneratePlayPart {
       .agg(
         sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimeInPackageVideosLast3Days),
         stddev(col(Dic.colBroadcastTime)).as(Dic.colVarTimeInPackageVideosLast3Days),
-        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberInPackagesVideosLast3Days)
-      )
+        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberInPackagesVideosLast3Days))
 
-    val play_medias_part_25=user_medias
+    val df_play_medias_part_25 = df_user_medias
       .filter(
         col(Dic.colPlayEndTime).<(now)
           && col(Dic.colPlayEndTime).>=(pre_1)
@@ -208,18 +211,18 @@ object UserProfileGeneratePlayPart {
       .agg(
         sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimeInPackageVideosLast1Days),
         stddev(col(Dic.colBroadcastTime)).as(Dic.colVarTimeInPackageVideosLast1Days),
-        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberInPackagesVideosLast1Days)
-      )
+        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberInPackagesVideosLast1Days))
 
-     result=result.join(play_medias_part_21,joinKeysUserId,"left")
-     .join(play_medias_part_22,joinKeysUserId, "left")
-     .join(play_medias_part_23,joinKeysUserId,"left")
-     .join(play_medias_part_24,joinKeysUserId, "left")
-     .join(play_medias_part_25,joinKeysUserId, "left")
+    val df_result_tmp_3 = df_result_tmp_2
+      .join(df_play_medias_part_21, joinKeysUserId, "left")
+      .join(df_play_medias_part_22, joinKeysUserId, "left")
+      .join(df_play_medias_part_23, joinKeysUserId, "left")
+      .join(df_play_medias_part_24, joinKeysUserId, "left")
+      .join(df_play_medias_part_25, joinKeysUserId, "left")
 
+    df_result_tmp_2.unpersist()
 
-
-    val play_medias_part_31=user_medias
+    val df_play_medias_part_31 = df_user_medias
       .filter(
         col(Dic.colPlayEndTime).<(now)
           && col(Dic.colPlayEndTime).>=(pre_30)
@@ -227,9 +230,9 @@ object UserProfileGeneratePlayPart {
       .groupBy(col(Dic.colUserId))
       .agg(
         sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimeChildrenVideosLast30Days),
-        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberChildrenVideosLast30Days)
-      )
-    val play_medias_part_32=user_medias
+        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberChildrenVideosLast30Days))
+
+    val df_play_medias_part_32 = df_user_medias
       .filter(
         col(Dic.colPlayEndTime).<(now)
           && col(Dic.colPlayEndTime).>=(pre_14)
@@ -237,9 +240,9 @@ object UserProfileGeneratePlayPart {
       .groupBy(col(Dic.colUserId))
       .agg(
         sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimeChildrenVideosLast14Days),
-        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberChildrenVideosLast14Days)
-      )
-    val play_medias_part_33=user_medias
+        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberChildrenVideosLast14Days))
+
+    val df_play_medias_part_33 = df_user_medias
       .filter(
         col(Dic.colPlayEndTime).<(now)
           && col(Dic.colPlayEndTime).>=(pre_7)
@@ -247,9 +250,9 @@ object UserProfileGeneratePlayPart {
       .groupBy(col(Dic.colUserId))
       .agg(
         sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimeChildrenVideosLast7Days),
-        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberChildrenVideosLast7Days)
-      )
-    val play_medias_part_34=user_medias
+        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberChildrenVideosLast7Days))
+
+    val df_play_medias_part_34 = df_user_medias
       .filter(
         col(Dic.colPlayEndTime).<(now)
           && col(Dic.colPlayEndTime).>=(pre_3)
@@ -257,9 +260,9 @@ object UserProfileGeneratePlayPart {
       .groupBy(col(Dic.colUserId))
       .agg(
         sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimeChildrenVideosLast3Days),
-        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberChildrenVideosLast3Days)
-      )
-    val play_medias_part_35=user_medias
+        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberChildrenVideosLast3Days))
+
+    val df_play_medias_part_35 = df_user_medias
       .filter(
         col(Dic.colPlayEndTime).<(now)
           && col(Dic.colPlayEndTime).>=(pre_1)
@@ -267,50 +270,87 @@ object UserProfileGeneratePlayPart {
       .groupBy(col(Dic.colUserId))
       .agg(
         sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimeChildrenVideosLast1Days),
-        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberChildrenVideosLast1Days)
-      )
-    result=result.join(play_medias_part_31,joinKeysUserId,"left")
-    .join(play_medias_part_32,joinKeysUserId, "left")
-    .join(play_medias_part_33,joinKeysUserId,"left")
-    .join(play_medias_part_34,joinKeysUserId, "left")
-    .join(play_medias_part_35,joinKeysUserId, "left")
+        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberChildrenVideosLast1Days))
 
+    val df_result = df_result_tmp_3
+      .join(df_play_medias_part_31, joinKeysUserId, "left")
+      .join(df_play_medias_part_32, joinKeysUserId, "left")
+      .join(df_play_medias_part_33, joinKeysUserId, "left")
+      .join(df_play_medias_part_34, joinKeysUserId, "left")
+      .join(df_play_medias_part_35, joinKeysUserId, "left")
 
+    df_result_tmp_3.unpersist()
 
-
-
-
-
-
-    //result.show()
-    val userProfilePlayPartSavePath=hdfsPath+"data/predict/common/processed/userprofileplaypart"+now.split(" ")(0)
-    //大约有85万用户
-    result.write.mode(SaveMode.Overwrite).format("parquet").save(userProfilePlayPartSavePath)
-
-
-
-
+    df_result
   }
 
+  /**
+    * Get processed media data.
+    *
+    * @param spark
+    * @return
+    */
+  def getMedias(spark: SparkSession) = {
 
-  def main(args:Array[String]): Unit ={
-    val hdfsPath="hdfs:///pay_predict/"
-    //val hdfsPath=""
-    val mediasProcessedPath=hdfsPath+"data/predict/common/processed/mediastemp"
-    val playsProcessedPath=hdfsPath+"data/predict/common/processed/plays"
-    val ordersProcessedPath=hdfsPath+"data/predict/common/processed/orders"
-    val now=args(0)+" "+args(1)
-    userProfileGeneratePlayPart(now,30,mediasProcessedPath,playsProcessedPath,ordersProcessedPath,hdfsPath)
+    // 1 - get processed medias
+    val user_order_sql =
+      s"""
+         |SELECT
+         |    video_id ,
+         |    video_title ,
+         |    video_one_level_classification ,
+         |    video_two_level_classification_list ,
+         |    video_tag_list ,
+         |    director_list ,
+         |    actor_list ,
+         |    country ,
+         |    language ,
+         |    release_date ,
+         |    storage_time ,
+         |    video_time ,
+         |    score ,
+         |    is_paid ,
+         |    package_id ,
+         |    is_single ,
+         |    is_trailers ,
+         |    supplier ,
+         |    introduction
+         |FROM
+         |    vodrs.t_media_sum_processed_paypredict
+         |WHERE
+         |    partitiondate='20201028' and license='wasu'
+      """.stripMargin
 
+    val df_medias = spark.sql(user_order_sql)
 
+    df_medias
+  }
 
+  /**
+    * Get user play data.
+    *
+    * @param spark
+    * @return
+    */
+  def getPlay(spark: SparkSession) = {
 
+    // 1 - 获取用户播放记录
+    val user_play_sql =
+      s"""
+         |SELECT
+         |    user_id,
+         |    video_id,
+         |    play_end_time,
+         |    broadcast_time
+         |FROM
+         |    vodrs.t_sdu_user_play_history_paypredict
+         |WHERE
+         |    partitiondate='$partitiondate' and license='$license'
+      """.stripMargin
 
+    val df_play = spark.sql(user_play_sql)
 
-
-
-
-
+    df_play
   }
 
 }

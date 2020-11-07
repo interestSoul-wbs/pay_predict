@@ -1,24 +1,16 @@
-package predict.userpay
+package predict.common.ori
 
 import mam.Dic
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
 import org.apache.spark.sql.{SaveMode, SparkSession}
-import org.apache.spark.sql.functions._
+
 import scala.collection.mutable.ArrayBuffer
 
 object  PredictFeatureProcessOld {
-
-  var tempTable = "temp_table"
-  var partitiondate: String = _
-  var license: String = _
-
   def main(args: Array[String]): Unit = {
-
-    partitiondate = args(0)
-    license = args(1)
-
-    val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
+    System.setProperty("hadoop.home.dir", "c:\\winutils")
+    Logger.getLogger("org").setLevel(Level.ERROR)
 
     //val userProfilePath =  "pay_predict/data/train/common/processed/userfile_0601.pkl"
     val hdfsPath="hdfs:///pay_predict/"
@@ -34,26 +26,19 @@ object  PredictFeatureProcessOld {
     val userProfilePreferencePartPath=hdfsPath+"data/predict/common/processed/userprofilepreferencepart"+args(0)
     val userProfileOrderPartPath=hdfsPath+"data/predict/common/processed/userprofileorderpart"+args(0)
 
-
-
-    import spark.implicits._
+    val spark: SparkSession = new sql.SparkSession.Builder()
+      .appName("PredictFeatureProcessNew")
+      //.master("local[6]")
+      .getOrCreate()
+    import org.apache.spark.sql.functions._
     val userProfilePlayPart = spark.read.format("parquet").load(userProfilePlayPartPath)
-
-//    val df_user_profile_play =
-
     val userProfilePreferencePart = spark.read.format("parquet").load(userProfilePreferencePartPath)
-
     val userProfileOrderPart = spark.read.format("parquet").load(userProfileOrderPartPath)
-
     val joinKeysUserId = Seq(Dic.colUserId)
-
     val temp=userProfilePlayPart.join(userProfilePreferencePart,joinKeysUserId,"left")
-
     val userProfiles=temp.join(userProfileOrderPart,joinKeysUserId,"left")
     //    val orders = spark.read.format("parquet").load(orderProcessedPath).toDF()
-
     val userList=spark.read.format("parquet").load(userListPath)
-
     val trainSet=userList.join(userProfiles,joinKeysUserId,"left")
     //trainSet.show()
     //println(trainSet.count())
@@ -186,9 +171,4 @@ object  PredictFeatureProcessOld {
     result.write.mode(SaveMode.Overwrite).option("header","true").csv(predictSetSavePath + "predictsetold" + args(0)+".csv")
   }
 
-  def getUserProfilePlayPart(spark: SparkSession) = {
-
-
-
-  }
 }
