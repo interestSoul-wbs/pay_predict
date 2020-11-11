@@ -9,12 +9,13 @@ import java.text.SimpleDateFormat
 
 import mam.Dic
 import mam.Utils
-import mam.Utils.{printDf, udfChangeDateFormat, udfFillDiscountDescription, udfGetDays, udfGetKeepSign}
+import mam.Utils.{printDf, udfChangeDateFormat, udfFillDiscountDescription, udfGetDays, udfGetErrorMoneySign, udfGetKeepSign, udfUniformTimeValidity}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
 import org.apache.spark.sql.functions.{col, udf, when}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
+import shapeless.ops.tuple
 
 object OrdersProcess {
 
@@ -35,14 +36,14 @@ object OrdersProcess {
       val orderRaw=getRawOrders(orderRawPath,spark)
 
       printDf("输入 orderRaw",orderRaw)
-      orderRaw.filter(col(Dic.colUserId).===("106411")).show()
 
-      val orderProcessed=orderProcess(orderRaw)
+      val orderProcessed = orderProcess(orderRaw)
 
-      printDf("输出 orderProcessed",orderProcessed)
-      orderProcessed.filter(col(Dic.colUserId).===("106411")).show()
-      orderProcessed.write.mode(SaveMode.Overwrite).format("parquet").save(orderProcessedPath)
-      println("订单数据处理完成！")
+//      printDf("输出 orderProcessed",orderProcessed)
+//      orderProcessed.filter(col(Dic.colUserId).===("106411")).show()
+//
+//      orderProcessed.write.mode(SaveMode.Overwrite).format("parquet").save(orderProcessedPath)
+//      println("订单数据处理完成！")
     }
 
 
@@ -71,11 +72,11 @@ object OrdersProcess {
 
   }
   def orderProcess(orderRaw:DataFrame)={
-    var orderProcessed=orderRaw.withColumn(Dic.colCreationTime,udfChangeDateFormat(col(Dic.colCreationTime)))
+    var orderProcessed = orderRaw.withColumn(Dic.colCreationTime,udfChangeDateFormat(col(Dic.colCreationTime)))
       .withColumn(Dic.colOrderStartTime,udfChangeDateFormat(col(Dic.colOrderStartTime)))
       .withColumn(Dic.colOrderEndTime,udfChangeDateFormat(col(Dic.colOrderEndTime)))
 
-    orderProcessed=orderProcessed.select(
+    orderProcessed = orderProcessed.select(
       when(col(Dic.colUserId)==="NULL",null).otherwise(col(Dic.colUserId)).as(Dic.colUserId),
       when(col(Dic.colMoney)==="NULL",Double.NaN).otherwise(col(Dic.colMoney) cast DoubleType).as(Dic.colMoney),
       when(col(Dic.colResourceType)==="NULL",Double.NaN).otherwise(col(Dic.colResourceType) cast DoubleType).as(Dic.colResourceType),
@@ -95,7 +96,10 @@ object OrdersProcess {
       //选取有效时间大于0的
       .filter(col(Dic.colTimeValidity).>=(0))
       // 根据 time_validity 和 resource_type 填充order中 discount_description 为 null的数值
-      .withColumn(Dic.colDiscountDescription, udfFillDiscountDescription(col(Dic.colResourceType),col(Dic.colTimeValidity)))
+      //.withColumn(Dic.colDiscountDescription, udfFillDiscountDescription(col(Dic.colResourceType),col(Dic.colTimeValidity)))
+      //统一有效时长
+      .withColumn(Dic.colTimeValidity, udfUniformTimeValidity(col(Dic.colTimeValidity)))
+
 
     /**
      * 选取生效时间晚于 creation_time 的数据 ，由于存在1/4的创建数据晚于生效时间，但时间差距基本为几秒，因此比较时间部分加上1min
@@ -118,8 +122,17 @@ object OrdersProcess {
     orderProcessed2= orderProcessed2.withColumnRenamed("max(order_status)", Dic.colOrderStatus)
 
     var orderProcessed3 = orderProcessed.join(orderProcessed2, Seq(Dic.colUserId, Dic.colResourceId, Dic.colCreationTime, Dic.colOrderStartTime, Dic.colOrderStatus ), "inner")
-    orderProcessed3
+
+    /**
+     * 标记金额信息异常用户
+     * ！！！！！！！！！！！！！！！！！！！！
+     * 目前仅仅用于会员付费预测信息
+     */
+
+    orderProcessed = orderProcessed.withColumn(Dic.colIsMoneyError, udfGetErrorMoneySign(col(Dic.colResourceId), col(Dic.colMoney)))
+
+    orderProcessed
 
   }
 
-  }
+}
