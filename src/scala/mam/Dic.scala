@@ -73,7 +73,7 @@ object Dic {
   val colOrderEndTime="order_end_time"
   val colTimeValidity = "time_validity"  //有效时长
   val colKeepSign = "keep_sign" //筛选数据使用
-
+  val colIsMoneyError = "is_money_error" //金额信息异常标注
 
   /**
    * 用户画像中的属性

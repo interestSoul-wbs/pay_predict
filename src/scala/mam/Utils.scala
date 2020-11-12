@@ -245,6 +245,30 @@ object Utils {
 
   }
 
+  def udfUniformTimeValidity = udf(uniformTimeValidity _)
+  def uniformTimeValidity(timeValidity: Int, resourceType:Int): Int ={
+    /**
+     * @description  统一有效时长
+     * @author wx
+     * @param [timeValidity] 订单有效时长
+     * @param [resourceType] 订单资源类型
+     * @return {@link int }
+     **/
+
+    if (resourceType == 0 || resourceType >= 4){
+      return timeValidity
+    }
+    if (timeValidity >= 360) {
+       365
+    }else if(timeValidity>= 183) {
+       183
+    }else if(timeValidity >= 80){
+       92
+    }else{
+     30
+  }
+  }
+
   def udfGetKeepSign = udf(getKeepSign _)
   def getKeepSign(creationTime:String, startTime: String):Int={
     /**
@@ -263,6 +287,30 @@ object Utils {
     } else{
        0
     }
+
+  }
+
+
+
+  def udfGetErrorMoneySign = udf(getErrorMoneySign _)
+  def getErrorMoneySign(resourceId: Int, money: Double ) : Int= {
+    /**
+     * @description 标注金额异常的订单信息
+     * @author wx
+     * @param [creationTime] 订单创建时间
+     * @param [startTime] 订单开始生效时间
+     * @return {@link int }
+     **/
+    val errorOrders = List((100201, 0), (100201, 100), (100202, 0), (100206, 100), (101601, 0), (101806, 100))
+
+    var sign = 0
+    for (item <- errorOrders){
+      if ((item._1 == resourceId)&&(item._2 == money)){
+         sign = 1
+      }
+    }
+
+     sign
 
   }
 
