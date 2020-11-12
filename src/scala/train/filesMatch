@@ -1,0 +1,70 @@
+# medias
+
+## mediastemp
+——data/train/common/processed/mediastemp
+
+vodrs.t_media_sum_processed_paypredict
+
+partitiondate='', license='wasu'
+
+
+## videofirstcategorytemp.txt
+——data/train/common/processed/videofirstcategorytemp.txt
+
+vodrs.t_media_label_paypredict
+
+partitiondate='', license='wasu', category='one_level'
+
+
+## videosecondcategorytemp.txt
+——data/train/common/processed/videosecondcategorytemp.txt
+
+vodrs.t_media_label_paypredict
+
+partitiondate='', license='wasu', category='two_level'
+
+## labeltemp.txt
+——data/train/common/processed/labeltemp.txt
+
+vodrs.t_media_label_paypredict
+
+partitiondate='', license='wasu', category='video_tag'
+
+----------------
+# OrdersProcess
+
+## orders
+——data/train/common/processed/orders
+
+vodrs.t_sdu_user_order_history_paypredict
+
+----
+# UserProfileGenerateOrderPart
+## userprofileorderpart
+——data/train/common/processed/userprofileorderpart
+
+vodrs.t_sdu_user_profile_order_paypredict
+
+---
+# UserProfileGeneratePlayPart
+## userprofileplaypart
+——data/train/common/processed/userprofileplaypart
+
+vodrs.t_sdu_user_profile_play_paypredict
+
+
+--------
+# UserProfileGeneratePreferencePart
+## userprofilepreferencepart
+——data/train/common/processed/userprofilepreferencepart
+
+vodrs.t_sdu_user_profile_preference_paypredict
+
+
+--------
+# VideoProfileGenerate
+## videoprofile
+——data/train/common/processed/videoprofile
+
+vodrs.t_sdu_user_video_profile_paypredict
+

@@ -1,76 +1,236 @@
 package train.common
+
 /**
- * @Author wj
- * @Date 2020/09
- * @Version 1.0
- */
+  * @Author wj
+  * @Date 2020/09
+  * @Version 1.0
+  */
 
-import java.text.SimpleDateFormat
-
+import com.github.nscala_time.time.Imports.{DateTimeFormat, _}
 import mam.Dic
-import mam.Utils
-import mam.Utils.udfChangeDateFormat
-import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql
-import org.apache.spark.sql.functions.udf
+import mam.GetSaveData._
+import mam.Utils._
+import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{SaveMode, SparkSession}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 object OrdersProcess {
 
-    def main(args: Array[String]): Unit ={
-      System.setProperty("hadoop.home.dir","c:\\winutils")
-      Logger.getLogger("org").setLevel(Level.ERROR)
-      val spark: SparkSession = new sql.SparkSession.Builder()
-        .appName("OrdersProcess")
-        //.master("local[6]")
-        .getOrCreate()
-      val schema= StructType(
-        List(
-          StructField(Dic.colUserId, StringType),
-          StructField(Dic.colMoney, StringType),
-          StructField(Dic.colResourceType, StringType),
-          StructField(Dic.colResourceId, StringType),
-          StructField(Dic.colResourceTitle, StringType),
-          StructField(Dic.colCreationTime, StringType),
-          StructField(Dic.colDiscountDescription, StringType),
-          StructField(Dic.colOrderStatus, StringType),
-          StructField(Dic.colOrderStartTime, StringType),
-          StructField(Dic.colOrderEndTime, StringType)
+  var tempTable = "temp_table"
+  var partitiondate: String = _
+  var license: String = _
+  var date: DateTime = _
+  var today: String = _
+  var yesterday: String = _
+  var halfYearAgo: String = _
+  var oneYearAgo: String = _
 
-        )
-      )
-       //hdfs:///pay_predict/
-      import org.apache.spark.sql.functions._
-      val hdfsPath="hdfs:///pay_predict/"
-      //val hdfsPath=""
-      val orderRawPath=hdfsPath+"data/train/common/raw/orders/order*.txt"
-      val orderProcessedPath=hdfsPath+"data/train/common/processed/orders"
-      val df = spark.read
-        .option("delimiter", "\t")
-        .option("header", false)
-        .schema(schema)
-        .csv(orderRawPath)
+  def main(args: Array[String]): Unit = {
 
-      val df1=df.withColumn(Dic.colCreationTime,udfChangeDateFormat(col(Dic.colCreationTime)))
-        .withColumn(Dic.colOrderStartTime,udfChangeDateFormat(col(Dic.colOrderStartTime)))
-        .withColumn(Dic.colOrderEndTime,udfChangeDateFormat(col(Dic.colOrderEndTime)))
-      
-      val df2=df1.select(
-        when(col(Dic.colUserId)==="NULL",null).otherwise(col(Dic.colUserId)).as(Dic.colUserId),
-        when(col(Dic.colMoney)==="NULL",Double.NaN).otherwise(col(Dic.colMoney) cast DoubleType).as(Dic.colMoney),
-        when(col(Dic.colResourceType)==="NULL",Double.NaN).otherwise(col(Dic.colResourceType) cast DoubleType).as(Dic.colResourceType),
-        when(col(Dic.colResourceId)==="NULL",null).otherwise(col(Dic.colResourceId) ).as(Dic.colResourceId),
-        when(col(Dic.colResourceTitle)==="NULL",null).otherwise(col(Dic.colResourceTitle)).as(Dic.colResourceTitle),
-        when(col(Dic.colCreationTime)==="NULL",null).otherwise(col(Dic.colCreationTime) cast TimestampType ).as(Dic.colCreationTime),
-        when(col(Dic.colDiscountDescription)==="NULL",null).otherwise(col(Dic.colDiscountDescription)).as(Dic.colDiscountDescription),
-        when(col(Dic.colOrderStatus)==="NULL",Double.NaN).otherwise(col(Dic.colOrderStatus) cast DoubleType).as(Dic.colOrderStatus),
-        when(col(Dic.colOrderStartTime)==="NULL",null).otherwise(col(Dic.colOrderStartTime) cast TimestampType).as(Dic.colOrderStartTime),
-        when(col(Dic.colOrderEndTime)==="NULL",null).otherwise(col(Dic.colOrderEndTime) cast TimestampType).as(Dic.colOrderEndTime)
-      )
-      //df2.show()
-      df2.write.mode(SaveMode.Overwrite).format("parquet").save(orderProcessedPath)
-      println("订单数据处理完成！")
-    }
+    val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
 
+    partitiondate = args(0)
+    license = args(1)
+
+    date = DateTime.parse(partitiondate, DateTimeFormat.forPattern("yyyyMMdd"))
+    today = date.toString(DateTimeFormat.forPattern("yyyyMMdd"))
+    yesterday = (date - 1.days).toString(DateTimeFormat.forPattern("yyyyMMdd"))
+    halfYearAgo = (date - 180.days).toString(DateTimeFormat.forPattern("yyyyMMdd"))
+    oneYearAgo = (date - 365.days).toString(DateTimeFormat.forPattern("yyyyMMdd"))
+
+    // 1 - get all raw order data.
+    val df_raw_order = getRawOrderByDateRangeSmpleUsers(spark, halfYearAgo, today, license)
+
+    printDf("df_raw_order", df_raw_order)
+
+    // 2 - process of order data.
+    val df_order = multiOrderTimesProcess(df_raw_order)
+
+    printDf("df_order", df_order)
+
+    val df_order_processed = orderProcees(df_order)
+
+    // 3 - save data to hive.
+    // 可能需要改动 - 2020-11-11
+    saveProcessedOrder(spark, df_order_processed)
+
+    println("预测阶段订单数据处理完成！")
   }
+
+  /**
+    * Get smaple users' order data within a year.
+    * @param spark
+    * @return
+    */
+  def getRawOrder(spark: SparkSession) = {
+
+    println(today)
+    println(halfYearAgo)
+    println(license)
+
+    // 1 - 获取用户购买记录
+    val user_order_ori_sql =
+      s"""
+         |select
+         |    userid as subscriberid,fee,resourcetype,resourceid,createdtime,discountid,status,resourcename,starttime,endtime
+         |from
+         |    vodbasicdim.o_com_vod_all_order
+         |where
+         |    partitiondate<='$today' and partitiondate>='$halfYearAgo' and licence='$license'
+      """.stripMargin
+
+    val df_order_ori = spark.sql(user_order_ori_sql)
+
+    printDf("df_order_ori", df_order_ori)
+
+    // 2 - 订单信息
+    val order_info_sql =
+      s"""
+         |SELECT
+         |    id as discountid,desc as discountdesc
+         |FROM
+         |    vodbasicdim.o_vod_ws_discount_info_day
+         |WHERE
+         |    partitiondate='$today'
+      """.stripMargin
+
+    val df_order_info = spark.sql(order_info_sql)
+
+    printDf("df_order_info", df_order_info)
+
+    val df_user_order = df_order_ori.join(df_order_info, Seq(Dic.colDiscountid), "left")
+
+    // 2 - sample users
+    // 上线时此处要修改，增加 用户筛选的逻辑 & 此处的 hive表 需要变更 - Konverse -2020-10-29
+    val sample_users_sql =
+      """
+        |SELECT
+        |     subscriberid,rank
+        |FROM
+        |     vodrs.t_vod_user_sample_sdu_v1
+        |WHERE
+        |     partitiondate='20201029' and license='wasu' and shunt_subid<=6 and shunt_subid>=1
+      """.stripMargin
+
+    val df_sample_user = spark.sql(sample_users_sql)
+
+    printDf("df_sample_user", df_sample_user)
+
+    // 3 - join
+    // 此处subid的逻辑上线时需要修改，使用真实subid - Konverse - 2020-10-29
+    val df_raw_order = df_user_order.join(df_sample_user, Seq(Dic.colSubscriberid))
+      .selectExpr("rank as subscriberid", "fee", "resourcetype", "resourceid", "resourcename", "createdtime",
+        "discountdesc", "status", "starttime", "endtime")
+      .select(
+        col(Dic.colSubscriberid).as(Dic.colUserId),
+        col(Dic.colFee).as(Dic.colMoney),
+        col(Dic.colResourcetype).as(Dic.colResourceType),
+        col(Dic.colResourceid).as(Dic.colResourceId),
+        col(Dic.colResourcename).as(Dic.colResourceTitle),
+        col(Dic.colCreatedtime).as(Dic.colCreationTime),
+        col(Dic.colDiscountdesc).as(Dic.colDiscountDescription),
+        col(Dic.colStatus).as(Dic.colOrderStatus),
+        col(Dic.colStarttime).as(Dic.colOrderStartTime),
+        col(Dic.colEndtime).as(Dic.colOrderEndTime))
+
+    df_raw_order
+  }
+
+  /**
+    * Process of order data.
+    * @param df_raw_order
+    * @return
+    */
+  def multiOrderTimesProcess(df_raw_order: DataFrame) = {
+
+    val df_order = df_raw_order
+      .select(
+        col(Dic.colUserId).cast(StringType),
+        col(Dic.colMoney).cast(DoubleType),
+        col(Dic.colResourceType).cast(DoubleType),
+        col(Dic.colResourceId).cast(StringType),
+        col(Dic.colResourceTitle).cast(StringType),
+        udfChangeDateFormat(col(Dic.colCreationTime)).cast(StringType).as(Dic.colCreationTime),
+        col(Dic.colDiscountDescription).cast(StringType),
+        col(Dic.colOrderStatus).cast(DoubleType),
+        udfChangeDateFormat(col(Dic.colOrderStartTime)).cast(StringType).as(Dic.colOrderStartTime),
+        udfChangeDateFormat(col(Dic.colOrderEndTime)).cast(StringType).as(Dic.colOrderEndTime))
+
+    df_order
+  }
+
+  def orderProcees(df_order: DataFrame) = {
+
+    val orderProcessed = df_order
+      .withColumn(Dic.colTimeValidity,udfGetDays(col(Dic.colOrderEndTime),col(Dic.colOrderStartTime)))
+      //选取有效时间大于0的
+      .filter(col(Dic.colTimeValidity).>=(0))
+      // 根据 time_validity 和 resource_type 填充order中 discount_description 为 null的数值
+      .withColumn(Dic.colDiscountDescription, udfFillDiscountDescription(col(Dic.colResourceType),col(Dic.colTimeValidity)))
+      .withColumn(Dic.colKeepSign, udfGetKeepSign(col(Dic.colCreationTime),col(Dic.colOrderStartTime)))
+      .filter(col(Dic.colKeepSign) === 1)
+      .drop(Dic.colKeepSign)
+      .dropDuplicates(Dic.colUserId, Dic.colCreationTime, Dic.colResourceId, Dic.colOrderStatus, Dic.colOrderStartTime)
+
+    val orderProcessed2 = orderProcessed
+      .groupBy(Dic.colUserId, Dic.colResourceId, Dic.colCreationTime, Dic.colOrderStartTime)
+      .agg(max(Dic.colOrderStatus).as(Dic.colOrderStatus))
+
+    val df_order_processed = orderProcessed.join(orderProcessed2, Seq(Dic.colUserId, Dic.colResourceId, Dic.colCreationTime, Dic.colOrderStartTime, Dic.colOrderStatus), "inner")
+
+    df_order_processed
+  }
+
+
+
+  /**
+    * Save order data.
+    * @param spark
+    * @param df_order
+    */
+  def saveProcessedOrder(spark: SparkSession, df_order: DataFrame) = {
+
+    spark.sql(
+      """
+        |CREATE TABLE IF NOT EXISTS
+        |     vodrs.t_sdu_user_order_history_paypredict(
+        |         user_id string,
+        |         money double,
+        |         resource_type double,
+        |         resource_id string,
+        |         resource_title string,
+        |         creation_time string,
+        |         discount_description string,
+        |         order_status double,
+        |         order_start_time string,
+        |         order_end_time string)
+        |PARTITIONED BY
+        |    (partitiondate string, license string)
+      """.stripMargin)
+
+    println("save data to hive........... \n" * 4)
+    df_order.createOrReplaceTempView(tempTable)
+    val insert_sql =
+      s"""
+         |INSERT OVERWRITE TABLE
+         |    vodrs.t_sdu_user_order_history_paypredict
+         |PARTITION
+         |    (partitiondate = '$partitiondate', license = '$license')
+         |SELECT
+         |    user_id,
+         |    money,
+         |    resource_type,
+         |    resource_id,
+         |    resource_title,
+         |    creation_time,
+         |    discount_description,
+         |    order_status,
+         |    order_start_time,
+         |    order_end_time
+         |FROM
+         |    $tempTable
+      """.stripMargin
+    spark.sql(insert_sql)
+    println("over over........... \n" * 4)
+  }
+}

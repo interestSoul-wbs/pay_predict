@@ -51,7 +51,8 @@ object Dic {
   val colMoney = "money"
   val colOrderStartTime = "order_start_time"
   val colOrderEndTime = "order_end_time"
-
+  val colTimeValidity = "time_validity" //有效时长
+  val colKeepSign = "keep_sign" //筛选数据使用
 
   /**
     * 用户画像中的属性
@@ -253,4 +254,6 @@ object Dic {
   val colVector: String = "vector"
   val colVectors: String = "vectors"
   val colWord: String = "word"
+  val colPlayMonth: String = "play_month"
+  val colResult: String = "result"
 }

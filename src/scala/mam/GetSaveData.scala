@@ -46,73 +46,6 @@ object GetSaveData {
     df_medias
   }
 
-  /**
-    * Save processed media data to hive
-    * @param df_media
-    */
-  def saveProcessedMedia(spark: SparkSession, df_media: DataFrame, partitiondate: String, license: String) = {
-
-    spark.sql(
-      """
-        |CREATE TABLE IF NOT EXISTS
-        |     vodrs.t_media_sum_processed_paypredict(
-        |            video_id            	string,
-        |            video_title         	string,
-        |            video_one_level_classification	string,
-        |            video_two_level_classification_list	array<string>,
-        |            video_tag_list      	array<string>,
-        |            director_list       	array<string>,
-        |            actor_list          	array<string>,
-        |            country             	string,
-        |            language            	string,
-        |            release_date        	string,
-        |            storage_time        	string,
-        |            video_time          	double,
-        |            score               	double,
-        |            is_paid             	double,
-        |            package_id          	string,
-        |            is_single           	double,
-        |            is_trailers         	double,
-        |            supplier            	string,
-        |            introduction        	string)
-        |PARTITIONED BY
-        |    (partitiondate string, license string)
-      """.stripMargin)
-
-    println("save data to hive........... \n" * 4)
-    df_media.createOrReplaceTempView(tempTable)
-    val insert_sql =
-      s"""
-         |INSERT OVERWRITE TABLE
-         |    vodrs.t_media_sum_processed_paypredict
-         |PARTITION
-         |    (partitiondate = '$partitiondate', license = '$license')
-         |SELECT
-         |    video_id ,
-         |    video_title ,
-         |    video_one_level_classification ,
-         |    video_two_level_classification_list ,
-         |    video_tag_list ,
-         |    director_list ,
-         |    actor_list ,
-         |    country ,
-         |    language ,
-         |    release_date ,
-         |    storage_time ,
-         |    video_time ,
-         |    score ,
-         |    is_paid ,
-         |    package_id ,
-         |    is_single ,
-         |    is_trailers ,
-         |    supplier ,
-         |    introduction
-         |FROM
-         |    $tempTable
-      """.stripMargin
-    spark.sql(insert_sql)
-    println("over over........... \n" * 4)
-  }
 
   /**
     * Get processed media data.
@@ -191,12 +124,12 @@ object GetSaveData {
 
 
   /**
-    * Get processed user order data.
+    * Get user order data.
     *
     * @param spark
     * @return
     */
-  def getOrderProcessed(spark: SparkSession, partitiondate: String, license: String, data_type: String) = {
+  def getProcessedOrder(spark: SparkSession, partitiondate: String, license: String) = {
 
     // 1 - 获取用户购买记录
     val user_order_sql =
@@ -213,9 +146,9 @@ object GetSaveData {
          |    order_start_time,
          |    order_end_time
          |FROM
-         |    vodrs.t_sdu_user_order_processed_paypredict
+         |    vodrs.t_sdu_user_order_history_paypredict
          |WHERE
-         |    partitiondate='$partitiondate' and license='$license' and data_type='$data_type'
+         |    partitiondate='$partitiondate' and license='$license'
       """.stripMargin
 
     val df_order = spark.sql(user_order_sql)
@@ -224,12 +157,38 @@ object GetSaveData {
   }
 
   /**
-    * Get processed user play data.
+    * 这是已经抽样的用户在一定时间段内的 play 数据，是抽取给山大的数据。
+    * 这里的subscriberid 是 rank，要拿到实际的 subscriberid 需要 通过 vodrs.t_vod_user_sample_sdu_v1 join
+    * @return
+    */
+  def getRawPlayByDateRangeSmpleUsers(spark: SparkSession, start_date: String, end_date: String, license: String) = {
+
+    // 1 - 获取用户播放记录
+    val user_play_sql =
+      s"""
+         |SELECT
+         |    subscriberid,
+         |    time,
+         |    itemid,
+         |    duration
+         |FROM
+         |    vodrs.t_sdu_user_play_history_day_sample_users
+         |WHERE
+         |    partitiondate>='$start_date' and partitiondate<='$end_date' license='$license'
+      """.stripMargin
+
+    val df_play = spark.sql(user_play_sql)
+
+    df_play
+  }
+
+  /**
+    * Get user play data.
     *
     * @param spark
     * @return
     */
-  def getPlayProcessed(spark: SparkSession, partitiondate: String, license: String, data_type: String) = {
+  def getProcessedPlay(spark: SparkSession, partitiondate: String, license: String) = {
 
     // 1 - 获取用户播放记录
     val user_play_sql =
@@ -240,9 +199,9 @@ object GetSaveData {
          |    play_end_time,
          |    broadcast_time
          |FROM
-         |    vodrs.t_sdu_user_play_processed_paypredict
+         |    vodrs.t_sdu_user_play_history_paypredict
          |WHERE
-         |    partitiondate='$partitiondate' and license='$license' and data_type='$data_type'
+         |    partitiondate='$partitiondate' and license='$license'
       """.stripMargin
 
     val df_play = spark.sql(user_play_sql)
@@ -314,6 +273,38 @@ object GetSaveData {
     df_user_profile_play
   }
 
+
+  /**
+    * 这是已经抽样的用户在一定时间段内的订单，是抽取给山大的数据。
+    * 这里的subscriberid 是 rank，要拿到实际的 subscriberid 需要 通过 vodrs.t_vod_user_sample_sdu_v1 join
+    * @return
+    */
+  def getRawOrderByDateRangeSmpleUsers(spark: SparkSession, start_date: String, end_date: String, license: String) = {
+
+    val sample_user_order_ori_sql =
+      s"""
+         |select
+         |    subscriberid,
+         |    fee,
+         |    resourcetype,
+         |    resourceid,
+         |    resourcename,
+         |    createdtime,
+         |    discountdesc,
+         |    status,
+         |    starttime,
+         |    endtime
+         |from
+         |    vodrs.t_sdu_user_order_history_day_v1
+         |where
+         |    partitiondate<='$start_date' and partitiondate>='$end_date' and licence='$license'
+      """.stripMargin
+
+    val df_order_ori = spark.sql(sample_user_order_ori_sql)
+
+    df_order_ori
+  }
+
   /**
     * Get smaple users' order data within a period.
     * @param spark
@@ -325,7 +316,16 @@ object GetSaveData {
     val user_order_ori_sql =
       s"""
          |select
-         |    userid as subscriberid,fee,resourcetype,resourceid,createdtime,discountid,status,resourcename,starttime,endtime
+         |    userid as subscriberid,
+         |    fee,
+         |    resourcetype,
+         |    resourceid,
+         |    createdtime,
+         |    discountid,
+         |    status,
+         |    resourcename,
+         |    starttime,
+         |    endtime
          |from
          |    vodbasicdim.o_com_vod_all_order
          |where
@@ -357,118 +357,48 @@ object GetSaveData {
 
   }
 
+
+
   /**
-    * Save user profile play data.
+    * Get processed media data.
     *
     * @param spark
-    * @param df_result
+    * @return
     */
-  def saveUserProfilePlayData(spark: SparkSession, df_result: DataFrame, partitiondate: String, license: String, data_type: String) = {
+  def getProcessedMedias(spark: SparkSession, partitiondate: String, license: String) = {
 
-    spark.sql(
-      """
-        |CREATE TABLE IF NOT EXISTS
-        |     vodrs.t_sdu_user_profile_play_paypredict(
-        |             user_id string,
-        |             active_days_last_30_days long,
-        |             total_time_last_30_days double,
-        |             days_from_last_active int,
-        |             days_since_first_active_in_timewindow int,
-        |             active_days_last_14_days long,
-        |             total_time_last_14_days double,
-        |             active_days_last_7_days long,
-        |             total_time_last_7_days double,
-        |             active_days_last_3_days long,
-        |             total_time_last_3_days double,
-        |             total_time_paid_videos_last_30_days double,
-        |             total_time_paid_videos_last_14_days double,
-        |             total_time_paid_videos_last_7_days double,
-        |             total_time_paid_videos_last_3_days double,
-        |             total_time_paid_videos_last_1_days double,
-        |             total_time_in_package_videos_last_30_days double,
-        |             var_time_in_package_videos_last_30_days double,
-        |             number_in_package_videos_last_30_days long,
-        |             total_time_in_package_videos_last_14_days double,
-        |             var_time_in_package_videos_last_14_days double,
-        |             number_in_package_videos_last_14_days long,
-        |             total_time_in_package_videos_last_7_days double,
-        |             var_time_in_package_videos_last_7_days double,
-        |             number_in_package_videos_last_7_days long,
-        |             total_time_in_package_videos_last_3_days double,
-        |             var_time_in_package_videos_last_3_days double,
-        |             number_in_package_videos_last_3_days long,
-        |             total_time_in_package_videos_last_1_days double,
-        |             var_time_in_package_videos_last_1_days double,
-        |             number_in_package_videos_last_1_days long,
-        |             total_time_children_videos_last_30_days double,
-        |             number_children_videos_last_30_days long,
-        |             total_time_children_videos_last_14_days double,
-        |             number_children_videos_last_14_days long,
-        |             total_time_children_videos_last_7_days double,
-        |             number_children_videos_last_7_days long,
-        |             total_time_children_videos_last_3_days double,
-        |             number_children_videos_last_3_days long,
-        |             total_time_children_videos_last_1_days double,
-        |             number_children_videos_last_1_days long)
-        |PARTITIONED BY
-        |    (partitiondate string, license string, data_type: string)
-      """.stripMargin)
-
-    println("save data to hive........... \n" * 4)
-    df_result.createOrReplaceTempView(tempTable)
-    val insert_sql =
+    // 1 - get processed medias
+    val user_order_sql =
       s"""
-         |INSERT OVERWRITE TABLE
-         |    vodrs.t_sdu_user_profile_play_paypredict
-         |PARTITION
-         |    (partitiondate='$partitiondate', license='$license', data_type='$data_type')
          |SELECT
-         |    user_id,
-         |    active_days_last_30_days,
-         |    total_time_last_30_days,
-         |    days_from_last_active,
-         |    days_since_first_active_in_timewindow,
-         |    active_days_last_14_days,
-         |    total_time_last_14_days,
-         |    active_days_last_7_days,
-         |    total_time_last_7_days,
-         |    active_days_last_3_days,
-         |    total_time_last_3_days,
-         |    total_time_paid_videos_last_30_days,
-         |    total_time_paid_videos_last_14_days,
-         |    total_time_paid_videos_last_7_days,
-         |    total_time_paid_videos_last_3_days,
-         |    total_time_paid_videos_last_1_days,
-         |    total_time_in_package_videos_last_30_days,
-         |    var_time_in_package_videos_last_30_days,
-         |    number_in_package_videos_last_30_days,
-         |    total_time_in_package_videos_last_14_days,
-         |    var_time_in_package_videos_last_14_days,
-         |    number_in_package_videos_last_14_days,
-         |    total_time_in_package_videos_last_7_days,
-         |    var_time_in_package_videos_last_7_days,
-         |    number_in_package_videos_last_7_days,
-         |    total_time_in_package_videos_last_3_days,
-         |    var_time_in_package_videos_last_3_days,
-         |    number_in_package_videos_last_3_days,
-         |    total_time_in_package_videos_last_1_days,
-         |    var_time_in_package_videos_last_1_days,
-         |    number_in_package_videos_last_1_days,
-         |    total_time_children_videos_last_30_days,
-         |    number_children_videos_last_30_days,
-         |    total_time_children_videos_last_14_days,
-         |    number_children_videos_last_14_days,
-         |    total_time_children_videos_last_7_days,
-         |    number_children_videos_last_7_days,
-         |    total_time_children_videos_last_3_days,
-         |    number_children_videos_last_3_days,
-         |    total_time_children_videos_last_1_days,
-         |    number_children_videos_last_1_days
+         |    video_id ,
+         |    video_title ,
+         |    video_one_level_classification ,
+         |    video_two_level_classification_list ,
+         |    video_tag_list ,
+         |    director_list ,
+         |    actor_list ,
+         |    country ,
+         |    language ,
+         |    release_date ,
+         |    storage_time ,
+         |    video_time ,
+         |    score ,
+         |    is_paid ,
+         |    package_id ,
+         |    is_single ,
+         |    is_trailers ,
+         |    supplier ,
+         |    introduction
          |FROM
-         |    $tempTable
+         |    vodrs.t_media_sum_processed_paypredict
+         |WHERE
+         |    partitiondate='$partitiondate' and license='$license'
       """.stripMargin
-    spark.sql(insert_sql)
-    println("over over........... \n" * 4)
+
+    val df_medias = spark.sql(user_order_sql)
+
+    df_medias
   }
 
 }

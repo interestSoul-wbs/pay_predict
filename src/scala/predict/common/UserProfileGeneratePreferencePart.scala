@@ -34,7 +34,7 @@ object UserProfileGeneratePreferencePart {
     printDf("df_plays", df_plays)
 
     // 3 - data process
-    val df_result = userProfileGeneratePreferencePart(now, 30, df_medias, df_plays)
+    val df_result = userProfileGeneratePreferencePartProcess(now, 30, df_medias, df_plays)
 
     printDf("df_result", df_result)
 
@@ -42,7 +42,7 @@ object UserProfileGeneratePreferencePart {
     saveData(spark, df_result)
   }
 
-  def userProfileGeneratePreferencePart(now: String, timeWindow: Int, df_medias: DataFrame, df_plays: DataFrame) = {
+  def userProfileGeneratePreferencePartProcess(now: String, timeWindow: Int, df_medias: DataFrame, df_plays: DataFrame) = {
 
     val df_user_id = df_plays
       .select(col(Dic.colUserId)).distinct()

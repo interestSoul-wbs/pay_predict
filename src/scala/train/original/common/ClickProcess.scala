@@ -1,4 +1,4 @@
-package train.common
+package train.original.common
 
 import mam.Dic
 import org.apache.log4j.{Level, Logger}

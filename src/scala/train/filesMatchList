@@ -1,0 +1,21 @@
+medias
+
+# vodrs.t_media_sum_processed_paypredict
+# partitiondate='', license='wasu'
+val hdfsPath = "hdfs:///pay_predict/"
+val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
+
+# vodrs.t_media_label_paypredict
+# partitiondate='', license='wasu', category='one_level'
+val videoFirstCategoryTempPath = hdfsPath + "data/train/common/processed/videofirstcategorytemp.txt"
+
+# vodrs.t_media_label_paypredict
+# partitiondate='', license='wasu', category='two_level'
+val videoSecondCategoryTempPath = hdfsPath + "data/train/common/processed/videosecondcategorytemp.txt"
+
+# vodrs.t_media_label_paypredict,
+# partitiondate='', license='wasu', category='video_tag'
+val labelTempPath = hdfsPath + "data/train/common/processed/labeltemp.txt"
+
+
+----------------
