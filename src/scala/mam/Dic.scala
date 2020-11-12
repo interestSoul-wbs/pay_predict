@@ -256,21 +256,27 @@ object Dic {
   val colItemId="itemid"
   val colPartitionDate="partitiondate"
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+  val colLabel = "label"
+  val colFirst = "first"
+  val colSecond = "second"
+  val colOneLevel = "one_level"
+  val colTwoLevel = "two_level"
+  val colVideoTag = "video_tag"
+  val colSubscriberid = "subscriberid"
+  val colFee = "fee"
+  val colResourcetype = "resourcetype"
+  val colResourceid = "resourceid"
+  val colResourcename = "resourcename"
+  val colCreatedtime = "createdtime"
+  val colDiscountdesc = "discountdesc"
+  val colStatus = "status"
+  val colStarttime = "starttime"
+  val colEndtime = "endtime"
+  val colDiscountid = "discountid"
+  val colVideoList = "video_list"
+  val colVector: String = "vector"
+  val colVectors: String = "vectors"
+  val colWord: String = "word"
+  val colPlayMonth: String = "play_month"
+  val colResult: String = "result"
 }
