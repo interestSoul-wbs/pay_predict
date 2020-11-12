@@ -153,7 +153,7 @@ object PlaysProcessBySplitSession {
      */
 
     val timeSum = play.groupBy(Dic.colUserId, Dic.colVideoId, Dic.colSessionSign).agg(sum(col(Dic.colBroadcastTime)))
-                      .withColumnRenamed("sum(broadcast_time)", Dic.colTimeSum)
+                      .withColumnRenamed("sum(broadcast_time)", Dic.colBroadcastTime)
 
     play = play.join(timeSum, Seq(Dic.colUserId, Dic.colVideoId, Dic.colSessionSign), "inner")
                 .select(Dic.colUserId, Dic.colVideoId, Dic.colPlayStartTime, Dic.colBroadcastTime, Dic.colTimeGapLeadSameVideo, Dic.colSessionSign, Dic.colTimeSum)
@@ -162,11 +162,10 @@ object PlaysProcessBySplitSession {
      * 同一个session内相同video只保留第一条数据
      */
 
-    val win2 = Window.partitionBy(Dic.colUserId, Dic.colVideoId, Dic.colSessionSign, Dic.colTimeSum).orderBy(Dic.colPlayStartTime)
+    val win2 = Window.partitionBy(Dic.colUserId, Dic.colVideoId, Dic.colSessionSign, Dic.colBroadcastTime).orderBy(Dic.colPlayStartTime)
     play = play.withColumn(Dic.colKeepSign, count(Dic.colSessionSign).over(win2)) //keep_sign为1的保留 其他全部去重
       .filter(col(Dic.colKeepSign) === 1)
       .drop(col(Dic.colKeepSign))
-      .drop(col(Dic.colBroadcastTime))
       .drop(col(Dic.colTimeGapLeadSameVideo))
       .drop(col(Dic.colSessionSign))
 

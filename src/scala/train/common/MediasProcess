@@ -4,22 +4,17 @@ package train.common
  * @Date 2020/09
  * @Version 1.0
  */
-import java.io.{File, PrintWriter}
-import java.text.SimpleDateFormat
 
 import mam.Dic
 import mam.Utils.{printArray, printDf, udfLongToTimestamp, udfLongToTimestampV2}
 import org.apache.log4j.{Level, Logger}
-import org.apache.parquet.schema.Types.ListBuilder
-import org.apache.spark.ml.feature.Imputer
+
 import org.apache.spark.{SparkConf, SparkContext, sql}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.ml.feature.Imputer
 import org.apache.spark.sql.expressions.Window
 
-import scala.collection.mutable
-import scala.collection.mutable.{ListBuffer, Set}
 import org.apache.spark.sql.functions._
 
 object MediasProcess {
@@ -31,7 +26,7 @@ object MediasProcess {
     Logger.getLogger("org").setLevel(Level.ERROR)
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("MediasProcess")
-      //.master("local[6]")
+      .master("local[6]")
       .getOrCreate()
 
 
@@ -47,11 +42,13 @@ object MediasProcess {
 
     printDf("输入 mediasRaw",dfRawMedias)
     //2、对数据进行处理
-    var dfModifiedFormat=mediasProcess(dfRawMedias)
+    var dfModifiedFormat = mediasProcess(dfRawMedias)
 
-    //3、对特定的列进行均值填充
+    //3、对空值进行填充
     val cols = Array(Dic.colScore, Dic.colVideoTime)
-    var dfMeanFill=meanFill(dfModifiedFormat,cols)
+    //指定col使用均值填充
+    var dfMeanFill = meanFill(dfModifiedFormat, cols)
+    //是否单点 是否付费填充
 
     //4、保存标签
     getSingleStrColLabelAndSave(dfMeanFill,Dic.colVideoOneLevelClassification,videoFirstCategoryTempPath)
@@ -61,7 +58,7 @@ object MediasProcess {
     //5、保存处理好的数据
     saveProcessedData(dfMeanFill,mediasProcessedPath)
     printDf("输出  mediasProcessed",dfMeanFill)
-     println("媒资数据处理完成！")
+    println("媒资数据处理完成！")
 
 
 
@@ -70,11 +67,11 @@ object MediasProcess {
 
   def getRawMedias(spark:SparkSession,rawMediasPath:String)={
     /**
-    *@author wj
-    *@param [spark, rawMediasPath]
-    *@return org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
-    *@description  读取原始文件
-    */
+     *@author wj
+     *@param [spark, rawMediasPath]
+     *@return org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
+     *@description  读取原始文件
+     */
     val schema= StructType(
       List(
         StructField(Dic.colVideoId, StringType),
@@ -112,11 +109,11 @@ object MediasProcess {
 
   def mediasProcess(rawMediasData:DataFrame)={
     /**
-    *@author wj
-    *@param [rawMediasData]
-    *@return org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
-    *@description  更改数据格式，主要将NULL字符串转化为null或者NaN
-    */
+     *@author wj
+     *@param [rawMediasData]
+     *@return org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
+     *@description  更改数据格式，主要将NULL字符串转化为null或者NaN
+     */
     var dfModifiedFormat=rawMediasData.select(
       when(col(Dic.colVideoId)==="NULL",null).otherwise(col(Dic.colVideoId)).as(Dic.colVideoId),
       when(col(Dic.colVideoTitle)==="NULL",null).otherwise(col(Dic.colVideoTitle)).as(Dic.colVideoTitle),
@@ -138,25 +135,34 @@ object MediasProcess {
       when(col(Dic.colSupplier)==="NULL",null).otherwise(col(Dic.colSupplier)).as(Dic.colSupplier),
       when(col(Dic.colIntroduction)==="NULL",null).otherwise(col(Dic.colIntroduction)).as(Dic.colIntroduction)
     )
+
+    //是否单点 是否付费填充
+    dfModifiedFormat = dfModifiedFormat.na.fill(Map((Dic.colIsSingle, 0),(Dic.colIsPaid, 0)))
+      //添加新列 是否在套餐内
+      .withColumn(Dic.colInPackage, when(col(Dic.colPackageId).>(0), 1).otherwise(0))
+
     dfModifiedFormat
 
   }
 
   def meanFill(dfModifiedFormat:DataFrame, cols: Array[String])={
     /**
-    *@author wj
-    *@param [dfModifiedFormat]
-    *@return org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
-    *@description  将指定的列使用均值进行填充
-    */
+     *@author wj
+     *@param [dfModifiedFormat]
+     *@return org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
+     *@description  将指定的列使用均值进行填充
+     */
+
     val imputer = new Imputer()
       .setInputCols(cols)
       .setOutputCols(cols)
       .setStrategy("mean")
 
-    val dfMeanFill=imputer.fit(dfModifiedFormat).transform(dfModifiedFormat)
+    val dfMeanFill = imputer.fit(dfModifiedFormat).transform(dfModifiedFormat)
+
     dfMeanFill
   }
+
   def getArrayStrColLabelAndSave(dfMedias: DataFrame, colName: String, labelSavedPath:String) = {
 
     val df_label = dfMedias
@@ -197,4 +203,5 @@ object MediasProcess {
 
     dfMediasProcessed.write.mode(SaveMode.Overwrite).format("parquet").save(mediasProcessedPath)
   }
+
 }

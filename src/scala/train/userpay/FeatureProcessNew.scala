@@ -7,8 +7,7 @@ import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
 import org.apache.spark.sql.{SaveMode, SparkSession}
 
-import scala.collection.mutable.{ArrayBuffer, ListBuffer}
-import scala.io.Source
+import scala.collection.mutable.ArrayBuffer
 
 object FeatureProcessNew {
 

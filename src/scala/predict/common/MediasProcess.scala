@@ -26,7 +26,7 @@ object MediasProcess {
     Logger.getLogger("org").setLevel(Level.ERROR)
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("PredictMediasProcess")
-      //.master("local[6]")
+      .master("local[6]")
       .getOrCreate()
 
     val schema= StructType(
@@ -54,8 +54,8 @@ object MediasProcess {
         StructField(Dic.colIntroduction, StringType)
       )
     )
-    val hdfsPath="hdfs:///pay_predict/"
-    //val hdfsPath=""
+    //val hdfsPath="hdfs:///pay_predict/"
+    val hdfsPath=""
     import org.apache.spark.sql.functions._
     val mediasRawPath=hdfsPath+"data/predict/common/raw/medias/medias.txt"
     val mediasProcessedPath=hdfsPath+"data/predict/common/processed/mediastemp"
@@ -161,11 +161,11 @@ object MediasProcess {
 
     import spark.implicits._
     var labelCsv = labelList.toDF("content")
-    labelCsv.coalesce(1).write.mode(SaveMode.Overwrite).option("header","false").csv(labelTempPath)
+//    labelCsv.coalesce(1).write.mode(SaveMode.Overwrite).option("header","false").csv(labelTempPath)
     var firstCsv = firstList.toDF("content")
-    firstCsv.coalesce(1).write.mode(SaveMode.Overwrite).option("header","false").csv(videoFirstCategoryTempPath)
+//    firstCsv.coalesce(1).write.mode(SaveMode.Overwrite).option("header","false").csv(videoFirstCategoryTempPath)
     var secondCsv = secondList.toDF("content")
-    secondCsv.coalesce(1).write.mode(SaveMode.Overwrite).option("header","false").csv(videoSecondCategoryTempPath)
+//    secondCsv.coalesce(1).write.mode(SaveMode.Overwrite).option("header","false").csv(videoSecondCategoryTempPath)
 
     printDf("labelCsv",labelCsv)
     printDf("firstCsv",firstCsv)
@@ -178,11 +178,11 @@ object MediasProcess {
       .setOutputCols(cols)
       .setStrategy("mean")
 
-    val df3=imputer.fit(df2).transform(df2)
+    val df3 = imputer.fit(df2).transform(df2)
 
     printDf("df3",df3)
 
-     df3.write.mode(SaveMode.Overwrite).format("parquet").save(mediasProcessedPath)
+//     df3.write.mode(SaveMode.Overwrite).format("parquet").save(mediasProcessedPath)
      println("预测阶段媒资数据处理完成！")
 
 

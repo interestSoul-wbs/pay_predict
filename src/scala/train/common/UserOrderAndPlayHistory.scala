@@ -16,16 +16,17 @@ import org.apache.spark.sql.functions._
  */
 object UserOrderAndPlayHistory {
   def main(args: Array[String]): Unit = {
-    val hdfsPath="hdfs:///pay_predict/"
-    //val hdfsPath=""
+    //val hdfsPath="hdfs:///pay_predict/"
+    val hdfsPath=""
     val playsProcessedPath=hdfsPath+"data/train/common/processed/plays"
     val ordersProcessedPath=hdfsPath+"data/train/common/processed/orders"
     val now=args(0)+" "+args(1)
+
     System.setProperty("hadoop.home.dir", "c:\\winutils")
     Logger.getLogger("org").setLevel(Level.ERROR)
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("UserOrderAndPlayHistory")
-      //.master("local[6]")
+      .master("local[6]")
       .getOrCreate()
 
 
@@ -58,7 +59,7 @@ object UserOrderAndPlayHistory {
   }
   def getUserPlaysList(plays:DataFrame,now:String)={
     //选取最近一周的观看历史
-    print(calDate(now,-7))
+    println(calDate(now,-7))
     val playsSelect=plays.filter(
       col(Dic.colPlayEndTime).<(now)
       && col(Dic.colPlayEndTime).>(calDate(now,-7))

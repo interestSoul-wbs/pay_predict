@@ -15,7 +15,7 @@ object VideoProfileGenerate {
     Logger.getLogger("org").setLevel(Level.ERROR)
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("PredictVideoProfileGenerate")
-      //.master("local[6]")
+      .master("local[6]")
       .getOrCreate()
     //设置shuffle过程中分区数
     // spark.sqlContext.setConf("spark.sql.shuffle.partitions", "1000")
@@ -172,19 +172,20 @@ object VideoProfileGenerate {
 
     val videoProfilePath=hdfsPath+"data/predict/common/processed/videoprofile"+now.split(" ")(0)
    // val videoProfileSavePath="pay_predict/data/train/common/processed/videoprofile.csv"
-    result.write.mode(SaveMode.Overwrite).format("parquet").save(videoProfilePath)
+//    result.write.mode(SaveMode.Overwrite).format("parquet").save(videoProfilePath)
     //result11.write.mode(SaveMode.Overwrite).format("parquet").save(userProfileOrderPartSavePath)
 
 
   }
 
   def main(args:Array[String]): Unit = {
-    val hdfsPath="hdfs:///pay_predict/"
-    //val hdfsPath=""
+    //val hdfsPath="hdfs:///pay_predict/"
+    val hdfsPath=""
     val mediasProcessedPath=hdfsPath+"data/predict/common/processed/mediastemp"
     val playsProcessedPath=hdfsPath+"data/predict/common/processed/plays"
     val ordersProcessedPath=hdfsPath+"data/predict/common/processed/orders"
-    val now=args(0)+" "+args(1)
+    //val now=args(0)+" "+args(1)
+    val now = "2020-04-23 00:00:00"
     videoProfileGenerate(now,30,mediasProcessedPath,playsProcessedPath,ordersProcessedPath,hdfsPath)
   }
 

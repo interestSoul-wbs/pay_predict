@@ -14,7 +14,7 @@ object VideoVectorForUserpay {
     System.setProperty("hadoop.home.dir","c:\\winutils")
     Logger.getLogger("org").setLevel(Level.ERROR)
     val spark: SparkSession = new sql.SparkSession.Builder()
-      .appName("PlayHistory")
+      .appName("PlayHistoryVector")
       .master("local[6]")
       .getOrCreate()
     val hdfsPath=""
@@ -22,12 +22,13 @@ object VideoVectorForUserpay {
     val playsProcessedPath = hdfsPath + "data/train/common/processed/plays"
     //val now = args(0)+" "+args(1)
     val now = "2020-06-01 00:00:00"
+    //读取play数据
     val plays = getData(spark,playsProcessedPath)
     //构建视频列表
-    val playsList=getPlayList(plays,now)
+    val playsList = getPlayList(plays, now)
     //用户每月平均观看视频32个
     printDf("plays_list",playsList)
-    var videoDict=getVector(playsList)
+    var videoDict = getVector(playsList)
 
     val vectorDimension=64
     for(i <- 0 to vectorDimension-1)
@@ -66,7 +67,7 @@ object VideoVectorForUserpay {
 
     val vectorDimension=64
     val windowSize=10  //默认参数为5，这里尝试设置为10，在一定程度上，windowSize越大，训练越慢,但是向量表达更准确
-    val w2vModel=new Word2Vec()
+    val w2vModel = new Word2Vec()
       .setInputCol("video_list")
       .setOutputCol("result")
       .setVectorSize(vectorDimension)

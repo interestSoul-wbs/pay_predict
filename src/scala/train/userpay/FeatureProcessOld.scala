@@ -7,7 +7,6 @@ import org.apache.spark.sql
 import org.apache.spark.sql.{SaveMode, SparkSession}
 
 import scala.collection.mutable.ArrayBuffer
-import scala.io.Source
 
 object FeatureProcessOld {
   def main(args: Array[String]): Unit = {

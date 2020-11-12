@@ -98,14 +98,14 @@ object OrdersProcess {
       // 根据 time_validity 和 resource_type 填充order中 discount_description 为 null的数值
       //.withColumn(Dic.colDiscountDescription, udfFillDiscountDescription(col(Dic.colResourceType),col(Dic.colTimeValidity)))
       //统一有效时长
-      .withColumn(Dic.colTimeValidity, udfUniformTimeValidity(col(Dic.colTimeValidity)))
+      .withColumn(Dic.colTimeValidity, udfUniformTimeValidity(col(Dic.colTimeValidity), col(Dic.colResourceType)))
 
 
     /**
-     * 选取生效时间晚于 creation_time 的数据 ，由于存在1/4的创建数据晚于生效时间，但时间差距基本为几秒，因此比较时间部分加上1min
+     * 选取生效时间晚于 creation_time 的数据 ，由于存在1/4的创建)数据晚于生效时间，但时间差距基本为几秒，因此比较时间部分加上1min
      */
 
-    orderProcessed= orderProcessed.withColumn(Dic.colKeepSign, udfGetKeepSign(col(Dic.colCreationTime),col(Dic.colOrderStartTime)))
+    orderProcessed = orderProcessed.withColumn(Dic.colKeepSign, udfGetKeepSign(col(Dic.colCreationTime),col(Dic.colOrderStartTime)))
       .filter(col(Dic.colKeepSign) === 1)
       .drop(Dic.colKeepSign)
 
