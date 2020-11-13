@@ -6,15 +6,13 @@ package train.common
  */
 
 import mam.Dic
-import mam.Utils.{printArray, printDf, udfLongToTimestamp, udfLongToTimestampV2}
+import mam.Utils.{printDf, udfGetDays, udfLongToTimestampV2}
 import org.apache.log4j.{Level, Logger}
-
 import org.apache.spark.{SparkConf, SparkContext, sql}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.ml.feature.Imputer
 import org.apache.spark.sql.expressions.Window
-
 import org.apache.spark.sql.functions._
 
 object MediasProcess {
@@ -29,23 +27,27 @@ object MediasProcess {
       .master("local[6]")
       .getOrCreate()
 
+    //val now = args(0) + " " + args(1)
+    val now = "2020-06-01 00:00:00"
 
-    val hdfsPath="hdfs:///pay_predict/"
-    //val hdfsPath=""
-    val mediasRawPath=hdfsPath+"data/train/common/raw/medias/medias.txt"
-    val mediasProcessedPath=hdfsPath+"data/train/common/processed/mediastemp"
-    val videoFirstCategoryTempPath=hdfsPath+"data/train/common/processed/videofirstcategorytemp.txt"
-    val videoSecondCategoryTempPath=hdfsPath+"data/train/common/processed/videosecondcategorytemp.txt"
-    val labelTempPath=hdfsPath+"data/train/common/processed/labeltemp.txt"///pay_predict/data/train/common/processed
+    //val hdfsPath="hdfs:///pay_predict/"
+    val hdfsPath=""
+    val mediasRawPath = hdfsPath + "data/train/common/raw/medias/medias.txt"
+    val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
+    val videoFirstCategoryTempPath = hdfsPath + "data/train/common/processed/videofirstcategorytemp.txt"
+    val videoSecondCategoryTempPath = hdfsPath + "data/train/common/processed/videosecondcategorytemp.txt"
+    val labelTempPath = hdfsPath + "data/train/common/processed/labeltemp.txt"///pay_predict/data/train/common/processed
+    
+    
     //1.获取原始数据
     var dfRawMedias=getRawMedias(spark,mediasRawPath)
 
     printDf("输入 mediasRaw",dfRawMedias)
     //2、对数据进行处理
-    var dfModifiedFormat = mediasProcess(dfRawMedias)
+    var dfModifiedFormat = mediasProcess(dfRawMedias, now)
 
     //3、对空值进行填充
-    val cols = Array(Dic.colScore, Dic.colVideoTime)
+    val cols = Array(Dic.colScore, Dic.colVideoTime, Dic.colStorageTimeGap)
     //指定col使用均值填充
     var dfMeanFill = meanFill(dfModifiedFormat, cols)
     //是否单点 是否付费填充
@@ -56,7 +58,7 @@ object MediasProcess {
     getArrayStrColLabelAndSave(dfMeanFill,Dic.colVideoTagList,labelTempPath)
 
     //5、保存处理好的数据
-    saveProcessedData(dfMeanFill,mediasProcessedPath)
+    //saveProcessedData(dfMeanFill,mediasProcessedPath)
     printDf("输出  mediasProcessed",dfMeanFill)
     println("媒资数据处理完成！")
 
@@ -107,14 +109,14 @@ object MediasProcess {
   }
 
 
-  def mediasProcess(rawMediasData:DataFrame)={
+  def mediasProcess(rawMediasData:DataFrame, now: String)={
     /**
      *@author wj
      *@param [rawMediasData]
      *@return org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
      *@description  更改数据格式，主要将NULL字符串转化为null或者NaN
      */
-    var dfModifiedFormat=rawMediasData.select(
+    var dfModifiedFormat = rawMediasData.select(
       when(col(Dic.colVideoId)==="NULL",null).otherwise(col(Dic.colVideoId)).as(Dic.colVideoId),
       when(col(Dic.colVideoTitle)==="NULL",null).otherwise(col(Dic.colVideoTitle)).as(Dic.colVideoTitle),
       when(col(Dic.colVideoOneLevelClassification)==="NULL",null).otherwise(col(Dic.colVideoOneLevelClassification)).as(Dic.colVideoOneLevelClassification),
@@ -140,6 +142,11 @@ object MediasProcess {
     dfModifiedFormat = dfModifiedFormat.na.fill(Map((Dic.colIsSingle, 0),(Dic.colIsPaid, 0)))
       //添加新列 是否在套餐内
       .withColumn(Dic.colInPackage, when(col(Dic.colPackageId).>(0), 1).otherwise(0))
+      //距今入库时间
+      .withColumn("now", lit(now))
+      .withColumn(Dic.colStorageTimeGap, udfGetDays(col(Dic.colStorageTime),col("now")))
+      .drop("now")
+
 
     dfModifiedFormat
 
@@ -176,7 +183,7 @@ object MediasProcess {
 
     printDf("输出  df_label", df_label)
 
-    saveLabel(df_label,labelSavedPath)
+    //saveLabel(df_label,labelSavedPath)
   }
 
   def getSingleStrColLabelAndSave(dfMedias: DataFrame, colName: String,labelSavedPath:String) = {
@@ -191,7 +198,7 @@ object MediasProcess {
 
     printDf("输出  df_label", dfLabel)
 
-    saveLabel(dfLabel,labelSavedPath)
+    //saveLabel(dfLabel,labelSavedPath)
   }
 
   def saveLabel(dfLabel: DataFrame,labelSavedPath:String) = {

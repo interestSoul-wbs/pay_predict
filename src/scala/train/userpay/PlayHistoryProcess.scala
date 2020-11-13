@@ -51,7 +51,7 @@ object PlayHistoryProcess {
 
     //获取csv文件格式 allUsers
     val allUsers = getCsv(spark, allUsersSavePath)
-    printDf("allUsers", allUsers)
+    printDf("allUsers CSV", allUsers)
 
 
     /**
@@ -65,17 +65,6 @@ object PlayHistoryProcess {
 
     printDf("plays_list",playsList)
 
-    var videoDict = getVector(playsList, Dic.colVideoId)
-
-//    val vectorDimension = 64
-//    for(i <- 0 to vectorDimension-1)
-//      videoDict = videoDict.withColumn("v_"+i,udfBreak(col("vector"),lit(i))).withColumnRenamed("word",Dic.colVideoId)
-
-    printDf("videoVector", videoDict)
-//    val videoVectorPath = hdfsPath + "data/train/common/processed/videovector" + args(0)
-//    videoDict.write.mode(SaveMode.Overwrite).format("parquet").save(videoVectorPath)
-//
-//    wordDict
 
   }
   def getData(spark:SparkSession,path:String)={
@@ -120,23 +109,6 @@ object PlayHistoryProcess {
                         .groupBy(col(Dic.colUserId))
                         .agg(collect_list(col(colName)).as(colName+"_list"))
     playList
-  }
-
-  def getVector(playsList:DataFrame, listName:String) ={
-
-    val vectorDimension = 64
-    val windowSize = 10  //默认参数为5，这里尝试设置为10，在一定程度上，windowSize越大，训练越慢,但是向量表达更准确
-    val w2vModel = new Word2Vec()
-      .setInputCol(listName + "_list")
-      .setOutputCol(listName + "_vector")
-      .setVectorSize(vectorDimension)
-      .setWindowSize(windowSize)
-      .setMinCount(5)  //???
-    val model = w2vModel.fit(playsList)
-
-    //print("滑动窗口的大小：" + w2vModel.getWindowSize)
-    //val result = model.transform(playsList)
-    model.getVectors
   }
 
 }
