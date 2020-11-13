@@ -14,6 +14,7 @@ object Dic {
   val colUserId = "user_id"
 
   val colPlayEndTime = "play_end_time"
+  val colPlayEndTimeTmp = "play_end_time_tmp"
   val colBroadcastTime =  "broadcast_time"
   //处理过程中添加
   val colPlayStartTime ="play_start_time"

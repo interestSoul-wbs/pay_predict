@@ -56,13 +56,15 @@ object PlaysProcess {
   def playsProcess(df_raw_play:DataFrame)={
 
     val df_play_processed = df_raw_play
-      .withColumn(Dic.colPlayEndTime,substring(col(Dic.colPlayEndTime),0,10))
-      .groupBy(col(Dic.colUserId),col(Dic.colVideoId),col(Dic.colPlayEndTime))
+      .withColumn(Dic.colPlayEndTimeTmp, substring(col(Dic.colPlayEndTime), 0, 10))
+      .drop(Dic.colPlayEndTime)
+      .groupBy(col(Dic.colUserId), col(Dic.colVideoId), col(Dic.colPlayEndTimeTmp))
       .agg(
         sum(col(Dic.colBroadcastTime)) as Dic.colBroadcastTime)
-      .filter(col(Dic.colBroadcastTime)<time_max_limit && col(Dic.colBroadcastTime)>time_min_limit )
-      .orderBy(col(Dic.colUserId),col(Dic.colPlayEndTime))
-      .withColumn(Dic.colPlayEndTime,udfAddSuffix(col(Dic.colPlayEndTime)))
+      .filter(col(Dic.colBroadcastTime) < time_max_limit && col(Dic.colBroadcastTime) > time_min_limit)
+      .orderBy(col(Dic.colUserId), col(Dic.colPlayEndTimeTmp))
+      .withColumn(Dic.colPlayEndTime, udfAddSuffix(col(Dic.colPlayEndTimeTmp)))
+      .drop(Dic.colPlayEndTimeTmp)
 
     df_play_processed
   }

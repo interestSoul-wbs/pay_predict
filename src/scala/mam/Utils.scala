@@ -194,9 +194,11 @@ object Utils {
    *@return int
    *@describe 计算两个日期相差的天数
    */
-    if(date==null){
+    if (date == "NULL") {
       -1
-    }else{
+    } else if (date == null) {
+      -1
+    } else {
       val sdf=new SimpleDateFormat("yyyy-MM-dd HH:mm:SS")
       val d1=sdf.parse(now)
       var d2=sdf.parse(now)
