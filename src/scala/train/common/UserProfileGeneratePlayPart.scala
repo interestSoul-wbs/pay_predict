@@ -19,7 +19,7 @@ object UserProfileGeneratePlayPart {
 
     val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
 
-    // 训练集的划分时间点 - 2020-06-01 00:00:00
+    // 训练集的划分时间点 - 2020-09-01 00:00:00
     val now = "2020-09-01 00:00:00"
 
     // 1 - processed medias -
@@ -38,7 +38,7 @@ object UserProfileGeneratePlayPart {
     printDf("df_result", df_result)
 
     // 4 - save data
-//    saveUserProfilePlayData(spark, df_result, partitiondate, license)
+    saveUserProfilePlayData(spark, df_result, partitiondate, license, "train")
   }
 
   def userProfileGeneratePlayPart(now: String, timeWindow: Int, df_medias: DataFrame, df_plays: DataFrame) = {
@@ -288,12 +288,12 @@ object UserProfileGeneratePlayPart {
     * @param spark
     * @param df_result
     */
-  def saveUserProfilePlayData(spark: SparkSession, df_result: DataFrame, partitiondate: String, license: String) = {
+  def saveUserProfilePlayData(spark: SparkSession, df_result: DataFrame, partitiondate: String, license: String, category: String) = {
 
     spark.sql(
       """
         |CREATE TABLE IF NOT EXISTS
-        |     vodrs.t_sdu_user_profile_play_paypredict(
+        |     vodrs.paypredict_user_profile_play_part(
         |             user_id string,
         |             active_days_last_30_days long,
         |             total_time_last_30_days double,
@@ -336,17 +336,18 @@ object UserProfileGeneratePlayPart {
         |             total_time_children_videos_last_1_days double,
         |             number_children_videos_last_1_days long)
         |PARTITIONED BY
-        |    (partitiondate string, license string, data_type: string)
+        |    (partitiondate string, license string, category string)
       """.stripMargin)
 
     println("save data to hive........... \n" * 4)
     df_result.createOrReplaceTempView(tempTable)
+
     val insert_sql =
       s"""
          |INSERT OVERWRITE TABLE
-         |    vodrs.t_sdu_user_profile_play_paypredict
+         |    vodrs.paypredict_user_profile_play_part
          |PARTITION
-         |    (partitiondate='$partitiondate', license='$license')
+         |    (partitiondate='$partitiondate', license='$license', category='$category')
          |SELECT
          |    user_id,
          |    active_days_last_30_days,
@@ -392,6 +393,7 @@ object UserProfileGeneratePlayPart {
          |FROM
          |    $tempTable
       """.stripMargin
+
     spark.sql(insert_sql)
     println("over over........... \n" * 4)
   }

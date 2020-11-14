@@ -3,7 +3,7 @@
 ## mediastemp
 ——data/train/common/processed/mediastemp
 
-vodrs.t_media_sum_processed_paypredict
+vodrs.paypredict_processed_media
 
 partitiondate='', license='wasu'
 
@@ -11,7 +11,7 @@ partitiondate='', license='wasu'
 ## videofirstcategorytemp.txt
 ——data/train/common/processed/videofirstcategorytemp.txt
 
-vodrs.t_media_label_paypredict
+vodrs.paypredict_processed_media_label
 
 partitiondate='', license='wasu', category='one_level'
 
@@ -19,14 +19,14 @@ partitiondate='', license='wasu', category='one_level'
 ## videosecondcategorytemp.txt
 ——data/train/common/processed/videosecondcategorytemp.txt
 
-vodrs.t_media_label_paypredict
+vodrs.paypredict_processed_media_label
 
 partitiondate='', license='wasu', category='two_level'
 
 ## labeltemp.txt
 ——data/train/common/processed/labeltemp.txt
 
-vodrs.t_media_label_paypredict
+vodrs.paypredict_processed_media_label
 
 partitiondate='', license='wasu', category='video_tag'
 
@@ -36,21 +36,29 @@ partitiondate='', license='wasu', category='video_tag'
 ## orders
 ——data/train/common/processed/orders
 
-vodrs.t_sdu_user_order_history_paypredict
+vodrs.paypredict_processed_order
 
 ----
+# PlayProcess
+## plays
+——data/train/common/processed/plays
+
+vodrs.paypredict_processed_play
+
+
+---
 # UserProfileGenerateOrderPart
 ## userprofileorderpart
 ——data/train/common/processed/userprofileorderpart
 
-vodrs.t_sdu_user_profile_order_paypredict
+vodrs.paypredict_user_profile_order_part
 
 ---
 # UserProfileGeneratePlayPart
 ## userprofileplaypart
 ——data/train/common/processed/userprofileplaypart
 
-vodrs.t_sdu_user_profile_play_paypredict
+vodrs.paypredict_user_profile_play_part
 
 
 --------
@@ -58,7 +66,7 @@ vodrs.t_sdu_user_profile_play_paypredict
 ## userprofilepreferencepart
 ——data/train/common/processed/userprofilepreferencepart
 
-vodrs.t_sdu_user_profile_preference_paypredict
+vodrs.paypredict_user_profile_preference_part
 
 
 --------
@@ -66,5 +74,12 @@ vodrs.t_sdu_user_profile_preference_paypredict
 ## videoprofile
 ——data/train/common/processed/videoprofile
 
-vodrs.t_sdu_user_video_profile_paypredict
+vodrs.paypredict_user_video_profile
 
+----
+# 
+## trainusersold
+——data/train/userpay/trainusersold
+
+vodrs.paypredict_user_split
+partitiondate, license, "train", "old"

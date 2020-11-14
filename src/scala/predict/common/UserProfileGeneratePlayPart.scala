@@ -25,9 +25,9 @@ object UserProfileGeneratePlayPart {
     val now = "2020-07-01 00:00:00"
 
     // 1 - processed medias - meida的数据处理相对固定，目前取固定分区 - 2020-10-28，wasu - Konverse - 2020-11-2
-    val df_medias = getMedias(spark)
+//    val df_medias = getMedias(spark)
 
-    printDf("df_medias", df_medias)
+//    printDf("df_medias", df_medias)
 
     // 2 - processed play data
     val df_plays = getPlay(spark)
@@ -35,9 +35,9 @@ object UserProfileGeneratePlayPart {
     printDf("df_plays", df_plays)
 
     // 3 - data process
-    val df_result = userProfileGeneratePlayPart(now, 30, df_medias, df_plays)
+//    val df_result = userProfileGeneratePlayPart(now, 30, df_medias, df_plays)
 
-    printDf("df_result", df_result)
+//    printDf("df_result", df_result)
 
     // 4 - save data
 //    saveData(spark, df_result)
@@ -282,48 +282,6 @@ object UserProfileGeneratePlayPart {
     df_result_tmp_3.unpersist()
 
     df_result
-  }
-
-  /**
-    * Get processed media data.
-    *
-    * @param spark
-    * @return
-    */
-  def getMedias(spark: SparkSession) = {
-
-    // 1 - get processed medias
-    val user_order_sql =
-      s"""
-         |SELECT
-         |    video_id ,
-         |    video_title ,
-         |    video_one_level_classification ,
-         |    video_two_level_classification_list ,
-         |    video_tag_list ,
-         |    director_list ,
-         |    actor_list ,
-         |    country ,
-         |    language ,
-         |    release_date ,
-         |    storage_time ,
-         |    video_time ,
-         |    score ,
-         |    is_paid ,
-         |    package_id ,
-         |    is_single ,
-         |    is_trailers ,
-         |    supplier ,
-         |    introduction
-         |FROM
-         |    vodrs.t_media_sum_processed_paypredict
-         |WHERE
-         |    partitiondate='20201028' and license='wasu'
-      """.stripMargin
-
-    val df_medias = spark.sql(user_order_sql)
-
-    df_medias
   }
 
   /**

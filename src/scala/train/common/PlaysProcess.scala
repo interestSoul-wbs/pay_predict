@@ -4,21 +4,19 @@ import com.github.nscala_time.time.Imports._
 import mam.Dic
 import mam.Utils.{printDf, udfAddSuffix}
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import mam.GetSaveData._
+import mam.Utils._
+
 object PlaysProcess {
 
   var tempTable = "temp_table"
   var partitiondate: String = _
   var license: String = _
   var date: DateTime = _
-  var today: String = _
-  var yesterday: String = _
   var halfYearAgo: String = _
-  var oneYearAgo: String = _
-  val time_max_limit=43200
-  val time_min_limit=30
+  val time_max_limit = 43200
+  val time_min_limit = 30
 
   def main(args: Array[String]): Unit = {
 
@@ -28,13 +26,10 @@ object PlaysProcess {
     license = args(1)
 
     date = DateTime.parse(partitiondate, DateTimeFormat.forPattern("yyyyMMdd"))
-    today = date.toString(DateTimeFormat.forPattern("yyyyMMdd"))
-    yesterday = (date - 1.days).toString(DateTimeFormat.forPattern("yyyyMMdd"))
     halfYearAgo = (date - 180.days).toString(DateTimeFormat.forPattern("yyyyMMdd"))
-    oneYearAgo = (date - 365.days).toString(DateTimeFormat.forPattern("yyyyMMdd"))
 
     // 1 - get sample users' play data.
-    val df_raw_play = getRawPlayByDateRangeSmpleUsers(spark, halfYearAgo, today, license)
+    val df_raw_play = getRawPlayByDateRangeSmpleUsers(spark, halfYearAgo, partitiondate, license)
 
     printDf("df_raw_play", df_raw_play)
 
@@ -49,28 +44,41 @@ object PlaysProcess {
   }
 
 
-
   /**
     * Process of play data.
+    *
     * @param df_raw_play
     * @return
     */
   def playProcess(df_raw_play: DataFrame) = {
 
-    val playProcessed=df_raw_play
-      .withColumn(Dic.colPlayEndTime,substring(col(Dic.colPlayEndTime),0,10))
-      .groupBy(col(Dic.colUserId),col(Dic.colVideoId),col(Dic.colPlayEndTime))
+    val df_play_processed = df_raw_play
+      .na.drop()
+      .withColumn(Dic.colIsOnlyNumberUserId, udfIsOnlyNumber(col(Dic.colUserId)))
+      .withColumn(Dic.colIsOnlyNumberVideoId, udfIsOnlyNumber(col(Dic.colVideoId)))
+      .withColumn(Dic.colIsOnlyNumberBroadcastTime, udfIsOnlyNumber(col(Dic.colBroadcastTime)))
+      .withColumn(Dic.colIsFormattedTimePlayEndTime, udfIsFormattedTime(col(Dic.colPlayEndTime)))
+      .filter(
+        col(Dic.colIsOnlyNumberUserId).===(1)
+          && col(Dic.colIsOnlyNumberVideoId).===(1)
+          && col(Dic.colIsOnlyNumberBroadcastTime).===(1)
+          && col(Dic.colIsFormattedTimePlayEndTime).===(1))
+      .withColumn(Dic.colPlayEndTimeTmp, substring(col(Dic.colPlayEndTime), 0, 10))
+      .drop(Dic.colPlayEndTime)
+      .groupBy(col(Dic.colUserId), col(Dic.colVideoId), col(Dic.colPlayEndTimeTmp))
       .agg(
         sum(col(Dic.colBroadcastTime)) as Dic.colBroadcastTime)
-      .filter(col(Dic.colBroadcastTime)<time_max_limit && col(Dic.colBroadcastTime)>time_min_limit )
-      .orderBy(col(Dic.colUserId),col(Dic.colPlayEndTime))
-      .withColumn(Dic.colPlayEndTime,udfAddSuffix(col(Dic.colPlayEndTime)))
+      .filter(col(Dic.colBroadcastTime) < time_max_limit && col(Dic.colBroadcastTime) > time_min_limit)
+      .orderBy(col(Dic.colUserId), col(Dic.colPlayEndTimeTmp))
+      .withColumn(Dic.colPlayEndTime, udfAddSuffix(col(Dic.colPlayEndTimeTmp)))
+      .drop(Dic.colPlayEndTimeTmp)
 
-    playProcessed
+    df_play_processed
   }
 
   /**
     * Save play data.
+    *
     * @param spark
     * @param df_order
     */
@@ -80,7 +88,7 @@ object PlaysProcess {
     spark.sql(
       """
         |CREATE TABLE IF NOT EXISTS
-        |     vodrs.t_sdu_user_play_history_paypredict(
+        |     vodrs.paypredict_processed_play(
         |         user_id string,
         |         video_id string,
         |         play_end_time string,
@@ -92,10 +100,11 @@ object PlaysProcess {
     // 2 - Save data.
     println("save data to hive........... \n" * 4)
     df_play.createOrReplaceTempView(tempTable)
+
     val insert_sql =
       s"""
          |INSERT OVERWRITE TABLE
-         |    vodrs.t_sdu_user_play_history_paypredict
+         |    vodrs.paypredict_processed_play
          |PARTITION
          |    (partitiondate = '$partitiondate', license = '$license')
          |SELECT

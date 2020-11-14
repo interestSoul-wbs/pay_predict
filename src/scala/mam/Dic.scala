@@ -13,6 +13,7 @@ object Dic {
   val colUserId = "user_id"
   val colPlayEndTime = "play_end_time"
   val colBroadcastTime = "broadcast_time"
+  val colPlayEndTimeTmp = "play_end_time_tmp"
   //还有一个video_id
 
   /**
@@ -256,4 +257,21 @@ object Dic {
   val colWord: String = "word"
   val colPlayMonth: String = "play_month"
   val colResult: String = "result"
+  val colItemid: String = "itemid"
+  val colDuration: String = "duration"
+  val colIsForMattedTime: String = "is_formatted_time"
+  val colIsLongtypeTimePattern1: String = "is_longtype_time_pattern_1"
+  val colIsLongtypeTimePattern2: String = "is_longtype_time_pattern_2"
+  val colIsOnlyNumberUserId: String = "is_only_number_user_id"
+  val colIsOnlyNumberVideoId: String = "is_only_number_video_id"
+  val colIsOnlyNumberBroadcastTime: String = "is_only_number_broadcast_time"
+  val colIsOnlyNumberVideoTime: String = "is_only_number_video_time"
+  val colIsOnlyNumberResourceId: String = "is_only_number_resource_id"
+  val colIsForMattedTimeReleaseDate: String = "is_formatted_time_release_date"
+  val colIsForMattedTimeStorageTime : String = "is_formatted_time_storage_time"
+  val colIsLongtypeTimeStorageTime: String = "is_longtype_time_storage_time"
+  val colIsLongtypeTimeCreationTime: String = "is_longtype_time_creation_time"
+  val colIsFormattedTimePlayEndTime: String = "is_formatted_time_play_end_time"
+  val colIsLongtypeTimeOrderStartTime: String = "is_longtype_time_order_start_time"
+  val colIsLongtypeTimeOrderEndTime: String = "is_longtype_time_order_end_time"
 }

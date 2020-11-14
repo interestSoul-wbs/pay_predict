@@ -2,7 +2,6 @@ package train.common
 
 import mam.Dic
 import mam.Utils.{calDate, printDf, udfGetDays}
-import org.apache.ivy.core.module.descriptor.License
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import mam.GetSaveData._
@@ -20,7 +19,7 @@ object UserProfileGenerateOrderPart {
 
     val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
 
-    // 训练集的划分时间点 - 2020-06-01 00:00:00
+    // 训练集的划分时间点 - 2020-09-01 00:00:00
     val now = "2020-09-01 00:00:00"
 
     // 1 - get play data.
@@ -40,7 +39,7 @@ object UserProfileGenerateOrderPart {
 
     // 4 - save
     // 可能修改 - 2020-11-11
-    saveUserProfileOrderPart(spark, df_result)
+    saveUserProfileOrderPart(spark, df_result, partitiondate, license, "train")
   }
 
   def userProfileGenerateOrderPart(now: String, timeWindow: Int, df_plays: DataFrame, df_orders: DataFrame) = {
@@ -185,12 +184,12 @@ object UserProfileGenerateOrderPart {
     * @param spark
     * @param df_result
     */
-  def saveUserProfileOrderPart(spark: SparkSession, df_result: DataFrame) = {
+  def saveUserProfileOrderPart(spark: SparkSession, df_result: DataFrame, partitiondate: String, license: String, category: String) = {
 
     spark.sql(
       """
         |CREATE TABLE IF NOT EXISTS
-        |     vodrs.t_sdu_user_profile_order_paypredict(
+        |     vodrs.paypredict_user_profile_order_part(
         |         user_id string,
         |         number_packages_purchased long,
         |         total_money_packages_purchased double,
@@ -213,17 +212,18 @@ object UserProfileGenerateOrderPart {
         |         number_paid_single_last_30_days long,
         |         days_remaining_package int)
         |PARTITIONED BY
-        |    (partitiondate string, license string)
+        |    (partitiondate string, license string, category string)
       """.stripMargin)
 
     println("save data to hive........... \n" * 4)
     df_result.createOrReplaceTempView(tempTable)
+
     val insert_sql =
       s"""
          |INSERT OVERWRITE TABLE
-         |    vodrs.t_sdu_user_profile_order_paypredict
+         |    vodrs.paypredict_user_profile_order_part
          |PARTITION
-         |    (partitiondate = '$partitiondate', license = '$license')
+         |    (partitiondate='$partitiondate', license='$license', category='$category')
          |SELECT
          |    user_id,
          |    number_packages_purchased,
@@ -249,6 +249,7 @@ object UserProfileGenerateOrderPart {
          |FROM
          |    $tempTable
       """.stripMargin
+
     spark.sql(insert_sql)
     println("over over........... \n" * 4)
   }

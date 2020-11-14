@@ -24,22 +24,22 @@ object UserProfileGeneratePreferencePart {
     val now = "2020-07-01 00:00:00"
 
     // 1 - processed df_medias - meida的数据处理相对固定，目前取固定分区 - 2020-10-28，wasu - Konverse - 2020-11-2
-    val df_medias = getMedias(spark)
-
-    printDf("df_medias", df_medias)
-
-    // 2 - processed play data
-    val df_plays = getPlay(spark)
-
-    printDf("df_plays", df_plays)
-
-    // 3 - data process
-    val df_result = userProfileGeneratePreferencePartProcess(now, 30, df_medias, df_plays)
-
-    printDf("df_result", df_result)
-
-    // 4 - save data
-    saveData(spark, df_result)
+//    val df_medias = getMedias(spark)
+//
+//    printDf("df_medias", df_medias)
+//
+//    // 2 - processed play data
+//    val df_plays = getPlay(spark)
+//
+//    printDf("df_plays", df_plays)
+//
+//    // 3 - data process
+//    val df_result = userProfileGeneratePreferencePartProcess(now, 30, df_medias, df_plays)
+//
+//    printDf("df_result", df_result)
+//
+//    // 4 - save data
+//    saveData(spark, df_result)
   }
 
   def userProfileGeneratePreferencePartProcess(now: String, timeWindow: Int, df_medias: DataFrame, df_plays: DataFrame) = {
@@ -290,47 +290,6 @@ object UserProfileGeneratePreferencePart {
     df_result
   }
 
-  /**
-    * Get processed media data.
-    *
-    * @param spark
-    * @return
-    */
-  def getMedias(spark: SparkSession) = {
-
-    // 1 - get processed df_medias
-    val user_order_sql =
-      s"""
-         |SELECT
-         |    video_id ,
-         |    video_title ,
-         |    video_one_level_classification ,
-         |    video_two_level_classification_list ,
-         |    video_tag_list ,
-         |    director_list ,
-         |    actor_list ,
-         |    country ,
-         |    language ,
-         |    release_date ,
-         |    storage_time ,
-         |    video_time ,
-         |    score ,
-         |    is_paid ,
-         |    package_id ,
-         |    is_single ,
-         |    is_trailers ,
-         |    supplier ,
-         |    introduction
-         |FROM
-         |    vodrs.t_media_sum_processed_paypredict
-         |WHERE
-         |    partitiondate='20201028' and license='wasu'
-      """.stripMargin
-
-    val df_order = spark.sql(user_order_sql)
-
-    df_order
-  }
 
   /**
     * Get user play data.

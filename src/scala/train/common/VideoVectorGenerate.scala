@@ -15,6 +15,9 @@ object VideoVectorGenerate {
   var license: String = _
   var vectorDimension: Int = 64
   var windowSize: Int = 5
+  var minCount: Int = 5
+  var maxSentence: Int = 30
+  var maxIteration: Int = 1
 
   // Konverse - 2020-11-3 - 还没跑通 - df_raw_video_dict 正常
   def main(args: Array[String]): Unit = {
@@ -38,11 +41,12 @@ object VideoVectorGenerate {
     printDf("df_plays_list", df_plays_list)
 
     // 3 - word2vec training and get vector
-    val df_video_dict = getVector(df_plays_list, vectorDimension, windowSize)
+    val df_video_dict = getVector(df_plays_list, vectorDimension, windowSize, minCount, maxSentence)
 
     printDf("df_video_dict", df_video_dict)
 
     // 4 - save
+    // 2020-11-12 - 先打出来看看，然后再看怎么存
   }
 
 
@@ -62,22 +66,19 @@ object VideoVectorGenerate {
 
   /**
     * Word2vec training.
-    *
-    * @param df_plays_list
-    * @param vectorDimension
-    * @param input_col
-    * @param output_col
-    * @return
     */
-  def getVector(df_plays_list: DataFrame, vector_dimension: Int = 64, window_size: Int = 5, input_col: String = Dic.colVideoList,
-                output_col: String = Dic.colResult) = {
+  def getVector(df_plays_list: DataFrame, vector_dimension: Int = 64, window_size: Int = 5, min_count: Int = 5,
+                max_length: Int = 30, max_iteration: Int = 1,
+                input_col: String = Dic.colVideoList, output_col: String = Dic.colResult) = {
 
     val w2vModel = new Word2Vec()
       .setInputCol(input_col)
       .setOutputCol(output_col)
       .setVectorSize(vector_dimension)
       .setWindowSize(window_size)
-      .setMinCount(5)
+      .setMinCount(min_count)
+      .setMaxSentenceLength(max_length)
+      .setMaxIter(max_iteration)
 
     val model = w2vModel.fit(df_plays_list)
 

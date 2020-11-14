@@ -7,7 +7,7 @@ package predict.common
   */
 
 import mam.Dic
-import mam.Utils.{generateSparkSession, printArray, printDf, udfLongToTimestamp}
+import mam.Utils.{printArray, printDf, udfLongToTimestamp}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.ml.feature.Imputer
 import org.apache.spark.sql
@@ -57,7 +57,7 @@ object MediasProcess {
     printDf("df_media_processed", df_media_processed)
 
     // 6 - save processed media
-    saveProcessedMedia(spark, df_media_processed, "20201028", license)
+//    saveProcessedMedia(spark, df_media_processed, "20201028", license)
 
     println("预测阶段媒资数据处理完成！")
   }
@@ -97,7 +97,7 @@ object MediasProcess {
 
     printDf("df_label", df_label)
 
-    saveLabel(spark, df_label, partitiondate, license, category)
+//    saveLabel(spark, df_label, partitiondate, license, category)
   }
 
   /**
@@ -120,7 +120,7 @@ object MediasProcess {
 
     printDf("df_label", df_label)
 
-    saveLabel(spark, df_label, partitiondate, license, category)
+//    saveLabel(spark, df_label, partitiondate, license, category)
   }
 
   /**
