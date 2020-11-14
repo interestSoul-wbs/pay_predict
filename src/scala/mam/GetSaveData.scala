@@ -302,7 +302,7 @@ object GetSaveData {
   }
 
 
-  def getTrainUserOld(spark: SparkSession, partitiondate: String, license: String, category: String, new_or_old: String) = {
+  def getTrainUser(spark: SparkSession, partitiondate: String, license: String, category: String, new_or_old: String) = {
 
     val data_sql =
       s"""
