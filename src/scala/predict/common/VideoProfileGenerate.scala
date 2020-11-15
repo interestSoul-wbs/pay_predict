@@ -1,13 +1,14 @@
 package predict.common
 
 import mam.Dic
-import mam.Utils.{calDate, printDf, udfGetDays}
-import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql
-import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
+import mam.GetSaveData._
+import mam.Utils._
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.IntegerType
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import scala.collection.mutable.ListBuffer
+
 
 object VideoProfileGenerate {
 
@@ -23,30 +24,57 @@ object VideoProfileGenerate {
     val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
 
     // 训练集的划分时间点 - 2020-06-01 00:00:00
-    val now = "2020-07-01 00:00:00"
+    val now = "2020-09-15 00:00:00"
 
     // 1 - processed df_medias
-//    val df_medias = getMedias(spark)
+    val df_medias = getProcessedMedias(spark, partitiondate, license)
+
+    printDf("df_medias", df_medias)
+
+    val selectColumns = df_medias.columns
+
+    val df_medias_purged = df_medias
+      .na.drop(Array(Dic.colVideoId, Dic.colReleaseDate, Dic.colStorageTime, Dic.colVideoTime))
+      .withColumn(Dic.colIsOnlyNumberVideoId, udfIsOnlyNumber(col(Dic.colVideoId)))
+      .withColumn(Dic.colIsForMattedTimeReleaseDate, udfIsFormattedTime(col(Dic.colReleaseDate)))
+      .withColumn(Dic.colIsForMattedTimeStorageTime, udfIsFormattedTime(col(Dic.colStorageTime)))
+      .withColumn(Dic.colIsOnlyNumberVideoTime, udfIsOnlyNumber(col(Dic.colVideoTime).cast(IntegerType)))
+      .filter(
+        col(Dic.colIsOnlyNumberVideoId).===(1)
+          && col(Dic.colIsForMattedTimeReleaseDate).===(1)
+          && col(Dic.colIsForMattedTimeStorageTime).===(1)
+          && col(Dic.colIsOnlyNumberVideoTime).===(1))
+      .select(selectColumns.head, selectColumns.tail: _*)
+
+    printDf("df_medias_purged", df_medias_purged)
+
+    // 2 - processed play data
+    val df_plays = getProcessedPlay(spark, partitiondate, license)
+
+    printDf("df_plays", df_plays)
+
+    // 3 - processed order data
+    val df_orders = getProcessedOrder(spark, partitiondate, license)
+
+    printDf("df_orders", df_orders)
+
+    // 4 - data process
+    val df_result = videoProfileGenerate(now, 30, df_medias_purged, df_plays, df_orders)
+
+    printDf("df_result", df_result)
+
+    // 5 - save data
+    // 2020-11-12 - 先打出来看一下，再看要怎么处理非 数值型特征，怎么存
+    saveVideoProfileGenerate(spark, df_result, partitiondate, license, "valid")
+
+    //将其他类型的列转化为字符串，容易保存为csv文件
+//    val anoColumns = df_result_tmp_3.columns.diff(numColumns)
+
+//    val df_result = anoColumns.foldLeft(df_result_tmp_2) {
+//      (currentDF, column) => currentDF.withColumn(column, col(column).cast("string"))
+//    }
 //
-//    printDf("df_medias", df_medias)
-//
-//    // 2 - processed play data
-//    val df_plays = getPlay(spark)
-//
-//    printDf("df_plays", df_plays)
-//
-//    // 3 - processed order data
-//    val df_orders = getOrder(spark)
-//
-//    printDf("df_orders", df_orders)
-//
-//    // 4 - data process
-//    val df_result = videoProfileGenerate(now, 30, df_medias, df_plays, df_orders)
-//
-//    printDf("df_result", df_result)
-//
-//    // 5 - save data
-//    saveData(spark, df_result)
+//    df_result
   }
 
   def videoProfileGenerate(now: String, timeWindow: Int, df_medias: DataFrame, df_plays: DataFrame, df_orders: DataFrame) = {
@@ -67,6 +95,8 @@ object VideoProfileGenerate {
         count(col(Dic.colVideoId)).as(Dic.colNumberOfPlaysIn30Days),
         countDistinct(col(Dic.colUserId)).as(Dic.colNumberOfViewsWithin30Days))
 
+    printDf("part_11", part_11)
+
     val part_12 = df_plays
       .filter(
         col(Dic.colPlayEndTime).<(now)
@@ -75,6 +105,8 @@ object VideoProfileGenerate {
       .agg(
         count(col(Dic.colVideoId)).as(Dic.colNumberOfPlaysIn14Days),
         countDistinct(col(Dic.colUserId)).as(Dic.colNumberOfViewsWithin14Days))
+
+    printDf("part_12", part_12)
 
     val part_13 = df_plays
       .filter(
@@ -85,6 +117,8 @@ object VideoProfileGenerate {
         count(col(Dic.colVideoId)).as(Dic.colNumberOfPlaysIn7Days),
         countDistinct(col(Dic.colUserId)).as(Dic.colNumberOfViewsWithin7Days))
 
+    printDf("part_13", part_13)
+
     val part_14 = df_plays
       .filter(
         col(Dic.colPlayEndTime).<(now)
@@ -94,9 +128,14 @@ object VideoProfileGenerate {
         count(col(Dic.colVideoId)).as(Dic.colNumberOfPlaysIn3Days),
         countDistinct(col(Dic.colUserId)).as(Dic.colNumberOfViewsWithin3Days))
 
+    printDf("part_14", part_14)
+
     val part_15 = df_medias
       .withColumn(Dic.colAbsOfNumberOfDaysBetweenStorageAndCurrent, udfGetDays(col(Dic.colStorageTime), lit(now)))
       .select(col(Dic.colVideoId), col(Dic.colAbsOfNumberOfDaysBetweenStorageAndCurrent))
+
+
+    printDf("part_15", part_15)
 
     val df_result_tmp_1 = df_medias
       .join(part_11, joinKeysVideoId, "left")
@@ -104,6 +143,8 @@ object VideoProfileGenerate {
       .join(part_13, joinKeysVideoId, "left")
       .join(part_14, joinKeysVideoId, "left")
       .join(part_15, joinKeysVideoId, "left")
+
+    printDf("df_result_tmp_1", df_result_tmp_1)
 
     val part_21 = df_orders.filter(
       col(Dic.colCreationTime).<(now)
@@ -116,6 +157,8 @@ object VideoProfileGenerate {
         col(Dic.colResourceId).as(Dic.colVideoId),
         col(Dic.colNumberOfTimesPurchasedWithin30Days))
 
+    printDf("part_21", part_21)
+
     val part_22 = df_orders.filter(
       col(Dic.colCreationTime).<(now)
         && col(Dic.colCreationTime).>=(pre_14)
@@ -126,6 +169,8 @@ object VideoProfileGenerate {
       .select(
         col(Dic.colResourceId).as(Dic.colVideoId),
         col(Dic.colNumberOfTimesPurchasedWithin14Days))
+
+    printDf("part_22", part_22)
 
     val part_23 = df_orders.filter(
       col(Dic.colCreationTime).<(now)
@@ -138,6 +183,8 @@ object VideoProfileGenerate {
         col(Dic.colResourceId).as(Dic.colVideoId),
         col(Dic.colNumberOfTimesPurchasedWithin7Days))
 
+    printDf("part_23", part_23)
+
     val part_24 = df_orders.filter(
       col(Dic.colCreationTime).<(now)
         && col(Dic.colCreationTime).>=(pre_3)
@@ -149,6 +196,8 @@ object VideoProfileGenerate {
         col(Dic.colResourceId).as(Dic.colVideoId),
         col(Dic.colNumberOfTimesPurchasedWithin3Days))
 
+    printDf("part_24", part_24)
+
     val part_25 = df_orders.filter(
       col(Dic.colCreationTime).<(now)
         && col(Dic.colOrderStatus).>(1))
@@ -159,12 +208,18 @@ object VideoProfileGenerate {
         col(Dic.colResourceId).as(Dic.colVideoId),
         col(Dic.colNumberOfTimesPurchasedTotal))
 
+    printDf("part_25", part_25)
+
+    printDf("df_result_tmp_1", df_result_tmp_1)
+
     val df_result_tmp_2 = df_result_tmp_1
       .join(part_21, Seq(Dic.colVideoId), "left")
       .join(part_22, Seq(Dic.colVideoId), "left")
       .join(part_23, Seq(Dic.colVideoId), "left")
       .join(part_24, Seq(Dic.colVideoId), "left")
       .join(part_25, Seq(Dic.colVideoId), "left")
+
+    printDf("df_result_tmp_2", df_result_tmp_2)
 
     //选出数据类型为数值类型的列
     val numColumns = new ListBuffer[String]
@@ -174,81 +229,12 @@ object VideoProfileGenerate {
       }
     }
 
-    val df_result_tmp_3 = df_result_tmp_2.na.fill(0, numColumns)
+    val df_result = df_result_tmp_2.na.fill(0, numColumns)
 
-    df_result_tmp_3
-//    //将其他类型的列转化为字符串，容易保存为csv文件
-//    val anoColumns = df_result_tmp_2.columns.diff(numColumns)
-//
-//    val df_result_tmp_3 = anoColumns.foldLeft(df_result_tmp_2) {
-//      (currentDF, column) => currentDF.withColumn(column, col(column).cast("string"))
-//    }
-//
-//    val df_result_tmp_4 = df_result_tmp_3.na.fill(0, numColumns)
+    printDf("df_result", df_result)
+
+    df_result
   }
-
-  /**
-    * Get user order data.
-    *
-    * @param spark
-    * @return
-    */
-  def getOrder(spark: SparkSession) = {
-
-    // 1 - 获取用户购买记录
-    val user_order_sql =
-      s"""
-         |SELECT
-         |    user_id,
-         |    money,
-         |    resource_type,
-         |    resource_id,
-         |    resource_title,
-         |    creation_time,
-         |    discount_description,
-         |    order_status,
-         |    order_start_time,
-         |    order_end_time
-         |FROM
-         |    vodrs.t_sdu_user_order_history_paypredict
-         |WHERE
-         |    partitiondate='$partitiondate' and license='$license'
-      """.stripMargin
-
-    val df_order = spark.sql(user_order_sql)
-
-    df_order
-  }
-
-
-
-  /**
-    * Get user play data.
-    *
-    * @param spark
-    * @return
-    */
-  def getPlay(spark: SparkSession) = {
-
-    // 1 - 获取用户播放记录
-    val user_play_sql =
-      s"""
-         |SELECT
-         |    user_id,
-         |    video_id,
-         |    play_end_time,
-         |    broadcast_time
-         |FROM
-         |    vodrs.t_sdu_user_play_history_paypredict
-         |WHERE
-         |    partitiondate='$partitiondate' and license='$license'
-      """.stripMargin
-
-    val df_play = spark.sql(user_play_sql)
-
-    df_play
-  }
-
 
   /**
     * Save data.
@@ -256,13 +242,13 @@ object VideoProfileGenerate {
     * @param spark
     * @param df_result
     */
-  def saveData(spark: SparkSession, df_result: DataFrame) = {
+  def saveVideoProfileGenerate(spark: SparkSession, df_result: DataFrame, partitiondate: String, license: String, category: String) = {
 
     spark.sql(
       """
         |CREATE TABLE IF NOT EXISTS
-        |     vodrs.t_sdu_user_video_profile_paypredict(
-        |video_id string,
+        |     vodrs.paypredict_user_video_profile(
+        |            video_id string,
         |            video_title string,
         |            video_one_level_classification string,
         |            video_two_level_classification_list array<string>,
@@ -296,17 +282,18 @@ object VideoProfileGenerate {
         |            number_of_times_purchased_within_3_days long,
         |            number_of_times_purchased_total long)
         |PARTITIONED BY
-        |    (partitiondate string, license string)
+        |    (partitiondate string, license string, category string)
       """.stripMargin)
 
     println("save data to hive........... \n" * 4)
     df_result.createOrReplaceTempView(tempTable)
+
     val insert_sql =
       s"""
          |INSERT OVERWRITE TABLE
-         |    vodrs.t_sdu_user_video_profile_paypredict
+         |    vodrs.paypredict_user_video_profile
          |PARTITION
-         |    (partitiondate = '$partitiondate', license = '$license')
+         |    (partitiondate='$partitiondate', license='$license', category='$category')
          |SELECT
          |    video_id,
          |    video_title,

@@ -13,6 +13,7 @@ object UserSplit {
   var tempTable = "temp_table"
   var partitiondate: String = _
   var license: String = _
+  var timeWindow: Int = 30
 
   def main(args: Array[String]): Unit = {
 
@@ -22,11 +23,7 @@ object UserSplit {
     // 1 - SparkSession and params initialize
     val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
 
-    //    val trainTime = args(0) + " " + args(1)
-
     val train_time = "2020-09-01 00:00:00"
-
-    val timeWindow = 30
 
     // 2 - processed df_plays
     val df_plays = getProcessedPlay(spark, partitiondate, license)
@@ -143,7 +140,7 @@ object UserSplit {
 
     println("新用户数据集生成完成！")
 
-    saveUserSamples(spark, df_train_old_result, partitiondate, license, "train", "new")
+    saveUserSamples(spark, trainNewResult, partitiondate, license, "train", "new")
   }
 
   def saveUserSamples(spark: SparkSession, df_result: DataFrame, partitiondate: String, license: String, category: String,

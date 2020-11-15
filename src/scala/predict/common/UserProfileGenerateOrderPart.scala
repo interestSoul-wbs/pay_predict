@@ -1,7 +1,7 @@
 package predict.common
 
-import com.github.nscala_time.time.Imports.DateTime
 import mam.Dic
+import mam.GetSaveData._
 import mam.Utils.{calDate, printDf, udfGetDays}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -19,16 +19,16 @@ object UserProfileGenerateOrderPart {
 
     val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
 
-    // 训练集的划分时间点 - 2020-06-01 00:00:00
-    val now = "2020-07-01 00:00:00"
+    // 训练集的划分时间点 - 2020-09-01 00:00:00
+    val now = "2020-09-15 00:00:00"
 
     // 1 - get play data.
-    val df_plays = getPlay(spark)
+    val df_plays = getProcessedPlay(spark, partitiondate, license)
 
     printDf("df_plays", df_plays)
 
     // 2 - get order data.
-    val df_orders = getOrder(spark)
+    val df_orders = getProcessedOrder(spark, partitiondate, license)
 
     printDf("df_orders", df_orders)
 
@@ -38,7 +38,8 @@ object UserProfileGenerateOrderPart {
     printDf("df_result", df_result)
 
     // 4 - save
-    saveData(spark, df_result)
+    // 可能修改 - 2020-11-11
+    saveUserProfileOrderPart(spark, df_result, partitiondate, license, "valid")
   }
 
   def userProfileGenerateOrderPart(now: String, timeWindow: Int, df_plays: DataFrame, df_orders: DataFrame) = {
@@ -176,65 +177,6 @@ object UserProfileGenerateOrderPart {
     df_result
   }
 
-  /**
-    * Get user play data.
-    *
-    * @param spark
-    * @return
-    */
-  def getPlay(spark: SparkSession) = {
-
-    // 1 - 获取用户播放记录
-    val user_play_sql =
-      s"""
-         |SELECT
-         |    user_id,
-         |    video_id,
-         |    play_end_time,
-         |    broadcast_time
-         |FROM
-         |    vodrs.t_sdu_user_play_history_paypredict
-         |WHERE
-         |    partitiondate='$partitiondate' and license='$license'
-      """.stripMargin
-
-    val df_play = spark.sql(user_play_sql)
-
-    df_play
-  }
-
-  /**
-    * Get user order data.
-    *
-    * @param spark
-    * @return
-    */
-  def getOrder(spark: SparkSession) = {
-
-    // 1 - 获取用户购买记录
-    val user_order_sql =
-      s"""
-         |SELECT
-         |    user_id,
-         |    money,
-         |    resource_type,
-         |    resource_id,
-         |    resource_title,
-         |    creation_time,
-         |    discount_description,
-         |    order_status,
-         |    order_start_time,
-         |    order_end_time
-         |FROM
-         |    vodrs.t_sdu_user_order_history_paypredict
-         |WHERE
-         |    partitiondate='$partitiondate' and license='$license'
-      """.stripMargin
-
-    val df_order = spark.sql(user_order_sql)
-
-    df_order
-  }
 
   /**
     * Save data to hive.
@@ -242,12 +184,12 @@ object UserProfileGenerateOrderPart {
     * @param spark
     * @param df_result
     */
-  def saveData(spark: SparkSession, df_result: DataFrame) = {
+  def saveUserProfileOrderPart(spark: SparkSession, df_result: DataFrame, partitiondate: String, license: String, category: String) = {
 
     spark.sql(
       """
         |CREATE TABLE IF NOT EXISTS
-        |     vodrs.t_sdu_user_profile_order_paypredict(
+        |     vodrs.paypredict_user_profile_order_part(
         |         user_id string,
         |         number_packages_purchased long,
         |         total_money_packages_purchased double,
@@ -270,17 +212,18 @@ object UserProfileGenerateOrderPart {
         |         number_paid_single_last_30_days long,
         |         days_remaining_package int)
         |PARTITIONED BY
-        |    (partitiondate string, license string)
+        |    (partitiondate string, license string, category string)
       """.stripMargin)
 
     println("save data to hive........... \n" * 4)
     df_result.createOrReplaceTempView(tempTable)
+
     val insert_sql =
       s"""
          |INSERT OVERWRITE TABLE
-         |    vodrs.t_sdu_user_profile_order_paypredict
+         |    vodrs.paypredict_user_profile_order_part
          |PARTITION
-         |    (partitiondate = '$partitiondate', license = '$license')
+         |    (partitiondate='$partitiondate', license='$license', category='$category')
          |SELECT
          |    user_id,
          |    number_packages_purchased,
@@ -306,6 +249,7 @@ object UserProfileGenerateOrderPart {
          |FROM
          |    $tempTable
       """.stripMargin
+
     spark.sql(insert_sql)
     println("over over........... \n" * 4)
   }

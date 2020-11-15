@@ -1,11 +1,10 @@
 package predict.common
 
 import mam.Dic
+import mam.GetSaveData._
 import mam.Utils.{calDate, printDf, udfGetLabelAndCount, udfGetLabelAndCount2}
-import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql
-import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 object UserProfileGeneratePreferencePart {
 
@@ -20,26 +19,26 @@ object UserProfileGeneratePreferencePart {
 
     val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
 
-    // 训练集的划分时间点 - 2020-06-01 00:00:00
-    val now = "2020-07-01 00:00:00"
+    // 训练集的划分时间点 - 2020-09-01 00:00:00
+    val now = "2020-09-15 00:00:00"
 
-    // 1 - processed df_medias - meida的数据处理相对固定，目前取固定分区 - 2020-10-28，wasu - Konverse - 2020-11-2
-//    val df_medias = getMedias(spark)
-//
-//    printDf("df_medias", df_medias)
-//
-//    // 2 - processed play data
-//    val df_plays = getPlay(spark)
-//
-//    printDf("df_plays", df_plays)
-//
-//    // 3 - data process
-//    val df_result = userProfileGeneratePreferencePartProcess(now, 30, df_medias, df_plays)
-//
-//    printDf("df_result", df_result)
-//
-//    // 4 - save data
-//    saveData(spark, df_result)
+    // 1 - processed media
+    val df_medias = getProcessedMedias(spark, partitiondate, license)
+
+    printDf("df_medias", df_medias)
+
+    // 2 - processed play
+    val df_plays = getProcessedPlay(spark, partitiondate, license)
+
+    printDf("df_plays", df_plays)
+
+    // 3 - data process
+    val df_result = userProfileGeneratePreferencePartProcess(now, 30, df_medias, df_plays)
+
+    printDf("df_result", df_result)
+
+    // 4 - save data
+    saveUserProfileGeneratePreferencePart(spark, df_result, partitiondate, license, "valid")
   }
 
   def userProfileGeneratePreferencePartProcess(now: String, timeWindow: Int, df_medias: DataFrame, df_plays: DataFrame) = {
@@ -48,9 +47,13 @@ object UserProfileGeneratePreferencePart {
       .select(col(Dic.colUserId)).distinct()
 
     val pre_30 = calDate(now, -30)
+
     val pre_14 = calDate(now, days = -14)
+
     val pre_7 = calDate(now, -7)
+
     val pre_3 = calDate(now, -3)
+
     val pre_1 = calDate(now, -1)
 
     val joinKeysUserId = Seq(Dic.colUserId)
@@ -236,7 +239,6 @@ object UserProfileGeneratePreferencePart {
       .withColumn(Dic.colVideoTwoLevelPreference, udfGetLabelAndCount2(col(Dic.colVideoTwoLevelPreference)))
       .withColumn(Dic.colTagPreference, udfGetLabelAndCount2(col(Dic.colTagPreference)))
 
-
     val play_medias_part_72_temp = user_medias
       .filter(
         col(Dic.colPlayEndTime).<(now)
@@ -290,47 +292,18 @@ object UserProfileGeneratePreferencePart {
     df_result
   }
 
-
-  /**
-    * Get user play data.
-    *
-    * @param spark
-    * @return
-    */
-  def getPlay(spark: SparkSession) = {
-
-    // 1 - 获取用户播放记录
-    val user_play_sql =
-      s"""
-         |SELECT
-         |    user_id,
-         |    video_id,
-         |    play_end_time,
-         |    broadcast_time
-         |FROM
-         |    vodrs.t_sdu_user_play_history_paypredict
-         |WHERE
-         |    partitiondate='$partitiondate' and license='$license'
-      """.stripMargin
-
-    val df_play = spark.sql(user_play_sql)
-
-    df_play
-  }
-
-
   /**
     * Save data.
     *
     * @param spark
     * @param df_result
     */
-  def saveData(spark: SparkSession, df_result: DataFrame) = {
+  def saveUserProfileGeneratePreferencePart(spark: SparkSession, df_result: DataFrame, partitiondate: String, license: String, category: String) = {
 
     spark.sql(
       """
         |CREATE TABLE IF NOT EXISTS
-        |     vodrs.t_sdu_user_profile_preference_paypredict(
+        |     vodrs.paypredict_user_profile_preference_part(
         |             user_id string,
         |             total_time_movies_last_30_days double,
         |             total_time_movies_last_14_days double,
@@ -359,17 +332,18 @@ object UserProfileGeneratePreferencePart {
         |             in_package_tag_preference map<string, int>
         |             )
         |PARTITIONED BY
-        |    (partitiondate string, license string)
+        |    (partitiondate string, license string, category string)
       """.stripMargin)
 
     println("save data to hive........... \n" * 4)
     df_result.createOrReplaceTempView(tempTable)
+
     val insert_sql =
       s"""
          |INSERT OVERWRITE TABLE
-         |    vodrs.t_sdu_user_profile_preference_paypredict
+         |    vodrs.paypredict_user_profile_preference_part
          |PARTITION
-         |    (partitiondate = '$partitiondate', license = '$license')
+         |    (partitiondate='$partitiondate', license='$license', category='$category')
          |SELECT
          |     user_id,
          |     total_time_movies_last_30_days,
@@ -400,6 +374,7 @@ object UserProfileGeneratePreferencePart {
          |FROM
          |    $tempTable
       """.stripMargin
+
     spark.sql(insert_sql)
     println("over over........... \n" * 4)
   }

@@ -1,12 +1,10 @@
 package predict.common
 
 import mam.Dic
+import mam.GetSaveData._
 import mam.Utils.{calDate, printDf, udfGetDays}
-import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
-
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 object UserProfileGeneratePlayPart {
 
@@ -21,26 +19,26 @@ object UserProfileGeneratePlayPart {
 
     val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
 
-    // 训练集的划分时间点 - 2020-06-01 00:00:00
-    val now = "2020-07-01 00:00:00"
+    // 训练集的划分时间点 - 2020-09-01 00:00:00
+    val now = "2020-09-15 00:00:00"
 
-    // 1 - processed medias - meida的数据处理相对固定，目前取固定分区 - 2020-10-28，wasu - Konverse - 2020-11-2
-//    val df_medias = getMedias(spark)
+    // 1 - processed medias -
+    val df_medias = getProcessedMedias(spark, partitiondate, license)
 
-//    printDf("df_medias", df_medias)
+    printDf("df_medias", df_medias)
 
     // 2 - processed play data
-    val df_plays = getPlay(spark)
+    val df_plays = getProcessedPlay(spark, partitiondate, license)
 
     printDf("df_plays", df_plays)
 
     // 3 - data process
-//    val df_result = userProfileGeneratePlayPart(now, 30, df_medias, df_plays)
+    val df_result = userProfileGeneratePlayPart(now, 30, df_medias, df_plays)
 
-//    printDf("df_result", df_result)
+    printDf("df_result", df_result)
 
     // 4 - save data
-//    saveData(spark, df_result)
+    saveUserProfilePlayData(spark, df_result, partitiondate, license, "valid")
   }
 
   def userProfileGeneratePlayPart(now: String, timeWindow: Int, df_medias: DataFrame, df_plays: DataFrame) = {
@@ -285,30 +283,118 @@ object UserProfileGeneratePlayPart {
   }
 
   /**
-    * Get user play data.
+    * Save user profile play data.
     *
     * @param spark
-    * @return
+    * @param df_result
     */
-  def getPlay(spark: SparkSession) = {
+  def saveUserProfilePlayData(spark: SparkSession, df_result: DataFrame, partitiondate: String, license: String, category: String) = {
 
-    // 1 - 获取用户播放记录
-    val user_play_sql =
+    spark.sql(
+      """
+        |CREATE TABLE IF NOT EXISTS
+        |     vodrs.paypredict_user_profile_play_part(
+        |             user_id string,
+        |             active_days_last_30_days long,
+        |             total_time_last_30_days double,
+        |             days_from_last_active int,
+        |             days_since_first_active_in_timewindow int,
+        |             active_days_last_14_days long,
+        |             total_time_last_14_days double,
+        |             active_days_last_7_days long,
+        |             total_time_last_7_days double,
+        |             active_days_last_3_days long,
+        |             total_time_last_3_days double,
+        |             total_time_paid_videos_last_30_days double,
+        |             total_time_paid_videos_last_14_days double,
+        |             total_time_paid_videos_last_7_days double,
+        |             total_time_paid_videos_last_3_days double,
+        |             total_time_paid_videos_last_1_days double,
+        |             total_time_in_package_videos_last_30_days double,
+        |             var_time_in_package_videos_last_30_days double,
+        |             number_in_package_videos_last_30_days long,
+        |             total_time_in_package_videos_last_14_days double,
+        |             var_time_in_package_videos_last_14_days double,
+        |             number_in_package_videos_last_14_days long,
+        |             total_time_in_package_videos_last_7_days double,
+        |             var_time_in_package_videos_last_7_days double,
+        |             number_in_package_videos_last_7_days long,
+        |             total_time_in_package_videos_last_3_days double,
+        |             var_time_in_package_videos_last_3_days double,
+        |             number_in_package_videos_last_3_days long,
+        |             total_time_in_package_videos_last_1_days double,
+        |             var_time_in_package_videos_last_1_days double,
+        |             number_in_package_videos_last_1_days long,
+        |             total_time_children_videos_last_30_days double,
+        |             number_children_videos_last_30_days long,
+        |             total_time_children_videos_last_14_days double,
+        |             number_children_videos_last_14_days long,
+        |             total_time_children_videos_last_7_days double,
+        |             number_children_videos_last_7_days long,
+        |             total_time_children_videos_last_3_days double,
+        |             number_children_videos_last_3_days long,
+        |             total_time_children_videos_last_1_days double,
+        |             number_children_videos_last_1_days long)
+        |PARTITIONED BY
+        |    (partitiondate string, license string, category string)
+      """.stripMargin)
+
+    println("save data to hive........... \n" * 4)
+    df_result.createOrReplaceTempView(tempTable)
+
+    val insert_sql =
       s"""
+         |INSERT OVERWRITE TABLE
+         |    vodrs.paypredict_user_profile_play_part
+         |PARTITION
+         |    (partitiondate='$partitiondate', license='$license', category='$category')
          |SELECT
          |    user_id,
-         |    video_id,
-         |    play_end_time,
-         |    broadcast_time
+         |    active_days_last_30_days,
+         |    total_time_last_30_days,
+         |    days_from_last_active,
+         |    days_since_first_active_in_timewindow,
+         |    active_days_last_14_days,
+         |    total_time_last_14_days,
+         |    active_days_last_7_days,
+         |    total_time_last_7_days,
+         |    active_days_last_3_days,
+         |    total_time_last_3_days,
+         |    total_time_paid_videos_last_30_days,
+         |    total_time_paid_videos_last_14_days,
+         |    total_time_paid_videos_last_7_days,
+         |    total_time_paid_videos_last_3_days,
+         |    total_time_paid_videos_last_1_days,
+         |    total_time_in_package_videos_last_30_days,
+         |    var_time_in_package_videos_last_30_days,
+         |    number_in_package_videos_last_30_days,
+         |    total_time_in_package_videos_last_14_days,
+         |    var_time_in_package_videos_last_14_days,
+         |    number_in_package_videos_last_14_days,
+         |    total_time_in_package_videos_last_7_days,
+         |    var_time_in_package_videos_last_7_days,
+         |    number_in_package_videos_last_7_days,
+         |    total_time_in_package_videos_last_3_days,
+         |    var_time_in_package_videos_last_3_days,
+         |    number_in_package_videos_last_3_days,
+         |    total_time_in_package_videos_last_1_days,
+         |    var_time_in_package_videos_last_1_days,
+         |    number_in_package_videos_last_1_days,
+         |    total_time_children_videos_last_30_days,
+         |    number_children_videos_last_30_days,
+         |    total_time_children_videos_last_14_days,
+         |    number_children_videos_last_14_days,
+         |    total_time_children_videos_last_7_days,
+         |    number_children_videos_last_7_days,
+         |    total_time_children_videos_last_3_days,
+         |    number_children_videos_last_3_days,
+         |    total_time_children_videos_last_1_days,
+         |    number_children_videos_last_1_days
          |FROM
-         |    vodrs.t_sdu_user_play_history_paypredict
-         |WHERE
-         |    partitiondate='$partitiondate' and license='$license'
+         |    $tempTable
       """.stripMargin
 
-    val df_play = spark.sql(user_play_sql)
-
-    df_play
+    spark.sql(insert_sql)
+    println("over over........... \n" * 4)
   }
-
 }

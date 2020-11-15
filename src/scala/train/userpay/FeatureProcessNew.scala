@@ -7,7 +7,7 @@ import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 import mam.Utils._
 import mam.GetSaveData._
 import FeatureProcessOld._
-import FeatureProcessOld.{udfFillPreference, udfFillPreferenceIndex}
+
 
 object FeatureProcessNew {
 
