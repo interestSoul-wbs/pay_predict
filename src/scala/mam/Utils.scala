@@ -500,32 +500,4 @@ object Utils {
     result
   }
 
-  def udfFillPreference = udf(fillPreference _)
-
-  def fillPreference(prefer: Map[String, Int], offset: Int) = {
-    if (prefer == null) {
-      null
-    } else {
-      val mapArray = prefer.toArray
-      if (mapArray.length > offset - 1) {
-        mapArray(offset - 1)._1
-      } else {
-        null
-      }
-    }
-  }
-
-  def udfFillPreferenceIndex = udf(fillPreferenceIndex _)
-
-  def fillPreferenceIndex(prefer: String, mapLine: String) = {
-    if (prefer == null) {
-      null
-    } else {
-      var tempMap: Map[String, Int] = Map()
-      var lineIterator1 = mapLine.split(",")
-      //迭代打印所有行
-      lineIterator1.foreach(m => tempMap += (m.split(" -> ")(0) -> m.split(" -> ")(1).toInt))
-      tempMap.get(prefer)
-    }
-  }
 }
