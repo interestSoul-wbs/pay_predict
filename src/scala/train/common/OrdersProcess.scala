@@ -32,18 +32,18 @@ object OrdersProcess {
       //val hdfsPath="hdfs:///pay_predict/"
       val hdfsPath=""
       val orderRawPath=hdfsPath+"data/train/common/raw/orders/order*.txt"
-      val orderProcessedPath=hdfsPath+"data/train/common/processed/orders"
+      val orderProcessedPath = hdfsPath+"data/train/common/processed/orders"
       val orderRaw=getRawOrders(orderRawPath,spark)
 
       printDf("输入 orderRaw",orderRaw)
 
       val orderProcessed = orderProcess(orderRaw)
 
-//      printDf("输出 orderProcessed",orderProcessed)
-//      orderProcessed.filter(col(Dic.colUserId).===("106411")).show()
-//
-//      orderProcessed.write.mode(SaveMode.Overwrite).format("parquet").save(orderProcessedPath)
-//      println("订单数据处理完成！")
+      printDf("输出 orderProcessed",orderProcessed)
+      orderProcessed.filter(col(Dic.colUserId).===("106411")).show()
+
+      orderProcessed.write.mode(SaveMode.Overwrite).format("parquet").save(orderProcessedPath)
+      println("订单数据处理完成！")
     }
 
 
@@ -78,18 +78,18 @@ object OrdersProcess {
 
     orderProcessed = orderProcessed.select(
       when(col(Dic.colUserId)==="NULL",null).otherwise(col(Dic.colUserId)).as(Dic.colUserId),
-      when(col(Dic.colMoney)==="NULL",Double.NaN).otherwise(col(Dic.colMoney) cast DoubleType).as(Dic.colMoney),
-      when(col(Dic.colResourceType)==="NULL",Double.NaN).otherwise(col(Dic.colResourceType) cast DoubleType).as(Dic.colResourceType),
+      when(col(Dic.colMoney)==="NULL",null).otherwise(col(Dic.colMoney) cast DoubleType).as(Dic.colMoney),
+      when(col(Dic.colResourceType)==="NULL",null).otherwise(col(Dic.colResourceType) cast DoubleType).as(Dic.colResourceType),
       when(col(Dic.colResourceId)==="NULL",null).otherwise(col(Dic.colResourceId) ).as(Dic.colResourceId),
       when(col(Dic.colResourceTitle)==="NULL",null).otherwise(col(Dic.colResourceTitle)).as(Dic.colResourceTitle),
       when(col(Dic.colCreationTime)==="NULL",null).otherwise(col(Dic.colCreationTime) cast TimestampType ).as(Dic.colCreationTime),
       when(col(Dic.colDiscountDescription)==="NULL",null).otherwise(col(Dic.colDiscountDescription)).as(Dic.colDiscountDescription),
-      when(col(Dic.colOrderStatus)==="NULL",Double.NaN).otherwise(col(Dic.colOrderStatus) cast DoubleType).as(Dic.colOrderStatus),
+      when(col(Dic.colOrderStatus)==="NULL",null).otherwise(col(Dic.colOrderStatus) cast DoubleType).as(Dic.colOrderStatus),
       when(col(Dic.colOrderStartTime)==="NULL",null).otherwise(col(Dic.colOrderStartTime) cast TimestampType).as(Dic.colOrderStartTime),
       when(col(Dic.colOrderEndTime)==="NULL",null).otherwise(col(Dic.colOrderEndTime) cast TimestampType).as(Dic.colOrderEndTime)
     )
     /**
-     * 添加订单的有效时长 选取有效时长大于0的订单   有效时长（单位 天） 并填充打折描述的空值
+     * 添加订单的有效时长 选取有效时长大于0的订单 并进行规范统一  有效时长（单位 天）
      */
     //计算有效时长
     orderProcessed = orderProcessed.withColumn(Dic.colTimeValidity,udfGetDays(col(Dic.colOrderEndTime),col(Dic.colOrderStartTime)))
@@ -118,8 +118,8 @@ object OrdersProcess {
      orderProcessed = orderProcessed.dropDuplicates(Dic.colUserId, Dic.colCreationTime, Dic.colResourceId, Dic.colOrderStatus, Dic.colOrderStartTime)
 
     //选取同时产生的两个订单中支付成功的(父子订单)
-    var orderProcessed2= orderProcessed.groupBy(Dic.colUserId, Dic.colResourceId, Dic.colCreationTime, Dic.colOrderStartTime).max(Dic.colOrderStatus)
-    orderProcessed2= orderProcessed2.withColumnRenamed("max(order_status)", Dic.colOrderStatus)
+    var orderProcessed2 = orderProcessed.groupBy(Dic.colUserId, Dic.colResourceId, Dic.colCreationTime, Dic.colOrderStartTime).max(Dic.colOrderStatus)
+    orderProcessed2 = orderProcessed2.withColumnRenamed("max(order_status)", Dic.colOrderStatus)
 
     var orderProcessed3 = orderProcessed.join(orderProcessed2, Seq(Dic.colUserId, Dic.colResourceId, Dic.colCreationTime, Dic.colOrderStartTime, Dic.colOrderStatus ), "inner")
 
@@ -127,11 +127,13 @@ object OrdersProcess {
      * 标记金额信息异常用户
      * ！！！！！！！！！！！！！！！！！！！！
      * 目前仅仅用于会员付费预测信息
+     *  error_orders = [(100201, 0), (100201, 100), (100202, 0), (100206, 100), (101601, 0), (101806, 100)]
+     *  在函数 udfGetErrorMoneySign 中定义
      */
 
-    orderProcessed = orderProcessed.withColumn(Dic.colIsMoneyError, udfGetErrorMoneySign(col(Dic.colResourceId), col(Dic.colMoney)))
+    orderProcessed3 = orderProcessed3.withColumn(Dic.colIsMoneyError, udfGetErrorMoneySign(col(Dic.colResourceId), col(Dic.colMoney)))
 
-    orderProcessed
+    orderProcessed3
 
   }
 

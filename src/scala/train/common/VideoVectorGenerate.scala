@@ -30,7 +30,7 @@ object VideoVectorGenerate {
     printDf("plays_list",playsList)
     var videoDict=getVector(playsList)
 
-    val vectorDimension=64
+    val vectorDimension = 64
     for(i <- 0 to vectorDimension-1)
       videoDict=videoDict.withColumn("v_"+i,udfBreak(col("vector"),lit(i))).withColumnRenamed("word",Dic.colVideoId)
 
@@ -70,15 +70,15 @@ object VideoVectorGenerate {
      *@return org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
      *@description  训练Word2vector模型，得到视频的嵌入向量
      */
-    val vectorDimension=64
-    val windowSize=10  //默认参数为5，这里尝试设置为10，在一定程度上，windowSize越大，训练越慢,但是向量表达更准确
-    val w2vModel=new Word2Vec()
+    val vectorDimension = 64
+    val windowSize = 10  //默认参数为5，这里尝试设置为10，在一定程度上，windowSize越大，训练越慢,但是向量表达更准确
+    val w2vModel = new Word2Vec()
       .setInputCol("video_list")
       .setOutputCol("result")
       .setVectorSize(vectorDimension)
       .setWindowSize(windowSize)
       .setMinCount(5)
-    val model=w2vModel.fit(playsList)
+    val model = w2vModel.fit(playsList)
 
     //print("滑动窗口的大小："+w2vModel.getWindowSize)
     //val result=model.transform(playsList)

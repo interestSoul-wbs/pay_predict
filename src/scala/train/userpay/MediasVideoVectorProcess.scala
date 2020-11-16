@@ -32,13 +32,18 @@ object MediasVideoVectorProcess {
       .appName("MediasVideoVectorProcess")
       .getOrCreate()
 
+    //val now = args(0)+" "+args(1)
+    val now = "2020-04-23 00:00:00"
 
     //val hdfsPath = "hdfs:///pay_predict/"
     val hdfsPath = ""
 
     //val mediasProcessedPath = hdfsPath + "data/predict/common/processed/mediastemp" //HDFS路径
     val mediasProcessedPath = "data/train/common/raw/medias/medias.txt"
-    var mediasProcessed = getProcessedMedias(mediasProcessedPath, spark)
+
+    var mediasProcessed = getProcessedMedias(mediasProcessedPath, spark, now) // getData 放在HDFS
+
+
     mediasProcessed = mediasProcess(mediasProcessed)  // !!!!!!!!!!!!!!!! 记得去掉
     printDf("获取 medias", mediasProcessed)
 
@@ -77,7 +82,7 @@ object MediasVideoVectorProcess {
 
 }
 
-  def getProcessedMedias(mediasProcessedPath: String, spark: SparkSession): DataFrame = {
+  def getProcessedMedias(mediasProcessedPath: String, spark: SparkSession, now: String): DataFrame = {
 
     val mediaSchema = StructType(
       List(
@@ -107,11 +112,17 @@ object MediasVideoVectorProcess {
       )
     )
 
-    val medias = spark.read
+    var medias = spark.read
       .option("delimiter", "\t")
       .option("header", false)
       .schema(mediaSchema)
       .csv(mediasProcessedPath)
+
+    //距今入库时间
+    medias = medias
+      .withColumn("now", lit(now))
+      .withColumn(Dic.colStorageTimeGap, udfGetDays(col(Dic.colStorageTime),col("now")))
+      .drop("now")
 
     medias
 
@@ -136,20 +147,24 @@ object MediasVideoVectorProcess {
       when(col(Dic.colLanguage)==="NULL",null).otherwise(col(Dic.colLanguage)).as(Dic.colLanguage),
       when(col(Dic.colReleaseDate)==="NULL",null).otherwise(col(Dic.colReleaseDate) ).as(Dic.colReleaseDate),
       when(col(Dic.colStorageTime)==="NULL",null).otherwise(udfLongToTimestampV2(col(Dic.colStorageTime ))).as(Dic.colStorageTime),
-      when(col(Dic.colVideoTime)==="NULL",Double.NaN).otherwise(col(Dic.colVideoTime) cast DoubleType).as(Dic.colVideoTime),
-      when(col(Dic.colScore)==="NULL",Double.NaN).otherwise(col(Dic.colScore) cast DoubleType).as(Dic.colScore),
-      when(col(Dic.colIsPaid)==="NULL",Double.NaN).otherwise(col(Dic.colIsPaid) cast DoubleType).as(Dic.colIsPaid),
+      when(col(Dic.colVideoTime)==="NULL",null).otherwise(col(Dic.colVideoTime) cast DoubleType).as(Dic.colVideoTime),
+      when(col(Dic.colScore)==="NULL",null).otherwise(col(Dic.colScore) cast DoubleType).as(Dic.colScore),
+      when(col(Dic.colIsPaid)==="NULL",null).otherwise(col(Dic.colIsPaid) cast DoubleType).as(Dic.colIsPaid),
       when(col(Dic.colPackageId)==="NULL",null).otherwise(col(Dic.colPackageId)).as(Dic.colPackageId),
-      when(col(Dic.colIsSingle)==="NULL",Double.NaN).otherwise(col(Dic.colIsSingle) cast DoubleType).as(Dic.colIsSingle),
-      when(col(Dic.colIsTrailers)==="NULL",Double.NaN).otherwise(col(Dic.colIsTrailers) cast DoubleType).as(Dic.colIsTrailers),
+      when(col(Dic.colIsSingle)==="NULL",null).otherwise(col(Dic.colIsSingle) cast DoubleType).as(Dic.colIsSingle),
+      when(col(Dic.colIsTrailers)==="NULL",null).otherwise(col(Dic.colIsTrailers) cast DoubleType).as(Dic.colIsTrailers),
       when(col(Dic.colSupplier)==="NULL",null).otherwise(col(Dic.colSupplier)).as(Dic.colSupplier),
       when(col(Dic.colIntroduction)==="NULL",null).otherwise(col(Dic.colIntroduction)).as(Dic.colIntroduction)
     )
 
+
     //是否单点 是否付费填充
-    dfModifiedFormat = dfModifiedFormat.na.fill(Map((Dic.colIsSingle, 0),(Dic.colIsPaid, 0)))
+    dfModifiedFormat = dfModifiedFormat.na.fill(Map((Dic.colIsSingle, 0),(Dic.colIsPaid, 0), (Dic.colIsTrailers, 0)))
+      .withColumn("video_hours", col(Dic.colVideoTime) / 60)
       //添加新列 是否在套餐内
       .withColumn(Dic.colInPackage, when(col(Dic.colPackageId).>(0), 1).otherwise(0))
+
+
     dfModifiedFormat
 
   }
