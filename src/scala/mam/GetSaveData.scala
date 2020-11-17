@@ -452,4 +452,134 @@ object GetSaveData {
     df_medias
   }
 
+
+  def getVideoProfile(spark: SparkSession, partitiondate: String, license: String, category: String) = {
+
+    val exec_sql =
+      s"""
+         |SELECT
+         |    video_id,
+         |    video_title,
+         |    video_one_level_classification,
+         |    video_two_level_classification_list,
+         |    video_tag_list,
+         |    director_list,
+         |    actor_list,
+         |    country,
+         |    language,
+         |    release_date,
+         |    storage_time,
+         |    video_time,
+         |    score,
+         |    is_paid,
+         |    package_id,
+         |    is_single,
+         |    is_trailers,
+         |    supplier,
+         |    introduction,
+         |    number_of_plays_in_30_days,
+         |    number_of_views_within_30_days,
+         |    number_of_plays_in_14_days,
+         |    number_of_views_within_14_days,
+         |    number_of_plays_in_7_days,
+         |    number_of_views_within_7_days,
+         |    number_of_plays_in_3_days,
+         |    number_of_views_within_3_days,
+         |    abs_of_number_of_days_between_storage_and_current,
+         |    number_of_times_purchased_within_30_days,
+         |    number_of_times_purchased_within_14_days,
+         |    number_of_times_purchased_within_7_days,
+         |    number_of_times_purchased_within_3_days,
+         |    number_of_times_purchased_total
+         |FROM
+         |    vodrs.paypredict_user_video_profile
+         |WHERE
+         |    partitiondate='$partitiondate' and license='$license' and category='$category'
+      """.stripMargin
+
+    val df_video_profile = spark.sql(exec_sql)
+
+    df_video_profile
+  }
+
+  def getVideoVector(spark: SparkSession, partitiondate: String, license: String) = {
+
+    val exec_sql =
+      s"""
+         |SELECT
+         |    video_id,
+         |    v_0,
+         |    v_1,
+         |    v_2,
+         |    v_3,
+         |    v_4,
+         |    v_5,
+         |    v_6,
+         |    v_7,
+         |    v_8,
+         |    v_9,
+         |    v_10,
+         |    v_11,
+         |    v_12,
+         |    v_13,
+         |    v_14,
+         |    v_15,
+         |    v_16,
+         |    v_17,
+         |    v_18,
+         |    v_19,
+         |    v_20,
+         |    v_21,
+         |    v_22,
+         |    v_23,
+         |    v_24,
+         |    v_25,
+         |    v_26,
+         |    v_27,
+         |    v_28,
+         |    v_29,
+         |    v_30,
+         |    v_31,
+         |    v_32,
+         |    v_33,
+         |    v_34,
+         |    v_35,
+         |    v_36,
+         |    v_37,
+         |    v_38,
+         |    v_39,
+         |    v_40,
+         |    v_41,
+         |    v_42,
+         |    v_43,
+         |    v_44,
+         |    v_45,
+         |    v_46,
+         |    v_47,
+         |    v_48,
+         |    v_49,
+         |    v_50,
+         |    v_51,
+         |    v_52,
+         |    v_53,
+         |    v_54,
+         |    v_55,
+         |    v_56,
+         |    v_57,
+         |    v_58,
+         |    v_59,
+         |    v_60,
+         |    v_61,
+         |    v_62,
+         |    v_63
+         |FROM
+         |    vodrs.paypredict_video_vector
+         |WHERE
+         |    partitiondate='$partitiondate' and license='$license'
+      """.stripMargin
+
+    val df_video_vector = spark.sql(exec_sql)
+
+    df_video_vector
+  }
 }

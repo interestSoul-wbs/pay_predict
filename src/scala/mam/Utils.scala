@@ -647,4 +647,34 @@ object Utils {
     }
 
   }
+
+  def getCategoryMap(df_category: DataFrame) = {
+
+    var df_category_map: Map[String, Int] = Map()
+
+    val conList = df_category.collect()
+
+    for (elem <- conList) {
+      val s = elem.toString()
+      df_category_map += (s.substring(1, s.length - 1).split("\t")(1) -> s.substring(1, s.length - 1).split("\t")(0).toInt)
+    }
+
+    df_category_map
+  }
+
+  def getSeqColList(df_user_profile: DataFrame) = {
+
+    val colTypeList = df_user_profile.dtypes.toList
+
+    val colList = ArrayBuffer[String]()
+
+    for (elem <- colTypeList) {
+      if (elem._2.equals("IntegerType") || elem._2.equals("DoubleType")
+        || elem._2.equals("LongType") || elem._2.equals("StringType")) {
+        colList.append(elem._1)
+      }
+    }
+
+    colList.toList
+  }
 }
