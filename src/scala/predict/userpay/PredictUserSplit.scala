@@ -1,11 +1,14 @@
 package predict.userpay
 
+import com.github.nscala_time.time.Imports.{DateTimeFormat, _}
 import mam.Dic
 import mam.Utils._
 import mam.GetSaveData._
+import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions.col
 import train.userpay.UserSplit.saveUserSamples
+import org.apache.spark.sql.functions._
 
 object PredictUserSplit {
 
@@ -50,15 +53,27 @@ object PredictUserSplit {
 
     val joinKeysUserId = Seq(Dic.colUserId)
 
+    // user_id and order_status - 增加label
+    val df_processed_orders = getProcessedOrder(spark, partitiondate, license)
+
+    val df_effective_order = getPredictUsersLabel(df_processed_orders, predict_time)
+
+    //
     predictOrderOld = df_all_users.join(predictOrderOld, joinKeysUserId, "inner")
 
-    val df_predict_old = predictOrderOld.select(col(Dic.colUserId)).distinct()
+    val df_predict_old = predictOrderOld
+      .select(col(Dic.colUserId))
+      .distinct()
+      .join(df_effective_order, Seq(Dic.colUserId), "left")
+      .na.fill(0)
 
     printDf("df_predict_old", df_predict_old)
 
     saveUserSamples(spark, df_predict_old, partitiondate, license, "valid", "old")
 
-    val df_predict_new = df_all_users.except(df_predict_old)
+    val df_predict_new = df_all_users.except(df_predict_old.select(col(Dic.colUserId)))
+      .join(df_effective_order, Seq(Dic.colUserId), "left")
+      .na.fill(0)
 
     printDf("df_predict_new", df_predict_new)
 
@@ -69,4 +84,27 @@ object PredictUserSplit {
     println("需要预测的新用户的数量：" + df_predict_new.count())
   }
 
+  def getPredictUsersLabel(df_processed_order: DataFrame, predict_time: String) = {
+
+    val end_date = getDaysAfter(predict_time, 14)
+
+    val df_result = df_processed_order
+      .filter(col(Dic.colCreationTime).gt(lit(predict_time)) && col(Dic.colCreationTime).lt(lit(end_date)))
+      .withColumn(Dic.colRank, row_number().over(Window.partitionBy(col(Dic.colUserId)).orderBy(col(Dic.colOrderStatus).desc)))
+      .filter(col(Dic.colOrderStatus).>(lit(1)) && col(Dic.colRank).===(lit(1)))
+      .select(
+        col(Dic.colUserId),
+        lit(1).as(Dic.colOrderStatus))
+
+    df_result
+  }
+
+  def getDaysAfter(date_now: String, n: Int) = {
+
+    val date_now_formatted = DateTime.parse(date_now, DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:SS"))
+
+    val date_after = (date_now_formatted + n.days).toString(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:SS"))
+
+    date_after
+  }
 }

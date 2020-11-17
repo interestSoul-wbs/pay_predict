@@ -8,6 +8,7 @@ import org.apache.spark.sql.{DataFrame, Row}
 
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 
 object Utils {
 
@@ -500,4 +501,150 @@ object Utils {
     result
   }
 
+
+  def module(vec:ArrayBuffer[Int]): Double ={
+    // math.sqrt( vec.map(x=>x*x).sum )
+    math.sqrt(vec.map(math.pow(_,2)).sum)
+  }
+
+  /**
+    * 求两个向量的内积
+    * @param v1
+    * @param v2
+    */
+  def innerProduct(v1:ArrayBuffer[Int],v2:ArrayBuffer[Int]): Double ={
+    val arrayBuffer=ArrayBuffer[Double]()
+    for(i<- 0 until v1.length-1){
+      arrayBuffer.append( v1(i)*v2(i) )
+    }
+    arrayBuffer.sum
+  }
+
+  /**
+    * 求两个向量的余弦值
+    * @param v1
+    * @param v2
+    */
+  def cosvec(v1:ArrayBuffer[Int],v2:ArrayBuffer[Int]):Double ={
+    val cos=innerProduct(v1,v2) / (module(v1)* module(v2))
+    if (cos <= 1) cos else 1.0
+  }
+
+  def udfCalFirstCategorySimilarity=udf(calFirstCategorySimilarity _)
+
+  def calFirstCategorySimilarity(category:String,preference:Map[String,Int],videoFirstCategoryString:String)={
+    var videoFirstCategoryMap: Map[String, Int] = Map()
+    for(elem<-videoFirstCategoryString.split(",")){
+      videoFirstCategoryMap+=(elem.split(" -> ")(0) -> elem.split(" -> ")(1).toInt)
+    }
+
+    if(category==null || preference==null){
+      0.0
+    }else {
+      var categoryArray = new ArrayBuffer[Int](videoFirstCategoryMap.size)
+      var preferenceArray = new ArrayBuffer[Int](videoFirstCategoryMap.size)
+      for (i <- 0 to videoFirstCategoryMap.size - 1) {
+        categoryArray.append(0)
+        preferenceArray.append(0)
+      }
+      for (elem<- preference.keys.toList) {
+        var index=videoFirstCategoryMap.getOrElse(elem, 0)
+        if(index>=preferenceArray.length) {
+
+        }else{
+          preferenceArray(index) = preference.getOrElse(elem, 0)
+        }
+      }
+
+      var index2=videoFirstCategoryMap.getOrElse(category, 0)
+      if(index2>=preferenceArray.length) {
+
+      }else{
+        categoryArray(index2) = 1
+      }
+
+      cosvec(categoryArray, preferenceArray)
+    }
+
+  }
+
+
+  def udfCalSecondCategorySimilarity=udf(calSecondCategorySimilarity _)
+
+  def calSecondCategorySimilarity(category:mutable.WrappedArray[String], preference:Map[String,Int],videoSecondCategoryString:String)={
+    var videoSecondCategoryMap: Map[String, Int] = Map()
+    for(elem<-videoSecondCategoryString.split(",")){
+      videoSecondCategoryMap+=(elem.split(" -> ")(0) -> elem.split(" -> ")(1).toInt)
+    }
+    if(category==null || preference==null){
+      0.0
+    }else {
+      var categoryArray = new ArrayBuffer[Int](videoSecondCategoryMap.size)
+      var preferenceArray = new ArrayBuffer[Int](videoSecondCategoryMap.size)
+      for (i <- 0 to videoSecondCategoryMap.size - 1) {
+        categoryArray.append(0)
+        preferenceArray.append(0)
+      }
+      for (elem<- preference.keys.toList) {
+        var index=videoSecondCategoryMap.getOrElse(elem, 0)
+        if(index>=preferenceArray.length) {
+
+        }else{
+          preferenceArray(index) = preference.getOrElse(elem, 0)
+        }
+      }
+
+      for (elem<- category) {
+        var index=videoSecondCategoryMap.getOrElse(elem, 0)
+        if(index>=preferenceArray.length) {
+
+        }else{
+          categoryArray(index) = 1
+        }
+      }
+      cosvec(categoryArray, preferenceArray)
+    }
+
+  }
+
+  def udfCalLabelSimilarity=udf(calLabelSimilarity _)
+
+  def calLabelSimilarity(category:mutable.WrappedArray[String], preference:Map[String,Int],labelString:String)={
+    var labelMap: Map[String, Int] = Map()
+    for(elem<-labelString.split(",")){
+      labelMap+=(elem.split(" -> ")(0) -> elem.split(" -> ")(1).toInt)
+    }
+    if(category==null || preference==null){
+      0.0
+    }else {
+      var categoryArray = new ArrayBuffer[Int](labelMap.size)
+      var preferenceArray = new ArrayBuffer[Int](labelMap.size)
+      for (i <- 0 to labelMap.size - 1) {
+        categoryArray.append(0)
+        preferenceArray.append(0)
+      }
+      //println(categoryArray.length+" "+preferenceArray.length)
+      for (elem<- preference.keys.toList) {
+        var index=labelMap.getOrElse(elem, 0)
+        if(index>=preferenceArray.length) {
+
+        }else{
+          preferenceArray(index) = preference.getOrElse(elem, 0)
+        }
+      }
+
+      for (elem<- category) {
+        var index=labelMap.getOrElse(elem, 0)
+        if(index>=preferenceArray.length) {
+
+        }else{
+          categoryArray(index) = 1
+        }
+      }
+      // println(categoryArray)
+      // println(preferenceArray)
+      cosvec(categoryArray, preferenceArray)
+    }
+
+  }
 }
