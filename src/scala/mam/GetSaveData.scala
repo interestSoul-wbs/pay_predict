@@ -2,6 +2,7 @@ package mam
 
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.{StringType, StructField, StructType}
 
 object GetSaveData {
 
@@ -46,7 +47,45 @@ object GetSaveData {
     df_medias
   }
 
+  def getRawMediaData(spark: SparkSession) = {
 
+    val hdfsPath = "hdfs:///pay_predict/"
+    //val hdfsPath=""
+    val mediasRawPath = hdfsPath + "data/train/common/raw/medias/medias.txt"
+
+    val schema = StructType(
+      List(
+        StructField(Dic.colVideoId, StringType),
+        StructField(Dic.colVideoTitle, StringType),
+        StructField(Dic.colVideoOneLevelClassification, StringType),
+        StructField(Dic.colVideoTwoLevelClassificationList, StringType),
+        StructField(Dic.colVideoTagList, StringType),
+        StructField(Dic.colDirectorList, StringType),
+        StructField(Dic.colActorList, StringType),
+        StructField(Dic.colCountry, StringType),
+        StructField(Dic.colLanguage, StringType),
+        StructField(Dic.colReleaseDate, StringType),
+        StructField(Dic.colStorageTime, StringType),
+        //视频时长
+        StructField(Dic.colVideoTime, StringType),
+        StructField(Dic.colScore, StringType),
+        StructField(Dic.colIsPaid, StringType),
+        StructField(Dic.colPackageId, StringType),
+        StructField(Dic.colIsSingle, StringType),
+        //是否片花
+        StructField(Dic.colIsTrailers, StringType),
+        StructField(Dic.colSupplier, StringType),
+        StructField(Dic.colIntroduction, StringType)
+      )
+    )
+    val dfRawMedias = spark.read
+      .option("delimiter", "\t")
+      .option("header", false)
+      .schema(schema)
+      .csv(mediasRawPath)
+
+    dfRawMedias
+  }
 
   /**
     * Get user order data.
