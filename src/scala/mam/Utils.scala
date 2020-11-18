@@ -678,4 +678,24 @@ object Utils {
     colList.toList
   }
 
+  def getNumerableColsSeq(df_result_tmp_1: DataFrame) = {
+
+    val colTypeList = df_result_tmp_1.dtypes.toList
+
+    val colList = ArrayBuffer[String]()
+
+    colList.+=(Dic.colUserId, Dic.colVideoId)
+
+    for (elem <- colTypeList) {
+      if (elem._2.equals("IntegerType") || elem._2.equals("DoubleType") || elem._2.equals("LongType")) {
+        colList.append(elem._1)
+      }
+    }
+
+    colList.-=(Dic.colIsSingle, Dic.colIsTrailers, Dic.colIsPaid)
+
+    colList.toList
+  }
+
+
 }
