@@ -71,6 +71,8 @@ object UserDivisionTrainDatasetGenerate {
       .limit(negativeN * positiveCount)
     println("负样本的条数为：" + df_neg_users.count())
 
+    printDf("df_neg_users", df_neg_users)
+
     //为正负样本分别添加标签
     val df_neg_users_with_label = df_neg_users.withColumn(Dic.colOrderStatus, udfAddOrderStatus(col(Dic.colUserId)) - 1)
     val df_user_paid_with_label = df_user_paid_profile.withColumn(Dic.colOrderStatus, udfAddOrderStatus(col(Dic.colUserId)))
@@ -78,6 +80,8 @@ object UserDivisionTrainDatasetGenerate {
     //将正负样本组合在一起并shuffle
     val df_all_users = df_user_paid_with_label.union(df_neg_users_with_label).sample(fraction = 1.0)
     println("总样本的条数为：" + df_all_users.count())
+
+    printDf("df_all_users", df_all_users)
 
     val df_all_users_not_null = df_all_users
       .na.fill(30, Seq(Dic.colDaysSinceLastPurchasePackage, Dic.colDaysSinceLastClickPackage,

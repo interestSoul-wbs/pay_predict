@@ -59,12 +59,18 @@ object RankTrainDatasetGenerate {
       .select(col(Dic.colUserId), col(Dic.colResourceId), col(Dic.colOrderStatus))
       .withColumnRenamed(Dic.colResourceId, Dic.colVideoId)
 
+    printDf("df_order_single_point", df_order_single_point)
+
     val df_all_profile_tmp_1 = df_order_single_point
       .join(df_user_profile, joinKeysUserId, "inner")
       .join(df_video_profile, joinKeysVideoId, "inner")
 
+    printDf("df_all_profile_tmp_1", df_all_profile_tmp_1)
+
     //第一部分的负样本
     val df_userid_videoid = df_all_profile_tmp_1.select(col(Dic.colUserId), col(Dic.colVideoId))
+
+    printDf("df_userid_videoid", df_userid_videoid)
 
     //设置负样本中选择多少个video作为负样本中的video
     val df_popular_video = df_userid_videoid
@@ -73,6 +79,8 @@ object RankTrainDatasetGenerate {
       .orderBy(col("count").desc)
       .limit(negativeN)
       .select(col(Dic.colVideoId))
+
+    printDf("df_popular_video", df_popular_video)
 
     val df_all_profile_tmp_2 = df_userid_videoid
       .select(col(Dic.colUserId))
@@ -85,11 +93,15 @@ object RankTrainDatasetGenerate {
 
     println("第二部分数据条数：" + df_all_profile_tmp_2.count())
 
+    printDf("df_all_profile_tmp_2", df_all_profile_tmp_2)
+
     //第二部分的负样本
     //开始构造第三部分的样本,用户选自没有在订单中出现过的用户
     val df_result_tmp_1 = df_all_profile_tmp_1
       .union(df_all_profile_tmp_2)
       .join(df_video_vector, joinKeysVideoId, "left")
+
+    printDf("df_result_tmp_1", df_result_tmp_1)
 
     val colTypeList = df_result_tmp_1.dtypes.toList
 
