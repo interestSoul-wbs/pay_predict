@@ -26,7 +26,7 @@ object TrainSetProcessAllUsers {
 
 
 //    val userListPath =  hdfsPath+"data/train/userpay/all_users"
-    val userListPath =  hdfsPath+"data/train/userpay/allUsers"
+    val userListPath =  hdfsPath+"data/train/userpay/allUsers/user_id.txt"
     val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3"
     val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders"
 
@@ -42,7 +42,7 @@ object TrainSetProcessAllUsers {
 
 
     //全部用户 海信提供的id
-    val userList = spark.read.format("parquent").load(userListPath)
+    val userList = spark.read.format("csv").load(userListPath).toDF(Dic.colUserId)
     printDf("allUsers", userList)
 
 

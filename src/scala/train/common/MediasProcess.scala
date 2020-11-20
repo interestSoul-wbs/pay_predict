@@ -22,14 +22,15 @@ object MediasProcess {
       .getOrCreate()
 
 
-    //val hdfsPath="hdfs:///pay_predict/"
-    val hdfsPath=""
-    val mediasRawPath = hdfsPath + "data/train/common/raw/medias/medias.txt"
-    val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
-    val videoFirstCategoryTempPath = hdfsPath + "data/train/common/processed/videofirstcategorytemp.txt"
-    val videoSecondCategoryTempPath = hdfsPath + "data/train/common/processed/videosecondcategorytemp.txt"
-    val labelTempPath = hdfsPath + "data/train/common/processed/labeltemp.txt"///pay_predict/data/train/common/processed
-    
+    val hdfsPath="hdfs:///pay_predict/"
+    //val hdfsPath=""
+    import org.apache.spark.sql.functions._
+    val mediasRawPath=hdfsPath+"data/train/common/raw/medias/*"
+    val mediasProcessedPath=hdfsPath+"data/train/common/processed/mediastemp3"
+    val videoFirstCategoryTempPath=hdfsPath+"data/train/common/processed/videofirstcategorytemp.txt"
+    val videoSecondCategoryTempPath=hdfsPath+"data/train/common/processed/videosecondcategorytemp.txt"
+    val labelTempPath=hdfsPath+"data/train/common/processed/labeltemp.txt" ///pay_predict/data/train/common/processed
+
     
     //1.获取原始数据
     var dfRawMedias = getRawMedias(spark, mediasRawPath)
@@ -139,7 +140,7 @@ object MediasProcess {
 
     //是否单点 是否付费填充
     dfModifiedFormat = dfModifiedFormat.na.fill(Map((Dic.colIsSingle, 0),(Dic.colIsPaid, 0), (Dic.colIsTrailers, 0)))
-      .withColumn("video_hours", col(Dic.colVideoTime) / 60)
+      .withColumn("video_hours", col(Dic.colVideoTime) / 3600)
       //添加新列 是否在套餐内
       .withColumn(Dic.colInPackage, when(col(Dic.colPackageId).>(0), 1).otherwise(0))
 

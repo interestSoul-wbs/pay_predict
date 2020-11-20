@@ -27,13 +27,13 @@ object Dic {
   val colTimeGap3hSignLag = "timeGap_3h_sign_lag"
   val colConvertEndTime = "convert_end_time"
   val colSessionSign = "session_sign"
+  val colConvertTime = "convert_time"
 
 
   //还有一个video_id  colVideoId
 
   /**
    * medias数据集中的属性
-   *
    */
   val colVideoId="video_id"
   val colVideoTitle="video_title"
@@ -54,10 +54,12 @@ object Dic {
   val colIsTrailers="is_trailers"
   val colSupplier="supplier"
   val colIntroduction="introduction"
-
+  val colInPackage = "in_package"
   //在处理medias过程中构造的属性
   val colRank="rank"
   val colContent="content"
+  val colStorageTimeGap = "storage_time_gap"
+
 
   /**
    * order中的属性

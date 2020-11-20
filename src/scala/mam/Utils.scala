@@ -413,4 +413,11 @@ object Utils {
   }
 
 
+  def udfConcatLabels = udf(concatLables _)
+  def concatLables() = {
+
+
+  }
+
+
 }

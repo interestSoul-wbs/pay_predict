@@ -1,5 +1,15 @@
 package predict.userpay
 
+
+import mam.Dic
+import mam.Utils.printDf
+import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.{SaveMode, SparkSession}
+
+import scala.collection.mutable.ArrayBuffer
+
 object PredictSetProcessAllUsers {
 
 
@@ -8,7 +18,7 @@ object PredictSetProcessAllUsers {
     Logger.getLogger("org").setLevel(Level.ERROR)
 
     val spark: SparkSession = new sql.SparkSession.Builder()
-      .appName("FeatureProcessForAllUsersPredict")
+      .appName("PredictSetAllUsersPredict")
       //.master("local[6]")
       .getOrCreate()
 
@@ -16,7 +26,7 @@ object PredictSetProcessAllUsers {
     //val hdfsPath=""
 
     //全体用户
-    val userListPath =  hdfsPath+"data/train/userpay/allUsers"
+    val userListPath =  hdfsPath+"data/train/userpay/allUsers/user_id.txt"
 
     //训练集数据的保存路径
     val predictSetSavePath = hdfsPath+ "data/predict/userpay/"
@@ -35,8 +45,7 @@ object PredictSetProcessAllUsers {
     val temp=userProfilePlayPart.join(userProfilePreferencePart,joinKeysUserId,"left")
     val userProfiles=temp.join(userProfileOrderPart,joinKeysUserId,"left")
 
-    val userList = spark.read.format("parquet").load(userListPath)
-
+    val userList = spark.read.format("csv").load(userListPath).toDF(Dic.colUserId)
     printDf("全部用户", userList)
 
     val predictSet = userList.join(userProfiles,joinKeysUserId,"left")

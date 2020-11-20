@@ -1,4 +1,4 @@
-package train.userpay.NotUseNow
+package predict.userpay.NotUserNow
 
 import mam.Dic
 import mam.Utils.{printDf, udfFillPreference, udfFillPreferenceIndex}
@@ -8,36 +8,28 @@ import org.apache.spark.sql.{SaveMode, SparkSession}
 
 import scala.collection.mutable.ArrayBuffer
 
-/**
- * @author wx
- * @param
- * @return
- * @describe
- */
-object FeatureProcessNew {
-
-
+object PredictFeatureProcessNew {
   def main(args: Array[String]): Unit = {
     System.setProperty("hadoop.home.dir", "c:\\winutils")
     Logger.getLogger("org").setLevel(Level.ERROR)
 
     //val userProfilePath =  "pay_predict/data/train/common/processed/userfile_0601.pkl"
-    //val hdfsPath="hdfs:///pay_predict/"
-    val hdfsPath = ""
+    val hdfsPath = "hdfs:///pay_predict/"
+    //val hdfsPath=""
     //筛选的训练集用户名单路径
-    val userListPath = hdfsPath + "data/train/userpay/trainusersnew" + args(0)
+    val userListPath = hdfsPath + "data/predict/userpay/predictusersnew" + args(0)
     //媒资数据路径
-    val mediasPath = hdfsPath + "data/train/common/processed/mediastemp.pkl"
-    //训练集数据的保存路径
-    val trainSetSavePath = hdfsPath + "data/train/userpay/"
+    val mediasPath = hdfsPath + "data/predict/common/processed/mediastemp.pkl"
+    //预测数据的保存路径
+    val predictSetSavePath = hdfsPath + "data/predict/userpay/"
     //最初生成的用户画像数据集路径
-    val userProfilePlayPartPath = hdfsPath + "data/train/common/processed/userprofileplaypart" + args(0)
-    val userProfilePreferencePartPath = hdfsPath + "data/train/common/processed/userprofilepreferencepart" + args(0)
-    val userProfileOrderPartPath = hdfsPath + "data/train/common/processed/userprofileorderpart" + args(0)
+    val userProfilePlayPartPath = hdfsPath + "data/predict/common/processed/userprofileplaypart" + args(0)
+    val userProfilePreferencePartPath = hdfsPath + "data/predict/common/processed/userprofilepreferencepart" + args(0)
+    val userProfileOrderPartPath = hdfsPath + "data/predict/common/processed/userprofileorderpart" + args(0)
 
     val spark: SparkSession = new sql.SparkSession.Builder()
-      .appName("FeatureProcessNew")
-      .master("local[6]")
+      .appName("PredictFeatureProcessNew")
+      //.master("local[6]")
       .getOrCreate()
     import org.apache.spark.sql.functions._
     val userProfilePlayPart = spark.read.format("parquet").load(userProfilePlayPartPath)
@@ -49,10 +41,11 @@ object FeatureProcessNew {
     //    val orders = spark.read.format("parquet").load(orderProcessedPath).toDF()
     val userList = spark.read.format("parquet").load(userListPath).toDF(Dic.colUserId)
 
-    printDf("输入  userProfilePlayPart", userProfilePlayPart)
-    printDf("输入  userProfilePreferencePart", userProfilePreferencePart)
-    printDf("输入  userProfileOrderPart", userProfileOrderPart)
-    printDf("输入  userList", userList)
+    printDf("userProfilePlayPart", userProfilePlayPart)
+    printDf("userProfilePreferencePart", userProfilePreferencePart)
+    printDf("userProfileOrderPart", userProfileOrderPart)
+    printDf("userList", userList)
+
 
     val trainSet = userList.join(userProfiles, joinKeysUserId, "left")
     //trainSet.show()
@@ -74,9 +67,9 @@ object FeatureProcessNew {
     //# 观看时长异常数据处理：1天24h
 
 
-    val videoFirstCategoryTempPath = hdfsPath + "data/train/common/processed/videofirstcategorytemp.txt"
-    val videoSecondCategoryTempPath = hdfsPath + "data/train/common/processed/videosecondcategorytemp.txt"
-    val labelTempPath = hdfsPath + "data/train/common/processed/labeltemp.txt"
+    val videoFirstCategoryTempPath = hdfsPath + "data/predict/common/processed/videofirstcategorytemp.txt"
+    val videoSecondCategoryTempPath = hdfsPath + "data/predict/common/processed/videosecondcategorytemp.txt"
+    val labelTempPath = hdfsPath + "data/predict/common/processed/labeltemp.txt"
     var videoFirstCategoryMap: Map[String, Int] = Map()
     var videoSecondCategoryMap: Map[String, Int] = Map()
     var labelMap: Map[String, Int] = Map()
@@ -119,12 +112,12 @@ object FeatureProcessNew {
         .withColumn(elem + "_2", udfFillPreference(col(elem), lit(2)))
         .withColumn(elem + "_3", udfFillPreference(col(elem), lit(3)))
     }
-    //tempDataFrame.show()
+    // tempDataFrame.show()
     //tempDataFrame.filter(!isnull(col("video_one_level_preference_1"))).show()
 
 
     for (elem <- pre) {
-      if (elem.equals(Dic.colVideoOneLevelPreference)) {
+      if (elem.contains(Dic.colVideoOneLevelPreference)) {
         tempDataFrame = tempDataFrame.withColumn(elem + "_1", udfFillPreferenceIndex(col(elem + "_1"), lit(videoFirstCategoryMap.mkString(","))))
           .withColumn(elem + "_2", udfFillPreferenceIndex(col(elem + "_2"), lit(videoFirstCategoryMap.mkString(","))))
           .withColumn(elem + "_3", udfFillPreferenceIndex(col(elem + "_3"), lit(videoFirstCategoryMap.mkString(","))))
@@ -154,10 +147,10 @@ object FeatureProcessNew {
     }
 
     val result = tempDataFrame.select(columnList.map(tempDataFrame.col(_)): _*)
-    printDf("输出  trainsetNew", result)
-    result.write.mode(SaveMode.Overwrite).format("parquet").save(trainSetSavePath + "trainsetnew" + args(0))
-    result.write.mode(SaveMode.Overwrite).option("header", "true").csv(trainSetSavePath + "trainsetnew" + args(0) + ".csv")
-
+    printDf("result", result)
+    //result.show()
+    result.write.mode(SaveMode.Overwrite).format("parquet").save(predictSetSavePath + "predictsetnew" + args(0))
+    result.write.mode(SaveMode.Overwrite).option("header", "true").csv(predictSetSavePath + "predictsetnew" + args(0) + ".csv")
 
   }
 

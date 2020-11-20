@@ -45,7 +45,7 @@ object FeatureProcessOld {
     val temp = userProfilePlayPart.join(userProfilePreferencePart, joinKeysUserId, "left")
     val userProfiles = temp.join(userProfileOrderPart, joinKeysUserId, "left")
     //    val orders = spark.read.format("parquet").load(orderProcessedPath).toDF()
-    val userList = spark.read.format("parquet").load(userListPath)
+    val userList = spark.read.format("parquet").load(userListPath).toDF(Dic.colUserId)
 
     printDf("输入  userProfilePlayPart", userProfilePlayPart)
     printDf("输入  userProfilePreferencePart", userProfilePreferencePart)

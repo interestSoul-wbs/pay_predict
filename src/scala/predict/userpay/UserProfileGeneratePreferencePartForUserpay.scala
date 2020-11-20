@@ -9,7 +9,7 @@ import org.apache.spark.sql.{SaveMode, SparkSession}
 
 object UserProfileGeneratePreferencePartForUserpay {
 
-  def userProfileGeneratePreferencePart(now:String,timeWindow:Int,medias_path:String,plays_path:String,orders_path:String,hdfsPath:String): Unit = {
+  def userProfileGeneratePreferencePart(now: String, timeWindow: Int, medias_path: String, plays_path: String, orders_path: String, hdfsPath: String): Unit = {
     System.setProperty("hadoop.home.dir", "c:\\winutils")
     Logger.getLogger("org").setLevel(Level.ERROR)
     val spark: SparkSession = new sql.SparkSession.Builder()
@@ -24,9 +24,10 @@ object UserProfileGeneratePreferencePartForUserpay {
     val orders = spark.read.format("parquet").load(orders_path)
 
 
-    val userListPath = hdfsPath + "data/train/userpay/allUsers"
-    //全部用户
-    var result = spark.read.format("parquet").load(userListPath)
+    val userListPath = hdfsPath + "data/train/userpay/allUsers/user_id.txt"
+    var result = spark.read.format("csv").load(userListPath).toDF(Dic.colUserId)
+    printDf("全部用户: ", result)
+
 
     printDf("全部用户: ", result)
 
@@ -38,8 +39,8 @@ object UserProfileGeneratePreferencePartForUserpay {
     val pre_1 = calDate(now, -1)
     val joinKeysUserId = Seq(Dic.colUserId)
 
-    val joinKeyVideoId=Seq(Dic.colVideoId)
-    val user_medias=plays.join(medias,joinKeyVideoId,"inner")
+    val joinKeyVideoId = Seq(Dic.colVideoId)
+    val user_medias = plays.join(medias, joinKeyVideoId, "inner")
 
 
     val play_medias_part_41 = user_medias
@@ -97,12 +98,11 @@ object UserProfileGeneratePreferencePartForUserpay {
       )
       .withColumn(Dic.colTotalTimeMoviesLast1Days, round(col(Dic.colTotalTimeMoviesLast1Days) / 60, 0))
 
-    result=result.join(play_medias_part_41,joinKeysUserId,"left")
-      .join(play_medias_part_42,joinKeysUserId, "left")
-      .join(play_medias_part_43,joinKeysUserId,"left")
-      .join(play_medias_part_44,joinKeysUserId, "left")
-      .join(play_medias_part_45,joinKeysUserId, "left")
-
+    result = result.join(play_medias_part_41, joinKeysUserId, "left")
+      .join(play_medias_part_42, joinKeysUserId, "left")
+      .join(play_medias_part_43, joinKeysUserId, "left")
+      .join(play_medias_part_44, joinKeysUserId, "left")
+      .join(play_medias_part_45, joinKeysUserId, "left")
 
 
     val play_medias_part_51 = user_medias
@@ -167,12 +167,11 @@ object UserProfileGeneratePreferencePartForUserpay {
       .withColumn(Dic.colTotalTimePaidMoviesLast1Days, round(col(Dic.colTotalTimePaidMoviesLast1Days) / 60, 0))
 
 
-    result=result.join(play_medias_part_51,joinKeysUserId,"left")
-      .join(play_medias_part_52,joinKeysUserId, "left")
-      .join(play_medias_part_53,joinKeysUserId,"left")
-      .join(play_medias_part_54,joinKeysUserId, "left")
-      .join(play_medias_part_55,joinKeysUserId, "left")
-
+    result = result.join(play_medias_part_51, joinKeysUserId, "left")
+      .join(play_medias_part_52, joinKeysUserId, "left")
+      .join(play_medias_part_53, joinKeysUserId, "left")
+      .join(play_medias_part_54, joinKeysUserId, "left")
+      .join(play_medias_part_55, joinKeysUserId, "left")
 
 
     val play_medias_part_61 = user_medias
@@ -224,13 +223,10 @@ object UserProfileGeneratePreferencePartForUserpay {
         avg(col(Dic.colTimeSum)).as(Dic.colAvgRestdailyTimePaidVideosLast30Days)
       )
 
-    result=result.join(play_medias_part_61,joinKeysUserId,"left")
-      .join(play_medias_part_62,joinKeysUserId, "left")
-      .join(play_medias_part_63,joinKeysUserId,"left")
-      .join(play_medias_part_64,joinKeysUserId, "left")
-
-
-
+    result = result.join(play_medias_part_61, joinKeysUserId, "left")
+      .join(play_medias_part_62, joinKeysUserId, "left")
+      .join(play_medias_part_63, joinKeysUserId, "left")
+      .join(play_medias_part_64, joinKeysUserId, "left")
 
 
     val play_medias_part_71_temp = user_medias
@@ -244,10 +240,10 @@ object UserProfileGeneratePreferencePartForUserpay {
         collect_list(col(Dic.colVideoTwoLevelClassificationList)).as(Dic.colVideoTwoLevelPreference),
         collect_list(col(Dic.colVideoTagList)).as(Dic.colTagPreference)
       )
-    val play_medias_part_71=play_medias_part_71_temp
-      .withColumn(Dic.colVideoOneLevelPreference,udfGetLabelAndCount(col(Dic.colVideoOneLevelPreference)))
-      .withColumn(Dic.colVideoTwoLevelPreference,udfGetLabelAndCount2(col(Dic.colVideoTwoLevelPreference)))
-      .withColumn(Dic.colTagPreference,udfGetLabelAndCount2(col(Dic.colTagPreference)))
+    val play_medias_part_71 = play_medias_part_71_temp
+      .withColumn(Dic.colVideoOneLevelPreference, udfGetLabelAndCount(col(Dic.colVideoOneLevelPreference)))
+      .withColumn(Dic.colVideoTwoLevelPreference, udfGetLabelAndCount2(col(Dic.colVideoTwoLevelPreference)))
+      .withColumn(Dic.colTagPreference, udfGetLabelAndCount2(col(Dic.colTagPreference)))
 
 
     val play_medias_part_72_temp = user_medias
@@ -261,10 +257,9 @@ object UserProfileGeneratePreferencePartForUserpay {
         collect_list(col(Dic.colVideoTwoLevelClassificationList)).as(Dic.colMovieTwoLevelPreference),
         collect_list(col(Dic.colVideoTagList)).as(Dic.colMovieTagPreference)
       )
-    val play_medias_part_72=play_medias_part_72_temp
-      .withColumn(Dic.colMovieTwoLevelPreference,udfGetLabelAndCount2(col(Dic.colMovieTwoLevelPreference)))
-      .withColumn(Dic.colMovieTagPreference,udfGetLabelAndCount2(col(Dic.colMovieTagPreference)))
-
+    val play_medias_part_72 = play_medias_part_72_temp
+      .withColumn(Dic.colMovieTwoLevelPreference, udfGetLabelAndCount2(col(Dic.colMovieTwoLevelPreference)))
+      .withColumn(Dic.colMovieTagPreference, udfGetLabelAndCount2(col(Dic.colMovieTagPreference)))
 
 
     val play_medias_part_73_temp = user_medias
@@ -278,9 +273,9 @@ object UserProfileGeneratePreferencePartForUserpay {
         collect_list(col(Dic.colVideoTwoLevelClassificationList)).as(Dic.colSingleTwoLevelPreference),
         collect_list(col(Dic.colVideoTagList)).as(Dic.colSingleTagPreference)
       )
-    val play_medias_part_73=play_medias_part_73_temp
-      .withColumn(Dic.colSingleTwoLevelPreference,udfGetLabelAndCount2(col(Dic.colSingleTwoLevelPreference)))
-      .withColumn(Dic.colSingleTagPreference,udfGetLabelAndCount2(col(Dic.colSingleTagPreference)))
+    val play_medias_part_73 = play_medias_part_73_temp
+      .withColumn(Dic.colSingleTwoLevelPreference, udfGetLabelAndCount2(col(Dic.colSingleTwoLevelPreference)))
+      .withColumn(Dic.colSingleTagPreference, udfGetLabelAndCount2(col(Dic.colSingleTagPreference)))
 
     val play_medias_part_74_temp = user_medias
       .filter(
@@ -293,33 +288,27 @@ object UserProfileGeneratePreferencePartForUserpay {
         collect_list(col(Dic.colVideoTwoLevelClassificationList)).as(Dic.colInPackageVideoTwoLevelPreference),
         collect_list(col(Dic.colVideoTagList)).as(Dic.colInPackageTagPreference)
       )
-    val play_medias_part_74=play_medias_part_74_temp
-      .withColumn(Dic.colInPackageVideoTwoLevelPreference,udfGetLabelAndCount2(col(Dic.colInPackageVideoTwoLevelPreference)))
-      .withColumn(Dic.colInPackageTagPreference,udfGetLabelAndCount2(col(Dic.colInPackageTagPreference)))
+    val play_medias_part_74 = play_medias_part_74_temp
+      .withColumn(Dic.colInPackageVideoTwoLevelPreference, udfGetLabelAndCount2(col(Dic.colInPackageVideoTwoLevelPreference)))
+      .withColumn(Dic.colInPackageTagPreference, udfGetLabelAndCount2(col(Dic.colInPackageTagPreference)))
 
 
+    result = result.join(play_medias_part_71, joinKeysUserId, "left")
+      .join(play_medias_part_72, joinKeysUserId, "left")
+      .join(play_medias_part_73, joinKeysUserId, "left")
+      .join(play_medias_part_74, joinKeysUserId, "left")
 
-    result=result.join(play_medias_part_71,joinKeysUserId,"left")
-      .join(play_medias_part_72,joinKeysUserId, "left")
-      .join(play_medias_part_73,joinKeysUserId,"left")
-      .join(play_medias_part_74,joinKeysUserId, "left")
 
-
-    val userProfilePreferencePartSavePath = hdfsPath + "data/predict/common/processed/userpay/userprofilepreferencepart"+now.split(" ")(0)
+    val userProfilePreferencePartSavePath = hdfsPath + "data/predict/common/processed/userpay/userprofilepreferencepart" + now.split(" ")(0)
     //大约有85万用户
     result.write.mode(SaveMode.Overwrite).format("parquet").save(userProfilePreferencePartSavePath)
-
-
-
-
-
 
 
   }
 
 
-  def main(args:Array[String]): Unit ={
-    val hdfsPath="hdfs:///pay_predict/"
+  def main(args: Array[String]): Unit = {
+    val hdfsPath = "hdfs:///pay_predict/"
     //val hdfsPath=""
     /**
      * 统一放在train下
@@ -328,9 +317,9 @@ object UserProfileGeneratePreferencePartForUserpay {
     val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3" //userpay
     val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders" //userpay
 
-    val now=args(0)+" "+args(1)
+    val now = args(0) + " " + args(1)
 
-    userProfileGeneratePreferencePart(now,30,mediasProcessedPath,playsProcessedPath,ordersProcessedPath,hdfsPath)
+    userProfileGeneratePreferencePart(now, 30, mediasProcessedPath, playsProcessedPath, ordersProcessedPath, hdfsPath)
 
 
   }

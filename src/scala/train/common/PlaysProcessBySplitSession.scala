@@ -28,12 +28,12 @@ object PlaysProcessBySplitSession {
     val hdfsPath = "hdfs:///pay_predict/"
     //val hdfsPath=""
 
-    val playRawPath = hdfsPath+"data/train/common/raw/plays/behavior_*.txt"
-    val playProcessedPath = hdfsPath+"data/train/common/processed/plays"
+    val playRawPath = hdfsPath+"data/train/common/raw/plays/*"
+    val playProcessedPath = hdfsPath+"data/train/common/processed/userpay/plays_new3"
     val playRaw=getRawPlays(playRawPath,spark)
     printDf("输入 playRaw",playRaw)
 
-    val mediasProcessedPath = hdfsPath + "data/train/common/raw/medias/medias.txt" //HDFS路径
+    val mediasProcessedPath = hdfsPath + "data/train/common/raw/medias/*" //HDFS路径
     val mediasProcessed = getProcessedMedias(mediasProcessedPath, spark)
 
     val playsProcessed = playsProcessBySpiltSession(playRaw, mediasProcessed)
