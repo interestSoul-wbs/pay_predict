@@ -5,7 +5,6 @@ import mam.GetSaveData._
 import mam.Utils._
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
-import train.userpay.FeatureProcessOld.saveTrainSet
 import scala.collection.mutable.ArrayBuffer
 
 
@@ -41,52 +40,23 @@ object PredictFeatureProcessNew {
 
     val colList = trainSet.columns.toList
 
-    val colTypeList = trainSet.dtypes.toList
-
-    val mapColList = ArrayBuffer[String]()
-
-    for (elem <- colTypeList) {
-      if (!elem._2.equals("StringType") && !elem._2.equals("IntegerType")
-        && !elem._2.equals("DoubleType") && !elem._2.equals("LongType")) {
-        mapColList.append(elem._1)
-      }
-    }
+    val mapColList = getFilteredColList(trainSet)
 
     val numColList = colList.diff(mapColList)
 
-    val tempTrainSet = trainSet.na.fill(-1, List(Dic.colDaysSinceLastPurchasePackage, Dic.colDaysSinceLastClickPackage,
+    val tempTrainSet = trainSet.na.fill(-1, Seq(Dic.colDaysSinceLastPurchasePackage, Dic.colDaysSinceLastClickPackage,
       Dic.colDaysFromLastActive, Dic.colDaysSinceFirstActiveInTimewindow))
 
     val trainSetNotNull = tempTrainSet.na.fill(0, numColList)
 
     //# 观看时长异常数据处理：1天24h
-    var videoFirstCategoryMap: Map[String, Int] = Map()
-    var videoSecondCategoryMap: Map[String, Int] = Map()
-    var labelMap: Map[String, Int] = Map()
-
     val df_video_first_category = getVideoCategory(spark, partitiondate, license, "one_level")
 
     val df_video_second_category = getVideoCategory(spark, partitiondate, license, "two_level")
 
-    val df_label_tmp = getVideoCategory(spark, partitiondate, license, "video_tag")
+    val videoFirstCategoryMap = getCategoryMap(df_video_first_category)
 
-    var conList = df_video_first_category.collect()
-    for (elem <- conList) {
-      var s = elem.toString()
-      videoFirstCategoryMap += (s.substring(1, s.length - 1).split("\t")(1) -> s.substring(1, s.length - 1).split("\t")(0).toInt)
-    }
-
-    conList = df_video_second_category.collect()
-    for (elem <- conList) {
-      var s = elem.toString()
-      videoSecondCategoryMap += (s.substring(1, s.length - 1).split("\t")(1) -> s.substring(1, s.length - 1).split("\t")(0).toInt)
-    }
-
-    conList = df_label_tmp.collect()
-    for (elem <- conList) {
-      var s = elem.toString()
-      labelMap += (s.substring(1, s.length - 1).split("\t")(1) -> s.substring(1, s.length - 1).split("\t")(0).toInt)
-    }
+    val videoSecondCategoryMap = getCategoryMap(df_video_second_category)
 
     val pre = List(Dic.colVideoOneLevelPreference, Dic.colVideoTwoLevelPreference,
       Dic.colMovieTwoLevelPreference, Dic.colSingleTwoLevelPreference, Dic.colInPackageVideoTwoLevelPreference)
@@ -140,6 +110,6 @@ object PredictFeatureProcessNew {
 
     printDf("df_result", df_result)
 
-    saveTrainSet(spark, df_result, partitiondate, license, "valid", "new")
+    saveFeatureProcessResult(spark, df_result, partitiondate, license, "valid", "new")
   }
 }

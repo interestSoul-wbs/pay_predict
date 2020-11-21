@@ -5,12 +5,15 @@ import mam.Utils.{calDate, printDf, udfGetLabelAndCount, udfGetLabelAndCount2}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import mam.GetSaveData._
+import com.github.nscala_time.time.Imports._
 
 object UserProfileGeneratePreferencePart {
 
   var tempTable = "temp_table"
   var partitiondate: String = _
   var license: String = _
+  var date: DateTime = _
+  var thirtyDaysAgo: String = _
 
   def main(args: Array[String]): Unit = {
 
@@ -19,8 +22,8 @@ object UserProfileGeneratePreferencePart {
 
     val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
 
-    // 训练集的划分时间点 - 2020-09-01 00:00:00
-    val now = "2020-09-01 00:00:00"
+    // 训练集的划分时间点 - 输入时间的30天之前
+    println("thirtyDaysAgo is : " + thirtyDaysAgo)
 
     // 1 - processed media
     val df_medias = getProcessedMedias(spark, partitiondate, license)
@@ -33,7 +36,7 @@ object UserProfileGeneratePreferencePart {
     printDf("df_plays", df_plays)
 
     // 3 - data process
-    val df_result = userProfileGeneratePreferencePartProcess(now, 30, df_medias, df_plays)
+    val df_result = userProfileGeneratePreferencePartProcess(thirtyDaysAgo, 30, df_medias, df_plays)
 
     printDf("df_result", df_result)
 
@@ -47,13 +50,9 @@ object UserProfileGeneratePreferencePart {
       .select(col(Dic.colUserId)).distinct()
 
     val pre_30 = calDate(now, -30)
-
     val pre_14 = calDate(now, days = -14)
-
     val pre_7 = calDate(now, -7)
-
     val pre_3 = calDate(now, -3)
-
     val pre_1 = calDate(now, -1)
 
     val joinKeysUserId = Seq(Dic.colUserId)
@@ -290,92 +289,5 @@ object UserProfileGeneratePreferencePart {
     df_result_tmp_3.unpersist()
 
     df_result
-  }
-
-  /**
-    * Save data.
-    *
-    * @param spark
-    * @param df_result
-    */
-  def saveUserProfileGeneratePreferencePart(spark: SparkSession, df_result: DataFrame, partitiondate: String, license: String, category: String) = {
-
-    spark.sql(
-      """
-        |CREATE TABLE IF NOT EXISTS
-        |     vodrs.paypredict_user_profile_preference_part(
-        |             user_id string,
-        |             total_time_movies_last_30_days double,
-        |             total_time_movies_last_14_days double,
-        |             total_time_movies_last_7_days double,
-        |             total_time_movies_last_3_days double,
-        |             total_time_movies_last_1_days double,
-        |             total_time_paid_movies_last_30_days double,
-        |             total_time_paid_movies_last_14_days double,
-        |             total_time_paid_movies_last_7_days double,
-        |             total_time_paid_movies_last_3_days double,
-        |             total_time_paid_movies_last_1_days double,
-        |             active_workdays_last_30_days long,
-        |             avg_workdaily_time_videos_last_30_days double,
-        |             active_restdays_last_30_days long,
-        |             avg_restdaily_time_videos_last_30_days double,
-        |             avg_workdaily_time_paid_videos_last_30_days double,
-        |             avg_restdaily_time_paid_videos_last_30_days double,
-        |             video_one_level_preference map<string, int>,
-        |             video_two_level_preference map<string, int>,
-        |             tag_preference map<string, int>,
-        |             movie_two_level_preference map<string, int>,
-        |             movie_tag_preference map<string, int>,
-        |             single_two_level_preference map<string, int>,
-        |             single_tag_preference map<string, int>,
-        |             in_package_video_two_level_preference map<string, int>,
-        |             in_package_tag_preference map<string, int>
-        |             )
-        |PARTITIONED BY
-        |    (partitiondate string, license string, category string)
-      """.stripMargin)
-
-    println("save data to hive........... \n" * 4)
-    df_result.createOrReplaceTempView(tempTable)
-
-    val insert_sql =
-      s"""
-         |INSERT OVERWRITE TABLE
-         |    vodrs.paypredict_user_profile_preference_part
-         |PARTITION
-         |    (partitiondate='$partitiondate', license='$license', category='$category')
-         |SELECT
-         |     user_id,
-         |     total_time_movies_last_30_days,
-         |     total_time_movies_last_14_days,
-         |     total_time_movies_last_7_days,
-         |     total_time_movies_last_3_days,
-         |     total_time_movies_last_1_days,
-         |     total_time_paid_movies_last_30_days,
-         |     total_time_paid_movies_last_14_days,
-         |     total_time_paid_movies_last_7_days,
-         |     total_time_paid_movies_last_3_days,
-         |     total_time_paid_movies_last_1_days,
-         |     active_workdays_last_30_days,
-         |     avg_workdaily_time_videos_last_30_days,
-         |     active_restdays_last_30_days,
-         |     avg_restdaily_time_videos_last_30_days,
-         |     avg_workdaily_time_paid_videos_last_30_days,
-         |     avg_restdaily_time_paid_videos_last_30_days,
-         |     video_one_level_preference,
-         |     video_two_level_preference,
-         |     tag_preference,
-         |     movie_two_level_preference,
-         |     movie_tag_preference,
-         |     single_two_level_preference,
-         |     single_tag_preference,
-         |     in_package_video_two_level_preference,
-         |     in_package_tag_preference
-         |FROM
-         |    $tempTable
-      """.stripMargin
-
-    spark.sql(insert_sql)
-    println("over over........... \n" * 4)
   }
 }

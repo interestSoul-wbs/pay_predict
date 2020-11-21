@@ -5,22 +5,26 @@ import mam.GetSaveData._
 import mam.Utils.{calDate, printDf, udfGetLabelAndCount, udfGetLabelAndCount2}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import com.github.nscala_time.time.Imports._
 
 object UserProfileGeneratePreferencePart {
 
   var tempTable = "temp_table"
   var partitiondate: String = _
   var license: String = _
+  var date: DateTime = _
+  var sixteenDaysAgo: String = _
 
   def main(args: Array[String]): Unit = {
 
     partitiondate = args(0)
     license = args(1)
 
-    val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
+    date = DateTime.parse(partitiondate, DateTimeFormat.forPattern("yyyyMMdd"))
+    // 测试集的划分时间点 - 2020-09-01 00:00:00
+    sixteenDaysAgo = (date - 16.days).toString(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:SS"))
 
-    // 训练集的划分时间点 - 2020-09-01 00:00:00
-    val now = "2020-09-15 00:00:00"
+    val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
 
     // 1 - processed media
     val df_medias = getProcessedMedias(spark, partitiondate, license)
@@ -33,7 +37,7 @@ object UserProfileGeneratePreferencePart {
     printDf("df_plays", df_plays)
 
     // 3 - data process
-    val df_result = userProfileGeneratePreferencePartProcess(now, 30, df_medias, df_plays)
+    val df_result = userProfileGeneratePreferencePartProcess(sixteenDaysAgo, 30, df_medias, df_plays)
 
     printDf("df_result", df_result)
 

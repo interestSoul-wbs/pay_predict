@@ -3,12 +3,17 @@ package mam
 import java.text.SimpleDateFormat
 import java.util.Calendar
 
-import org.apache.spark.sql.functions.udf
+import com.github.nscala_time.time.Imports._
+import org.apache.spark.ml.feature.{MinMaxScaler, VectorAssembler, Word2Vec}
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, Row}
 
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import org.apache.spark.ml.linalg.Vector
+import org.apache.spark.sql.functions._
 
 object Utils {
 
@@ -62,33 +67,33 @@ object Utils {
     new_time
   }
 
-//  def udfChangeDateFormat = udf(changeDateFormat _) //实名函数的注册 要在后面加 _(
-//
-//  def changeDateFormat(date: String) = {
-//    /**
-//      * @author wj
-//      * @param [date ]
-//      * @return java.lang.String
-//      * @describe 修改日期时间的格式
-//      */
-//    if (date == "NULL") {
-//      "0000-00-00 00:00:00"
-//    } else {
-//      //
-//      try {
-//        val sdf = new SimpleDateFormat("yyyyMMddHHmmSS")
-//        val dt: Long = sdf.parse(date).getTime()
-//        val new_time: String = new SimpleDateFormat("yyyy-MM-dd HH:mm:SS").format(dt)
-//        new_time
-//      }
-//      catch {
-//        case e: Exception => {
-//          "NULL"
-//        }
-//      }
-//    }
-//
-//  }
+  //  def udfChangeDateFormat = udf(changeDateFormat _) //实名函数的注册 要在后面加 _(
+  //
+  //  def changeDateFormat(date: String) = {
+  //    /**
+  //      * @author wj
+  //      * @param [date ]
+  //      * @return java.lang.String
+  //      * @describe 修改日期时间的格式
+  //      */
+  //    if (date == "NULL") {
+  //      "0000-00-00 00:00:00"
+  //    } else {
+  //      //
+  //      try {
+  //        val sdf = new SimpleDateFormat("yyyyMMddHHmmSS")
+  //        val dt: Long = sdf.parse(date).getTime()
+  //        val new_time: String = new SimpleDateFormat("yyyy-MM-dd HH:mm:SS").format(dt)
+  //        new_time
+  //      }
+  //      catch {
+  //        case e: Exception => {
+  //          "NULL"
+  //        }
+  //      }
+  //    }
+  //
+  //  }
 
   def udfLongToDateTime = udf(longToDateTime _)
 
@@ -164,19 +169,6 @@ object Utils {
     }
   }
 
-
-  def udfGetString = udf(getString _)
-
-  def getString(features: Vector[Double]) = {
-    /**
-      * @author wj
-      * @param [features ]
-      * @return java.lang.String
-      * @describe 转化为字符串
-      */
-    features.mkString(",")
-  }
-
   def udfAddOrderStatus = udf(addOrderStatus _)
 
   def addOrderStatus(arg: String) = {
@@ -208,25 +200,25 @@ object Utils {
 
 
   //计算日期相差的天数
-//  def udfGetDays = udf(getDays _)
-//
-//  def getDays(date: String, now: String) = {
-//
-//    val sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:SS")
-//
-//    val d1 = sdf.parse(now)
-//
-//    val d2 = sdf.parse(date)
-//
-//    var daysBetween = 0
-//    if (now > date) {
-//      daysBetween = ((d1.getTime() - d2.getTime() + 1000000) / (60 * 60 * 24 * 1000)).toInt
-//    } else {
-//      daysBetween = ((d2.getTime() - d1.getTime() + 1000000) / (60 * 60 * 24 * 1000)).toInt
-//    }
-//
-//    daysBetween
-//  }
+  //  def udfGetDays = udf(getDays _)
+  //
+  //  def getDays(date: String, now: String) = {
+  //
+  //    val sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:SS")
+  //
+  //    val d1 = sdf.parse(now)
+  //
+  //    val d2 = sdf.parse(date)
+  //
+  //    var daysBetween = 0
+  //    if (now > date) {
+  //      daysBetween = ((d1.getTime() - d2.getTime() + 1000000) / (60 * 60 * 24 * 1000)).toInt
+  //    } else {
+  //      daysBetween = ((d2.getTime() - d1.getTime() + 1000000) / (60 * 60 * 24 * 1000)).toInt
+  //    }
+  //
+  //    daysBetween
+  //  }
 
   def udfGetDays = udf(getDays _)
 
@@ -352,20 +344,20 @@ object Utils {
     ListMap(result.toSeq.sortWith(_._2 > _._2): _ *)
   }
 
-  def udfBreak = udf(break _)
-
-  def break(array: Object, index: Int) = {
-    /**
-      * @author wj
-      * @param [array , index]
-      * @return double
-      * @description 将一个vector拆分成多个列
-      */
-    val vectorString = array.toString
-    vectorString.substring(1, vectorString.length - 1).split(",")(index).toDouble
-    //(Vector)
-
-  }
+  //  def udfBreak = udf(break _)
+  //
+  //  def break(array: Object, index: Int) = {
+  //    /**
+  //      * @author wj
+  //      * @param [array , index]
+  //      * @return double
+  //      * @description 将一个vector拆分成多个列
+  //      */
+  //    val vectorString = array.toString
+  //    vectorString.substring(1, vectorString.length - 1).split(",")(index).toDouble
+  //    //(Vector)
+  //
+  //  }
 
   def udfFillPreference = udf(fillPreference _)
 
@@ -435,9 +427,10 @@ object Utils {
 
   /**
     * 判断一个字符串是不是 数字，至少有1位数
+    *
     * @return
     */
-  def udfIsOnlyNumber= udf(isOnlyNumber  _)
+  def udfIsOnlyNumber = udf(isOnlyNumber _)
 
   def isOnlyNumber(str: String) = {
 
@@ -460,7 +453,7 @@ object Utils {
     *
     * @return
     */
-  def udfIsLongTypeTimePattern1 = udf(isLongTypeTimePattern1  _)
+  def udfIsLongTypeTimePattern1 = udf(isLongTypeTimePattern1 _)
 
   def isLongTypeTimePattern1(longtype_time: String) = {
 
@@ -483,7 +476,7 @@ object Utils {
     *
     * @return
     */
-  def udfIsLongTypeTimePattern2 = udf(isLongTypeTimePattern2  _)
+  def udfIsLongTypeTimePattern2 = udf(isLongTypeTimePattern2 _)
 
   def isLongTypeTimePattern2(longtype_time: String) = {
 
@@ -502,64 +495,66 @@ object Utils {
   }
 
 
-  def module(vec:ArrayBuffer[Int]): Double ={
+  def module(vec: ArrayBuffer[Int]): Double = {
     // math.sqrt( vec.map(x=>x*x).sum )
-    math.sqrt(vec.map(math.pow(_,2)).sum)
+    math.sqrt(vec.map(math.pow(_, 2)).sum)
   }
 
   /**
     * 求两个向量的内积
+    *
     * @param v1
     * @param v2
     */
-  def innerProduct(v1:ArrayBuffer[Int],v2:ArrayBuffer[Int]): Double ={
-    val arrayBuffer=ArrayBuffer[Double]()
-    for(i<- 0 until v1.length-1){
-      arrayBuffer.append( v1(i)*v2(i) )
+  def innerProduct(v1: ArrayBuffer[Int], v2: ArrayBuffer[Int]): Double = {
+    val arrayBuffer = ArrayBuffer[Double]()
+    for (i <- 0 until v1.length - 1) {
+      arrayBuffer.append(v1(i) * v2(i))
     }
     arrayBuffer.sum
   }
 
   /**
     * 求两个向量的余弦值
+    *
     * @param v1
     * @param v2
     */
-  def cosvec(v1:ArrayBuffer[Int],v2:ArrayBuffer[Int]):Double ={
-    val cos=innerProduct(v1,v2) / (module(v1)* module(v2))
+  def cosvec(v1: ArrayBuffer[Int], v2: ArrayBuffer[Int]): Double = {
+    val cos = innerProduct(v1, v2) / (module(v1) * module(v2))
     if (cos <= 1) cos else 1.0
   }
 
-  def udfCalFirstCategorySimilarity=udf(calFirstCategorySimilarity _)
+  def udfCalFirstCategorySimilarity = udf(calFirstCategorySimilarity _)
 
-  def calFirstCategorySimilarity(category:String,preference:Map[String,Int],videoFirstCategoryString:String)={
+  def calFirstCategorySimilarity(category: String, preference: Map[String, Int], videoFirstCategoryString: String) = {
     var videoFirstCategoryMap: Map[String, Int] = Map()
-    for(elem<-videoFirstCategoryString.split(",")){
-      videoFirstCategoryMap+=(elem.split(" -> ")(0) -> elem.split(" -> ")(1).toInt)
+    for (elem <- videoFirstCategoryString.split(",")) {
+      videoFirstCategoryMap += (elem.split(" -> ")(0) -> elem.split(" -> ")(1).toInt)
     }
 
-    if(category==null || preference==null){
+    if (category == null || preference == null) {
       0.0
-    }else {
+    } else {
       var categoryArray = new ArrayBuffer[Int](videoFirstCategoryMap.size)
       var preferenceArray = new ArrayBuffer[Int](videoFirstCategoryMap.size)
       for (i <- 0 to videoFirstCategoryMap.size - 1) {
         categoryArray.append(0)
         preferenceArray.append(0)
       }
-      for (elem<- preference.keys.toList) {
-        var index=videoFirstCategoryMap.getOrElse(elem, 0)
-        if(index>=preferenceArray.length) {
+      for (elem <- preference.keys.toList) {
+        var index = videoFirstCategoryMap.getOrElse(elem, 0)
+        if (index >= preferenceArray.length) {
 
-        }else{
+        } else {
           preferenceArray(index) = preference.getOrElse(elem, 0)
         }
       }
 
-      var index2=videoFirstCategoryMap.getOrElse(category, 0)
-      if(index2>=preferenceArray.length) {
+      var index2 = videoFirstCategoryMap.getOrElse(category, 0)
+      if (index2 >= preferenceArray.length) {
 
-      }else{
+      } else {
         categoryArray(index2) = 1
       }
 
@@ -569,36 +564,36 @@ object Utils {
   }
 
 
-  def udfCalSecondCategorySimilarity=udf(calSecondCategorySimilarity _)
+  def udfCalSecondCategorySimilarity = udf(calSecondCategorySimilarity _)
 
-  def calSecondCategorySimilarity(category:mutable.WrappedArray[String], preference:Map[String,Int],videoSecondCategoryString:String)={
+  def calSecondCategorySimilarity(category: mutable.WrappedArray[String], preference: Map[String, Int], videoSecondCategoryString: String) = {
     var videoSecondCategoryMap: Map[String, Int] = Map()
-    for(elem<-videoSecondCategoryString.split(",")){
-      videoSecondCategoryMap+=(elem.split(" -> ")(0) -> elem.split(" -> ")(1).toInt)
+    for (elem <- videoSecondCategoryString.split(",")) {
+      videoSecondCategoryMap += (elem.split(" -> ")(0) -> elem.split(" -> ")(1).toInt)
     }
-    if(category==null || preference==null){
+    if (category == null || preference == null) {
       0.0
-    }else {
+    } else {
       var categoryArray = new ArrayBuffer[Int](videoSecondCategoryMap.size)
       var preferenceArray = new ArrayBuffer[Int](videoSecondCategoryMap.size)
       for (i <- 0 to videoSecondCategoryMap.size - 1) {
         categoryArray.append(0)
         preferenceArray.append(0)
       }
-      for (elem<- preference.keys.toList) {
-        var index=videoSecondCategoryMap.getOrElse(elem, 0)
-        if(index>=preferenceArray.length) {
+      for (elem <- preference.keys.toList) {
+        var index = videoSecondCategoryMap.getOrElse(elem, 0)
+        if (index >= preferenceArray.length) {
 
-        }else{
+        } else {
           preferenceArray(index) = preference.getOrElse(elem, 0)
         }
       }
 
-      for (elem<- category) {
-        var index=videoSecondCategoryMap.getOrElse(elem, 0)
-        if(index>=preferenceArray.length) {
+      for (elem <- category) {
+        var index = videoSecondCategoryMap.getOrElse(elem, 0)
+        if (index >= preferenceArray.length) {
 
-        }else{
+        } else {
           categoryArray(index) = 1
         }
       }
@@ -607,16 +602,16 @@ object Utils {
 
   }
 
-  def udfCalLabelSimilarity=udf(calLabelSimilarity _)
+  def udfCalLabelSimilarity = udf(calLabelSimilarity _)
 
-  def calLabelSimilarity(category:mutable.WrappedArray[String], preference:Map[String,Int],labelString:String)={
+  def calLabelSimilarity(category: mutable.WrappedArray[String], preference: Map[String, Int], labelString: String) = {
     var labelMap: Map[String, Int] = Map()
-    for(elem<-labelString.split(",")){
-      labelMap+=(elem.split(" -> ")(0) -> elem.split(" -> ")(1).toInt)
+    for (elem <- labelString.split(",")) {
+      labelMap += (elem.split(" -> ")(0) -> elem.split(" -> ")(1).toInt)
     }
-    if(category==null || preference==null){
+    if (category == null || preference == null) {
       0.0
-    }else {
+    } else {
       var categoryArray = new ArrayBuffer[Int](labelMap.size)
       var preferenceArray = new ArrayBuffer[Int](labelMap.size)
       for (i <- 0 to labelMap.size - 1) {
@@ -624,20 +619,20 @@ object Utils {
         preferenceArray.append(0)
       }
       //println(categoryArray.length+" "+preferenceArray.length)
-      for (elem<- preference.keys.toList) {
-        var index=labelMap.getOrElse(elem, 0)
-        if(index>=preferenceArray.length) {
+      for (elem <- preference.keys.toList) {
+        var index = labelMap.getOrElse(elem, 0)
+        if (index >= preferenceArray.length) {
 
-        }else{
+        } else {
           preferenceArray(index) = preference.getOrElse(elem, 0)
         }
       }
 
-      for (elem<- category) {
-        var index=labelMap.getOrElse(elem, 0)
-        if(index>=preferenceArray.length) {
+      for (elem <- category) {
+        var index = labelMap.getOrElse(elem, 0)
+        if (index >= preferenceArray.length) {
 
-        }else{
+        } else {
           categoryArray(index) = 1
         }
       }
@@ -662,7 +657,7 @@ object Utils {
     df_category_map
   }
 
-  def getSeqColList(df_user_profile: DataFrame) = {
+  def getFilteredColList(df_user_profile: DataFrame) = {
 
     val colTypeList = df_user_profile.dtypes.toList
 
@@ -698,4 +693,169 @@ object Utils {
   }
 
 
+  def getPredictUsersLabel(df_processed_order: DataFrame, predict_time: String) = {
+
+    val end_date = getDaysAfter(predict_time, 14)
+
+    val df_result = df_processed_order
+      .filter(col(Dic.colCreationTime).gt(lit(predict_time)) && col(Dic.colCreationTime).lt(lit(end_date)))
+      .withColumn(Dic.colRank, row_number().over(Window.partitionBy(col(Dic.colUserId)).orderBy(col(Dic.colOrderStatus).desc)))
+      .filter(col(Dic.colOrderStatus).>(lit(1)) && col(Dic.colRank).===(lit(1)))
+      .select(
+        col(Dic.colUserId),
+        lit(1).as(Dic.colOrderStatus))
+
+    df_result
+  }
+
+  def getDaysAfter(date_now: String, n: Int) = {
+
+    val date_now_formatted = DateTime.parse(date_now, DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:SS"))
+
+    val date_after = (date_now_formatted + n.days).toString(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:SS"))
+
+    date_after
+  }
+
+  case class splitVecToDoubleDfAndNewCols(df_result_with_vec_cols: DataFrame, new_cols_array: Array[String])
+
+  /**
+    *
+    * @param df_raw_video_dict
+    * @return
+    */
+  def splitVecToDouble(df_raw_video_dict: DataFrame, vec_col: String, vectorDimension: Int, prefix_of_separate_vec_col: String) = {
+
+    // 将 vec_col 切分后的df
+    val df_result = df_raw_video_dict
+      .select(
+        col("*")
+          +: (0 until vectorDimension).map(i => col(vec_col).getItem(i).as(s"$prefix_of_separate_vec_col" + s"_$i")): _*)
+
+    // 将 vec_col 切分后，新出现的 col name array
+    val new_cols_array = ArrayBuffer[String]()
+
+    for (i <- 0 until vectorDimension) {
+      new_cols_array.append(s"$prefix_of_separate_vec_col" + s"_$i")
+    }
+
+    splitVecToDoubleDfAndNewCols(df_result, new_cols_array.toArray)
+  }
+
+  /**
+    *
+    * @param df_raw_video_dict
+    * @return
+    */
+  def splitVecToDoubleRanlPart(df_raw_video_dict: DataFrame, selected_id_col_1: String, selected_id_col_2: String,
+                               vec_col: String, vectorDimension: Int, prefix_of_separate_vec_col: String) = {
+
+    val df_video_dict = df_raw_video_dict
+      .select(
+        col(selected_id_col_1) +:
+          col(selected_id_col_2) +:
+          (0 until vectorDimension).map(i => col(vec_col).getItem(i).as(s"$prefix_of_separate_vec_col" + s"_$i")): _*)
+
+    df_video_dict
+  }
+
+  /**
+    *
+    * @return
+    */
+  def udfVectorToArray = udf(vectorToArray _)
+
+  def vectorToArray(col_vector: Vector) = {
+    col_vector.toArray
+  }
+
+  def getPlayList(df_plays: DataFrame, now: String) = {
+
+    val df_play_list = df_plays
+      .withColumn(Dic.colPlayMonth, substring(col(Dic.colPlayEndTime), 0, 7))
+      .filter(col(Dic.colPlayEndTime).<(lit(now)))
+      .groupBy(col(Dic.colUserId), col(Dic.colPlayMonth))
+      .agg(collect_list(col(Dic.colVideoId)).as(Dic.colVideoList))
+
+    df_play_list
+  }
+
+  /**
+    * Transform Spark vectors to double.
+    *
+    * @return
+    */
+  def udfBreak = udf(break _)
+
+  def break(array: Object, index: Int) = {
+
+    val vectorString = array.toString
+
+    vectorString.substring(1, vectorString.length - 1).split(",")(index).toDouble
+  }
+
+  /**
+    * Word2vec training.
+    */
+  def getVector(df_plays_list: DataFrame, vector_dimension: Int = 64, window_size: Int = 10, min_count: Int = 5,
+                max_length: Int = 30, max_iteration: Int = 1,
+                input_col: String = Dic.colVideoList, output_col: String = Dic.colResult) = {
+
+    val w2vModel = new Word2Vec()
+      .setInputCol(input_col)
+      .setOutputCol(output_col)
+      .setVectorSize(vector_dimension)
+      .setWindowSize(window_size)
+      .setMinCount(min_count)
+      .setMaxSentenceLength(max_length)
+      .setMaxIter(max_iteration)
+
+    val model = w2vModel.fit(df_plays_list)
+
+    val df_raw_video_dict = model
+      .getVectors
+      .select(
+        col(Dic.colWord).as(Dic.colVideoId),
+        udfVectorToArray(
+          col(Dic.colVector)).as(Dic.colVector))
+
+    val splitVecToDoubleDfAndNewCols = splitVecToDouble(df_raw_video_dict, Dic.colVector, vector_dimension, "v")
+
+    val df_video_dict = splitVecToDoubleDfAndNewCols.df_result_with_vec_cols
+      .select(Array(Dic.colVideoId).++(splitVecToDoubleDfAndNewCols.new_cols_array).map(col): _*)
+
+    df_video_dict
+  }
+
+
+  def scaleData(df_orginal: DataFrame, excluded_cols: Array[String]) = {
+
+    val all_original_cols = df_orginal.columns
+
+    val input_cols = all_original_cols.diff(excluded_cols)
+
+    val final_df_schema = excluded_cols.++(input_cols)
+
+    val assembler = new VectorAssembler()
+      .setInputCols(input_cols)
+      .setOutputCol(Dic.colFeatures)
+
+    val df_output = assembler.transform(df_orginal)
+
+    val minMaxScaler = new MinMaxScaler()
+      .setInputCol(Dic.colFeatures)
+      .setOutputCol(Dic.colScaledFeatures)
+      .fit(df_output)
+
+    val df_scaled_data = minMaxScaler.transform(df_output)
+      .withColumn(Dic.colVector, udfVectorToArray(col(Dic.colScaledFeatures)))
+
+    val splitVecToDoubleDfAndNewCols = splitVecToDouble(df_scaled_data, Dic.colVector, input_cols.length, "f")
+
+    val df_result = splitVecToDoubleDfAndNewCols.df_result_with_vec_cols
+      .select(excluded_cols.++(splitVecToDoubleDfAndNewCols.new_cols_array).map(col): _*)
+      .toDF(final_df_schema: _*)
+
+    df_result
+  }
 }

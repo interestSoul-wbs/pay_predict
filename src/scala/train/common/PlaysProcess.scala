@@ -40,7 +40,7 @@ object PlaysProcess {
 
     // 3 - save data to hive.
     // 可能需要改动 - 2020-11-11
-    saveProcessedPlay(spark, df_play)
+    saveProcessedPlay(spark, df_play, partitiondate, license)
   }
 
 
@@ -76,48 +76,6 @@ object PlaysProcess {
     df_play_processed
   }
 
-  /**
-    * Save play data.
-    *
-    * @param spark
-    * @param df_order
-    */
-  def saveProcessedPlay(spark: SparkSession, df_play: DataFrame) = {
-
-    // 1 - If table not exist, creat.
-    spark.sql(
-      """
-        |CREATE TABLE IF NOT EXISTS
-        |     vodrs.paypredict_processed_play(
-        |         user_id string,
-        |         video_id string,
-        |         play_end_time string,
-        |         broadcast_time double)
-        |PARTITIONED BY
-        |    (partitiondate string, license string)
-      """.stripMargin)
-
-    // 2 - Save data.
-    println("save data to hive........... \n" * 4)
-    df_play.createOrReplaceTempView(tempTable)
-
-    val insert_sql =
-      s"""
-         |INSERT OVERWRITE TABLE
-         |    vodrs.paypredict_processed_play
-         |PARTITION
-         |    (partitiondate = '$partitiondate', license = '$license')
-         |SELECT
-         |    user_id,
-         |    video_id,
-         |    play_end_time,
-         |    broadcast_time
-         |FROM
-         |    $tempTable
-      """.stripMargin
-    spark.sql(insert_sql)
-    println("over over........... \n" * 4)
-  }
 }
 
 

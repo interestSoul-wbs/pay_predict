@@ -1,12 +1,12 @@
 package train.userpay
 
-import java.text.SimpleDateFormat
 import mam.GetSaveData._
 import mam.Dic
 import mam.Utils._
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions.{col, isnull, udf}
 import org.apache.spark.sql.{SaveMode, SparkSession}
+import com.github.nscala_time.time.Imports._
 
 object UserSplit {
 
@@ -14,16 +14,22 @@ object UserSplit {
   var partitiondate: String = _
   var license: String = _
   var timeWindow: Int = 30
-
+  var date: DateTime = _
+  var thirtyDaysAgo: String = _
+  
   def main(args: Array[String]): Unit = {
 
     partitiondate = args(0)
     license = args(1)
 
+    date = DateTime.parse(partitiondate, DateTimeFormat.forPattern("yyyyMMdd"))
+    thirtyDaysAgo = (date - 30.days).toString(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:SS"))
+    
     // 1 - SparkSession and params initialize
     val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
 
-    val train_time = "2020-09-01 00:00:00"
+    // 训练集的划分时间点 - 输入时间的30天之前
+    println("thirtyDaysAgo is : " + thirtyDaysAgo)
 
     // 2 - processed df_plays
     val df_plays = getProcessedPlay(spark, partitiondate, license)
@@ -40,22 +46,22 @@ object UserSplit {
           && col(Dic.colResourceType).<(4))
 
     //order中在train_time后14天内的支付成功订单
-    val trainTimePost14 = calDate(train_time, days = 14)
+    val trainTimePost14 = calDate(thirtyDaysAgo, days = 14)
 
     val df_train_pos = df_order_package
       .filter(
         col(Dic.colOrderStatus).>(1)
-          && col(Dic.colCreationTime).>=(train_time)
+          && col(Dic.colCreationTime).>=(thirtyDaysAgo)
           && col(Dic.colCreationTime).<(trainTimePost14))
 
     //println("df_train_pos.shape："+df_train_pos.count())
     //在time-time_window到time时间段内成功支付过订单 或者 在time之前创建的订单到time时仍旧有效
-    val trainTimePre = calDate(train_time, days = -timeWindow)
+    val trainTimePre = calDate(thirtyDaysAgo, days = -timeWindow)
     var df_train_order_old = df_order_package
       .filter(
         col(Dic.colOrderStatus).>(1)
-          && ((col(Dic.colCreationTime).>(trainTimePre) && col(Dic.colCreationTime).<(train_time))
-          || (col(Dic.colOrderEndTime).>(train_time) && col(Dic.colCreationTime).<(train_time))))
+          && ((col(Dic.colCreationTime).>(trainTimePre) && col(Dic.colCreationTime).<(thirtyDaysAgo))
+          || (col(Dic.colOrderEndTime).>(thirtyDaysAgo) && col(Dic.colCreationTime).<(thirtyDaysAgo))))
 
     val joinKeysUserId = Seq(Dic.colUserId)
     df_train_order_old = df_all_users.join(df_train_order_old, joinKeysUserId, "inner")
@@ -90,13 +96,13 @@ object UserSplit {
 
     println("老用户数据集生成完成！")
 
-    saveUserSamples(spark, df_train_old_result, partitiondate, license, "train", "old")
+    saveUserSplitResult(spark, df_train_old_result, partitiondate, license, "train", "old")
 
     //构造新用户的训练样本，首先找出新用户
     //order中在train_time时间段支付套餐订单且不是老用户的用户为新用户的正样本，其余非老用户为负样本
     var trainPosUsers = df_order_package
       .filter(
-        col(Dic.colCreationTime).>=(train_time)
+        col(Dic.colCreationTime).>=(thirtyDaysAgo)
           && col(Dic.colCreationTime).<(trainTimePost14)
           && col(Dic.colOrderStatus).>(1))
       .select(col(Dic.colUserId)).distinct()
@@ -107,7 +113,7 @@ object UserSplit {
 
     var trainNegOrderUsers = df_order_package
       .filter(
-        col(Dic.colCreationTime).>=(train_time)
+        col(Dic.colCreationTime).>=(thirtyDaysAgo)
           && col(Dic.colCreationTime).<(trainTimePost14)
           && col(Dic.colOrderStatus).<=(1))
       .select(col(Dic.colUserId))
@@ -117,7 +123,7 @@ object UserSplit {
 
     var trainPlay = df_plays
       .filter(
-        col(Dic.colPlayEndTime).===(train_time)
+        col(Dic.colPlayEndTime).===(thirtyDaysAgo)
           && col(Dic.colBroadcastTime) > 120)
       .select(col(Dic.colUserId))
       .distinct()
@@ -140,40 +146,8 @@ object UserSplit {
 
     println("新用户数据集生成完成！")
 
-    saveUserSamples(spark, trainNewResult, partitiondate, license, "train", "new")
+    saveUserSplitResult(spark, trainNewResult, partitiondate, license, "train", "new")
   }
 
-  def saveUserSamples(spark: SparkSession, df_result: DataFrame, partitiondate: String, license: String, category: String,
-                      new_or_old: String) = {
-
-    spark.sql(
-      """
-        |CREATE TABLE IF NOT EXISTS
-        |     vodrs.paypredict_user_split(
-        |            user_id string,
-        |            order_status int)
-        |PARTITIONED BY
-        |    (partitiondate string, license string, category string, new_or_old string)
-      """.stripMargin)
-
-    println("save data to hive........... \n" * 4)
-    df_result.createOrReplaceTempView(tempTable)
-
-    val insert_sql =
-      s"""
-         |INSERT OVERWRITE TABLE
-         |    vodrs.paypredict_user_split
-         |PARTITION
-         |    (partitiondate='$partitiondate', license='$license', category='$category', new_or_old='$new_or_old')
-         |SELECT
-         |    user_id,
-         |    order_status
-         |FROM
-         |    $tempTable
-      """.stripMargin
-    spark.sql(insert_sql)
-    println("over over........... \n" * 4)
-
-  }
 
 }

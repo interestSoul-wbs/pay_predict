@@ -274,4 +274,11 @@ object Dic {
   val colIsFormattedTimePlayEndTime: String = "is_formatted_time_play_end_time"
   val colIsLongtypeTimeOrderStartTime: String = "is_longtype_time_order_start_time"
   val colIsLongtypeTimeOrderEndTime: String = "is_longtype_time_order_end_time"
+  val colCount: String = "count"
+  val colLicense: String = "license"
+  val colCategory: String = "category"
+  val colFeatures: String = "features"
+  val colScaledFeatures: String = "scaled_features"
+  val colKeepOriginalFeatures: String = "keep_original_features"
+
 }

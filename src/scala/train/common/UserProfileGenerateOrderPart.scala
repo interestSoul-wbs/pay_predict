@@ -5,22 +5,28 @@ import mam.Utils.{calDate, printDf, udfGetDays}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import mam.GetSaveData._
+import com.github.nscala_time.time.Imports._
 
 object UserProfileGenerateOrderPart {
 
   var tempTable = "temp_table"
   var partitiondate: String = _
   var license: String = _
+  var date: DateTime = _
+  var thirtyDaysAgo: String = _
 
   def main(args: Array[String]): Unit = {
 
     partitiondate = args(0)
     license = args(1)
 
+    date = DateTime.parse(partitiondate, DateTimeFormat.forPattern("yyyyMMdd"))
+    thirtyDaysAgo = (date - 30.days).toString(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:SS"))
+
     val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
 
-    // 训练集的划分时间点 - 2020-09-01 00:00:00
-    val now = "2020-09-01 00:00:00"
+    // 训练集的划分时间点 - 输入时间的30天之前
+    println("thirtyDaysAgo is : " + thirtyDaysAgo)
 
     // 1 - get play data.
     val df_plays = getProcessedPlay(spark, partitiondate, license)
@@ -33,7 +39,7 @@ object UserProfileGenerateOrderPart {
     printDf("df_orders", df_orders)
 
     // 3 - data process
-    val df_result = userProfileGenerateOrderPart(now, 30, df_plays, df_orders)
+    val df_result = userProfileGenerateOrderPart(thirtyDaysAgo, 30, df_plays, df_orders)
 
     printDf("df_result", df_result)
 
@@ -177,80 +183,4 @@ object UserProfileGenerateOrderPart {
     df_result
   }
 
-
-  /**
-    * Save data to hive.
-    *
-    * @param spark
-    * @param df_result
-    */
-  def saveUserProfileOrderPart(spark: SparkSession, df_result: DataFrame, partitiondate: String, license: String, category: String) = {
-
-    spark.sql(
-      """
-        |CREATE TABLE IF NOT EXISTS
-        |     vodrs.paypredict_user_profile_order_part(
-        |         user_id string,
-        |         number_packages_purchased long,
-        |         total_money_packages_purchased double,
-        |         max_money_package_purchased double,
-        |         min_money_package_purchased double,
-        |         avg_money_package_purchased double,
-        |         var_money_package_purchased double,
-        |         number_singles_purchased long,
-        |         total_money_singles_purchased double,
-        |         total_money_consumption double,
-        |         number_packages_unpurchased long,
-        |         money_packages_unpurchased double,
-        |         number_singles_unpurchased long,
-        |         money_singles_unpurchased double,
-        |         days_since_last_purchase_package int,
-        |         days_since_last_click_package int,
-        |         number_orders_last_30_days long,
-        |         number_paid_orders_last_30_days long,
-        |         number_paid_package_last_30_days long,
-        |         number_paid_single_last_30_days long,
-        |         days_remaining_package int)
-        |PARTITIONED BY
-        |    (partitiondate string, license string, category string)
-      """.stripMargin)
-
-    println("save data to hive........... \n" * 4)
-    df_result.createOrReplaceTempView(tempTable)
-
-    val insert_sql =
-      s"""
-         |INSERT OVERWRITE TABLE
-         |    vodrs.paypredict_user_profile_order_part
-         |PARTITION
-         |    (partitiondate='$partitiondate', license='$license', category='$category')
-         |SELECT
-         |    user_id,
-         |    number_packages_purchased,
-         |    total_money_packages_purchased,
-         |    max_money_package_purchased,
-         |    min_money_package_purchased,
-         |    avg_money_package_purchased,
-         |    var_money_package_purchased,
-         |    number_singles_purchased,
-         |    total_money_singles_purchased,
-         |    total_money_consumption,
-         |    number_packages_unpurchased,
-         |    money_packages_unpurchased,
-         |    number_singles_unpurchased,
-         |    money_singles_unpurchased,
-         |    days_since_last_purchase_package,
-         |    days_since_last_click_package,
-         |    number_orders_last_30_days,
-         |    number_paid_orders_last_30_days,
-         |    number_paid_package_last_30_days,
-         |    number_paid_single_last_30_days,
-         |    days_remaining_package
-         |FROM
-         |    $tempTable
-      """.stripMargin
-
-    spark.sql(insert_sql)
-    println("over over........... \n" * 4)
-  }
 }

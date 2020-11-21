@@ -6,25 +6,27 @@ import mam.Utils._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.IntegerType
 import org.apache.spark.sql.{DataFrame, SparkSession}
-
+import com.github.nscala_time.time.Imports._
 import scala.collection.mutable.ListBuffer
-
 
 object VideoProfileGenerate {
 
   var tempTable = "temp_table"
   var partitiondate: String = _
   var license: String = _
+  var date: DateTime = _
+  var sixteenDaysAgo: String = _
 
   def main(args: Array[String]): Unit = {
 
     partitiondate = args(0)
     license = args(1)
 
-    val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
+    date = DateTime.parse(partitiondate, DateTimeFormat.forPattern("yyyyMMdd"))
+    // 测试集的划分时间点 - 例：2020-09-15 00:00:00， 截止日期是 2020-10-01
+    sixteenDaysAgo = (date - 16.days).toString(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:SS"))
 
-    // 训练集的划分时间点 - 2020-06-01 00:00:00
-    val now = "2020-09-15 00:00:00"
+    val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
 
     // 1 - processed df_medias
     val df_medias = getProcessedMedias(spark, partitiondate, license)
@@ -59,22 +61,12 @@ object VideoProfileGenerate {
     printDf("df_orders", df_orders)
 
     // 4 - data process
-    val df_result = videoProfileGenerate(now, 30, df_medias_purged, df_plays, df_orders)
+    val df_result = videoProfileGenerate(sixteenDaysAgo, 30, df_medias_purged, df_plays, df_orders)
 
     printDf("df_result", df_result)
 
     // 5 - save data
-    // 2020-11-12 - 先打出来看一下，再看要怎么处理非 数值型特征，怎么存
     saveVideoProfileGenerate(spark, df_result, partitiondate, license, "valid")
-
-    //将其他类型的列转化为字符串，容易保存为csv文件
-//    val anoColumns = df_result_tmp_3.columns.diff(numColumns)
-
-//    val df_result = anoColumns.foldLeft(df_result_tmp_2) {
-//      (currentDF, column) => currentDF.withColumn(column, col(column).cast("string"))
-//    }
-//
-//    df_result
   }
 
   def videoProfileGenerate(now: String, timeWindow: Int, df_medias: DataFrame, df_plays: DataFrame, df_orders: DataFrame) = {

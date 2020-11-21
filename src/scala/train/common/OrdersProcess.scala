@@ -47,7 +47,7 @@ object OrdersProcess {
     printDf("df_order_processed", df_order_processed)
 
     // 3 - save data to hive.
-    saveProcessedOrder(spark, df_order_processed)
+    saveProcessedOrder(spark, df_order_processed, partitiondate, license)
 
     println("预测阶段订单数据处理完成！")
   }
@@ -111,56 +111,4 @@ object OrdersProcess {
   }
 
 
-  /**
-    * Save order data.
-    *
-    * @param spark
-    * @param df_order
-    */
-  def saveProcessedOrder(spark: SparkSession, df_order: DataFrame) = {
-
-    spark.sql(
-      """
-        |CREATE TABLE IF NOT EXISTS
-        |     vodrs.paypredict_processed_order(
-        |         user_id string,
-        |         money double,
-        |         resource_type double,
-        |         resource_id string,
-        |         resource_title string,
-        |         creation_time string,
-        |         discount_description string,
-        |         order_status double,
-        |         order_start_time string,
-        |         order_end_time string)
-        |PARTITIONED BY
-        |    (partitiondate string, license string)
-      """.stripMargin)
-
-    println("save data to hive........... \n" * 4)
-    df_order.createOrReplaceTempView(tempTable)
-
-    val insert_sql =
-      s"""
-         |INSERT OVERWRITE TABLE
-         |    vodrs.paypredict_processed_order
-         |PARTITION
-         |    (partitiondate = '$partitiondate', license = '$license')
-         |SELECT
-         |    user_id,
-         |    money,
-         |    resource_type,
-         |    resource_id,
-         |    resource_title,
-         |    creation_time,
-         |    discount_description,
-         |    order_status,
-         |    order_start_time,
-         |    order_end_time
-         |FROM
-         |    $tempTable
-      """.stripMargin
-    spark.sql(insert_sql)
-    println("over over........... \n" * 4)
-  }
 }

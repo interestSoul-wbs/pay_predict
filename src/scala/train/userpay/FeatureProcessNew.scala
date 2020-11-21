@@ -140,6 +140,6 @@ object FeatureProcessNew {
 
     printDf("df_result", df_result)
 
-    saveTrainSet(spark, df_result, partitiondate, license, "train", "new")
+    saveFeatureProcessResult(spark, df_result, partitiondate, license, "train", "new")
   }
 }

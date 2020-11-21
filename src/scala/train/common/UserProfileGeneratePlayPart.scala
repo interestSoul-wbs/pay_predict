@@ -5,22 +5,28 @@ import mam.Utils.{calDate, printDf, udfGetDays}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import mam.GetSaveData._
+import com.github.nscala_time.time.Imports._
 
 object UserProfileGeneratePlayPart {
 
   var tempTable = "temp_table"
   var partitiondate: String = _
   var license: String = _
+  var date: DateTime = _
+  var thirtyDaysAgo: String = _
 
   def main(args: Array[String]): Unit = {
 
     partitiondate = args(0)
     license = args(1)
 
+    date = DateTime.parse(partitiondate, DateTimeFormat.forPattern("yyyyMMdd"))
+    thirtyDaysAgo = (date - 30.days).toString(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:SS"))
+
     val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
 
-    // 训练集的划分时间点 - 2020-09-01 00:00:00
-    val now = "2020-09-01 00:00:00"
+    // 训练集的划分时间点 - 输入时间的30天之前
+    println("thirtyDaysAgo is : " + thirtyDaysAgo)
 
     // 1 - processed medias -
     val df_medias = getProcessedMedias(spark, partitiondate, license)
@@ -33,7 +39,7 @@ object UserProfileGeneratePlayPart {
     printDf("df_plays", df_plays)
 
     // 3 - data process
-    val df_result = userProfileGeneratePlayPart(now, 30, df_medias, df_plays)
+    val df_result = userProfileGeneratePlayPart(thirtyDaysAgo, 30, df_medias, df_plays)
 
     printDf("df_result", df_result)
 
@@ -280,121 +286,5 @@ object UserProfileGeneratePlayPart {
     df_result_tmp_3.unpersist()
 
     df_result
-  }
-
-  /**
-    * Save user profile play data.
-    *
-    * @param spark
-    * @param df_result
-    */
-  def saveUserProfilePlayData(spark: SparkSession, df_result: DataFrame, partitiondate: String, license: String, category: String) = {
-
-    spark.sql(
-      """
-        |CREATE TABLE IF NOT EXISTS
-        |     vodrs.paypredict_user_profile_play_part(
-        |             user_id string,
-        |             active_days_last_30_days long,
-        |             total_time_last_30_days double,
-        |             days_from_last_active int,
-        |             days_since_first_active_in_timewindow int,
-        |             active_days_last_14_days long,
-        |             total_time_last_14_days double,
-        |             active_days_last_7_days long,
-        |             total_time_last_7_days double,
-        |             active_days_last_3_days long,
-        |             total_time_last_3_days double,
-        |             total_time_paid_videos_last_30_days double,
-        |             total_time_paid_videos_last_14_days double,
-        |             total_time_paid_videos_last_7_days double,
-        |             total_time_paid_videos_last_3_days double,
-        |             total_time_paid_videos_last_1_days double,
-        |             total_time_in_package_videos_last_30_days double,
-        |             var_time_in_package_videos_last_30_days double,
-        |             number_in_package_videos_last_30_days long,
-        |             total_time_in_package_videos_last_14_days double,
-        |             var_time_in_package_videos_last_14_days double,
-        |             number_in_package_videos_last_14_days long,
-        |             total_time_in_package_videos_last_7_days double,
-        |             var_time_in_package_videos_last_7_days double,
-        |             number_in_package_videos_last_7_days long,
-        |             total_time_in_package_videos_last_3_days double,
-        |             var_time_in_package_videos_last_3_days double,
-        |             number_in_package_videos_last_3_days long,
-        |             total_time_in_package_videos_last_1_days double,
-        |             var_time_in_package_videos_last_1_days double,
-        |             number_in_package_videos_last_1_days long,
-        |             total_time_children_videos_last_30_days double,
-        |             number_children_videos_last_30_days long,
-        |             total_time_children_videos_last_14_days double,
-        |             number_children_videos_last_14_days long,
-        |             total_time_children_videos_last_7_days double,
-        |             number_children_videos_last_7_days long,
-        |             total_time_children_videos_last_3_days double,
-        |             number_children_videos_last_3_days long,
-        |             total_time_children_videos_last_1_days double,
-        |             number_children_videos_last_1_days long)
-        |PARTITIONED BY
-        |    (partitiondate string, license string, category string)
-      """.stripMargin)
-
-    println("save data to hive........... \n" * 4)
-    df_result.createOrReplaceTempView(tempTable)
-
-    val insert_sql =
-      s"""
-         |INSERT OVERWRITE TABLE
-         |    vodrs.paypredict_user_profile_play_part
-         |PARTITION
-         |    (partitiondate='$partitiondate', license='$license', category='$category')
-         |SELECT
-         |    user_id,
-         |    active_days_last_30_days,
-         |    total_time_last_30_days,
-         |    days_from_last_active,
-         |    days_since_first_active_in_timewindow,
-         |    active_days_last_14_days,
-         |    total_time_last_14_days,
-         |    active_days_last_7_days,
-         |    total_time_last_7_days,
-         |    active_days_last_3_days,
-         |    total_time_last_3_days,
-         |    total_time_paid_videos_last_30_days,
-         |    total_time_paid_videos_last_14_days,
-         |    total_time_paid_videos_last_7_days,
-         |    total_time_paid_videos_last_3_days,
-         |    total_time_paid_videos_last_1_days,
-         |    total_time_in_package_videos_last_30_days,
-         |    var_time_in_package_videos_last_30_days,
-         |    number_in_package_videos_last_30_days,
-         |    total_time_in_package_videos_last_14_days,
-         |    var_time_in_package_videos_last_14_days,
-         |    number_in_package_videos_last_14_days,
-         |    total_time_in_package_videos_last_7_days,
-         |    var_time_in_package_videos_last_7_days,
-         |    number_in_package_videos_last_7_days,
-         |    total_time_in_package_videos_last_3_days,
-         |    var_time_in_package_videos_last_3_days,
-         |    number_in_package_videos_last_3_days,
-         |    total_time_in_package_videos_last_1_days,
-         |    var_time_in_package_videos_last_1_days,
-         |    number_in_package_videos_last_1_days,
-         |    total_time_children_videos_last_30_days,
-         |    number_children_videos_last_30_days,
-         |    total_time_children_videos_last_14_days,
-         |    number_children_videos_last_14_days,
-         |    total_time_children_videos_last_7_days,
-         |    number_children_videos_last_7_days,
-         |    total_time_children_videos_last_3_days,
-         |    number_children_videos_last_3_days,
-         |    total_time_children_videos_last_1_days,
-         |    number_children_videos_last_1_days
-         |FROM
-         |    $tempTable
-      """.stripMargin
-
-    spark.sql(insert_sql)
-    println("over over........... \n" * 4)
   }
 }

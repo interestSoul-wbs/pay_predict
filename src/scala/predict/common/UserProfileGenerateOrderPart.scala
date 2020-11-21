@@ -5,22 +5,26 @@ import mam.GetSaveData._
 import mam.Utils.{calDate, printDf, udfGetDays}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import com.github.nscala_time.time.Imports._
 
 object UserProfileGenerateOrderPart {
 
   var tempTable = "temp_table"
   var partitiondate: String = _
   var license: String = _
+  var date: DateTime = _
+  var sixteenDaysAgo: String = _
 
   def main(args: Array[String]): Unit = {
 
     partitiondate = args(0)
     license = args(1)
 
-    val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
+    date = DateTime.parse(partitiondate, DateTimeFormat.forPattern("yyyyMMdd"))
+    // 测试集的划分时间点 - 2020-09-01 00:00:00
+    sixteenDaysAgo = (date - 16.days).toString(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:SS"))
 
-    // 训练集的划分时间点 - 2020-09-01 00:00:00
-    val now = "2020-09-15 00:00:00"
+    val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
 
     // 1 - get play data.
     val df_plays = getProcessedPlay(spark, partitiondate, license)
@@ -33,7 +37,7 @@ object UserProfileGenerateOrderPart {
     printDf("df_orders", df_orders)
 
     // 3 - data process
-    val df_result = userProfileGenerateOrderPart(now, 30, df_plays, df_orders)
+    val df_result = userProfileGenerateOrderPart(sixteenDaysAgo, 30, df_plays, df_orders)
 
     printDf("df_result", df_result)
 
