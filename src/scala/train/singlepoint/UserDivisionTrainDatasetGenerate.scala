@@ -6,7 +6,6 @@ import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
 import mam.GetSaveData._
 import com.github.nscala_time.time.Imports._
-import org.apache.spark.ml.feature.{MinMaxScaler, VectorAssembler}
 
 object UserDivisionTrainDatasetGenerate {
 
