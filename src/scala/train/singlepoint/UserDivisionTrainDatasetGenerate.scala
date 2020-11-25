@@ -93,7 +93,10 @@ object UserDivisionTrainDatasetGenerate {
     val df_user_paid_with_label = df_user_paid_profile.withColumn(Dic.colOrderStatus, udfAddOrderStatus(col(Dic.colUserId)))
 
     //将正负样本组合在一起并shuffle
-    val df_all_users = df_user_paid_with_label.union(df_neg_users_with_label).sample(fraction = 1.0)
+    val df_all_users = df_user_paid_with_label
+      .union(df_neg_users_with_label)
+      .sample(fraction = 1.0)
+
     println("总样本的条数为：" + df_all_users.count())
 
     printDf("df_all_users", df_all_users)
@@ -106,6 +109,9 @@ object UserDivisionTrainDatasetGenerate {
 
     printDf("df_all_users_not_null", df_all_users_not_null)
 
+    println("df_all_users_not_null count: ", df_all_users_not_null.count())
+
+
     // MinMaxScaler
     val exclude_cols = Array(Dic.colUserId)
 
@@ -115,7 +121,4 @@ object UserDivisionTrainDatasetGenerate {
 
     saveSinglepointUserDivisionData(spark, df_all_users_not_null, partitiondate, license, "train")
   }
-
-
-
 }

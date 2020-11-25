@@ -4,10 +4,10 @@ import com.github.nscala_time.time.Imports.{DateTimeFormat, _}
 import mam.Dic
 import mam.Utils._
 import mam.GetSaveData._
-import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql._
 import org.apache.spark.sql.functions.col
 import com.github.nscala_time.time.Imports._
+import org.apache.spark.sql.functions._
 
 object PredictUserSplit {
 
@@ -25,9 +25,9 @@ object PredictUserSplit {
 
     date = DateTime.parse(partitiondate, DateTimeFormat.forPattern("yyyyMMdd"))
     sixteenDaysAgo = (date - 16.days).toString(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:SS"))
-    
+
     val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
-    
+
     // 1 - processed play data
     val df_plays = getProcessedPlay(spark, partitiondate, license)
 
@@ -56,17 +56,13 @@ object PredictUserSplit {
     val joinKeysUserId = Seq(Dic.colUserId)
 
     // user_id and order_status - 增加label
-    val df_processed_orders = getProcessedOrder(spark, partitiondate, license)
-
-    val df_effective_order = getPredictUsersLabel(df_processed_orders, sixteenDaysAgo)
-
-    //
+    // 因为存储时，hive中的order_status必须有值，此处，测试集的标签列用 -1 进行填充；
     predictOrderOld = df_all_users.join(predictOrderOld, joinKeysUserId, "inner")
 
     val df_predict_old = predictOrderOld
       .select(col(Dic.colUserId))
       .distinct()
-      .join(df_effective_order, Seq(Dic.colUserId), "left")
+      .withColumn(Dic.colOrderStatus, lit(-1))
       .na.fill(0)
 
     printDf("df_predict_old", df_predict_old)
@@ -74,7 +70,7 @@ object PredictUserSplit {
     saveUserSplitResult(spark, df_predict_old, partitiondate, license, "valid", "old")
 
     val df_predict_new = df_all_users.except(df_predict_old.select(col(Dic.colUserId)))
-      .join(df_effective_order, Seq(Dic.colUserId), "left")
+      .withColumn(Dic.colOrderStatus, lit(-1))
       .na.fill(0)
 
     printDf("df_predict_new", df_predict_new)
