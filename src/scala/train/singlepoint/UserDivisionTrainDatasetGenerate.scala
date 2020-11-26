@@ -1,11 +1,13 @@
 package train.singlepoint
 
 import mam.Dic
+import mam.GetSaveData.scaleData
 import mam.Utils.{printDf, udfAddOrderStatus, udfGetString}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
 import org.apache.spark.sql.functions.udf
 import org.apache.spark.sql.{SaveMode, SparkSession}
+import org.apache.spark.sql.functions._
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -17,7 +19,7 @@ object UserDivisionTrainDatasetGenerate {
     System.setProperty("hadoop.home.dir", "c:\\winutils")
     Logger.getLogger("org").setLevel(Level.ERROR)
     val hdfsPath="hdfs:///pay_predict/"
-   // val hdfsPath=""
+    //val hdfsPath=""
     val orderProcessedPath=hdfsPath+"data/train/common/processed/orders"
     val userProfilePlayPartPath=hdfsPath+"data/train/common/processed/userprofileplaypart"+args(0)
     val userProfilePreferencePartPath=hdfsPath+"data/train/common/processed/userprofilepreferencepart"+args(0)
@@ -26,7 +28,6 @@ object UserDivisionTrainDatasetGenerate {
       .appName("UserDivisionTrainDatasetGenerate")
       //.master("local[6]")
       .getOrCreate()
-    import org.apache.spark.sql.functions._
     val userProfilePlayPart = spark.read.format("parquet").load(userProfilePlayPartPath)
     val userProfilePreferencePart = spark.read.format("parquet").load(userProfilePreferencePartPath)
     val userProfileOrderPart = spark.read.format("parquet").load(userProfileOrderPartPath)
@@ -86,38 +87,22 @@ object UserDivisionTrainDatasetGenerate {
     val allUsers=usersPaidWithLabel.union(negativeUsersWithLabel).sample(fraction = 1.0)
     println("总样本的条数为："+allUsers.count())
 
-    val tempProfile=allUsers.na.fill(30,List(Dic.colDaysSinceLastPurchasePackage,Dic.colDaysSinceLastClickPackage,
+    val allUsersNotNull=allUsers.na.fill(30,List(Dic.colDaysSinceLastPurchasePackage,Dic.colDaysSinceLastClickPackage,
       Dic.colDaysFromLastActive,Dic.colDaysSinceFirstActiveInTimewindow))
-    var allUsersNotNull=tempProfile.na.fill(0)
-    allUsersNotNull=allUsersNotNull.na.drop()
-    //allUsersNotNull.show()
-    //val columns:Array[String]=allUsersNotNull.columns
-   // val col1=columns.tail.take(columns.length-2)
+      .na.fill(0)
+      .na.drop()
 
 
-//    val assembler = new VectorAssembler()
-//      .setInputCols(col1)
-//      .setOutputCol("features_not_scale")
-//    val allUsersConcat = assembler.transform(allUsersNotNull)
-//    //allUsersConcat.select("features_not_scale").show()
-//
-//    val scaleTool=new MinMaxScaler()
-//      .setInputCol("features_not_scale")
-//      .setOutputCol("features_scale")
-//
-//    // Compute summary statistics and generate MinMaxScalerModel
-//    val scaleModel = scaleTool.fit(allUsersConcat)
-//
-//    // rescale each feature to range [min, max].
-//    val scaledData = scaleModel.transform(allUsersConcat)
+
+    val exclude_cols = Array(Dic.colUserId)
+    val df_result = scaleData(allUsersNotNull, exclude_cols)
+    printDf("输出  df_result", df_result)
     val dataPath=hdfsPath+"data/train/singlepoint/userdivisiontraindata"
     printDf("输出  allUsersNotNull",allUsersNotNull)
+    df_result.write.mode(SaveMode.Overwrite).format("parquet").save(dataPath+"_scaled"+args(0)+"-"+args(2))
     allUsersNotNull.write.mode(SaveMode.Overwrite).format("parquet").save(dataPath+args(0)+"-"+args(2))
-    allUsersNotNull.write.mode(SaveMode.Overwrite).option("header","true").csv(dataPath+args(0)+"-"+args(2)+".csv")
 
-//    val model = new LogisticRegression()  //建立模型
-//    model.setLabelCol(Dic.colOrderStatus).setFeaturesCol("features_scale").fit(scaledData)
-   // spark.read.format("parquet").load(dataPath+args(0)+"--"+args(2)).show()
+
 
 
 

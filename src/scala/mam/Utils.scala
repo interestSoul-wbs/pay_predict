@@ -8,7 +8,7 @@ import org.apache.spark
 import org.apache.spark.sql
 import org.apache.spark.sql.{DataFrame, Dataset, Row}
 import org.apache.spark.sql.functions.{length, udf}
-
+import org.apache.spark.ml.linalg.Vector
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
 
@@ -133,7 +133,7 @@ object Utils {
 
 
   def udfGetString=udf(getString _)
-  def getString(features:Vector[Double])={
+  def getString(features:Array[Double])={
     /**
     *@author wj
     *@param [features]
@@ -362,6 +362,89 @@ object Utils {
       lineIterator1.foreach(m=>tempMap += (m.split(" -> ")(0) -> m.split(" -> ")(1).toInt))
       tempMap.get(prefer)
     }
+  }
+  def udfVectorToArray = udf(vectorToArray _)
+
+  def vectorToArray(col_vector: Vector) = {
+    col_vector.toArray
+  }
+
+  /**
+   * 用来对播放记录按照时间进行排序
+   * @return
+   */
+  def  udfSortByPlayTime=udf(sortByPlayTime _)
+  def  sortByPlayTime(rows:Seq[Row])={
+    rows.map { case Row(movieId: String, timestamp: String) => (movieId, timestamp) }
+      .sortBy { case (_, timestamp) => timestamp }
+      .map { case (movieId, _) => movieId }
+  }
+  /**
+   * 判断一个字符串是不是 数字，至少有1位数
+   *
+   * @return
+   */
+  def udfIsOnlyNumber = udf(isOnlyNumber _)
+
+  def isOnlyNumber(str: String) = {
+
+    var result = 0
+
+    val pattern_1 = """^\d+$""".r
+
+    val tmp_result = pattern_1 findFirstIn str
+
+    tmp_result match {
+      case None => result = 0
+      case _ => result = 1
+    }
+
+    result
+  }
+  /**
+   * 判断一个时间是不是 LongType - 10位数字 的时间 - 例：1425939527
+   *
+   * @return
+   */
+  def udfIsLongTypeTimePattern1 = udf(isLongTypeTimePattern1 _)
+
+  def isLongTypeTimePattern1(longtype_time: String) = {
+
+    var result = 0
+
+    val pattern_1 = """^\d{10}$""".r
+
+    val tmp_result = pattern_1 findFirstIn longtype_time
+
+    tmp_result match {
+      case None => result = 0
+      case _ => result = 1
+    }
+
+    result
+  }
+
+  /**
+   * 判断一个时间是不是 LongType - 14位数字 的时间 - 例：1425939527
+   *
+   * @return
+   */
+  def udfIsLongTypeTimePattern2 = udf(isLongTypeTimePattern2 _)
+
+  def isLongTypeTimePattern2(longtype_time: String) = {
+
+    var result = 0
+
+    val pattern_1 = """^\d{14}$""".r
+
+    val tmp_result = pattern_1 findFirstIn longtype_time
+
+    tmp_result match {
+      case None => result = 0
+      case _ => result = 1
+    }
+
+    result
   }
 
 

@@ -55,9 +55,7 @@ object Dic {
   val colSupplier="supplier"
   val colIntroduction="introduction"
 
-  //在处理medias过程中构造的属性
-  val colRank="rank"
-  val colContent="content"
+
 
   /**
    * order中的属性
@@ -255,6 +253,54 @@ object Dic {
   val colItemType="itemtype"
   val colItemId="itemid"
   val colPartitionDate="partitiondate"
+
+
+
+  val colRank = "rank"
+  val colContent = "content"
+  val colLabel = "label"
+  val colFirst = "first"
+  val colSecond = "second"
+  val colOneLevel = "one_level"
+  val colTwoLevel = "two_level"
+  val colVideoTag = "video_tag"
+  val colSubscriberid = "subscriberid"
+  val colFee = "fee"
+  val colResourcetype = "resourcetype"
+  val colResourceid = "resourceid"
+  val colResourcename = "resourcename"
+  val colCreatedtime = "createdtime"
+  val colDiscountdesc = "discountdesc"
+  val colStatus = "status"
+  val colStarttime = "starttime"
+  val colEndtime = "endtime"
+  val colDiscountid = "discountid"
+  val colVideoList = "video_list"
+  val colVector: String = "vector"
+  val colVectors: String = "vectors"
+  val colWord: String = "word"
+  val colPlayMonth: String = "play_month"
+  val colResult: String = "result"
+  val colItemid: String = "itemid"
+  val colDuration: String = "duration"
+  val colIsForMattedTime: String = "is_formatted_time"
+  val colIsLongtypeTimePattern1: String = "is_longtype_time_pattern_1"
+  val colIsLongtypeTimePattern2: String = "is_longtype_time_pattern_2"
+  val colIsOnlyNumberUserId: String = "is_only_number_user_id"
+  val colIsOnlyNumberVideoId: String = "is_only_number_video_id"
+  val colIsOnlyNumberBroadcastTime: String = "is_only_number_broadcast_time"
+  val colIsOnlyNumberVideoTime: String = "is_only_number_video_time"
+  val colIsOnlyNumberResourceId: String = "is_only_number_resource_id"
+  val colIsForMattedTimeReleaseDate: String = "is_formatted_time_release_date"
+  val colIsForMattedTimeStorageTime : String = "is_formatted_time_storage_time"
+  val colIsLongtypeTimeStorageTime: String = "is_longtype_time_storage_time"
+  val colIsLongtypeTimeCreationTime: String = "is_longtype_time_creation_time"
+  val colIsFormattedTimePlayEndTime: String = "is_formatted_time_play_end_time"
+  val colIsLongtypeTimeOrderStartTime: String = "is_longtype_time_order_start_time"
+  val colIsLongtypeTimeOrderEndTime: String = "is_longtype_time_order_end_time"
+  val colFeatures="features"
+  val colScaledFeatures="scaled_features"
+
 
 
 

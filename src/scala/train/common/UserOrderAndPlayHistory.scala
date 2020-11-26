@@ -1,7 +1,8 @@
 package train.common
 
 import mam.Dic
-import mam.Utils.{calDate, printDf}
+import mam.GetSaveData.{getProcessedMedias, getProcessedOrders, getProcessedPlays}
+import mam.Utils.{calDate, printDf, udfSortByPlayTime}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
 import org.apache.spark.sql.expressions.Window
@@ -20,6 +21,7 @@ object UserOrderAndPlayHistory {
     //val hdfsPath=""
     val playsProcessedPath=hdfsPath+"data/train/common/processed/plays"
     val ordersProcessedPath=hdfsPath+"data/train/common/processed/orders"
+    val mediasProcessedPath=hdfsPath+"data/train/common/processed/mediastemp"
     val now=args(0)+" "+args(1)
     System.setProperty("hadoop.home.dir", "c:\\winutils")
     Logger.getLogger("org").setLevel(Level.ERROR)
@@ -29,14 +31,16 @@ object UserOrderAndPlayHistory {
       .getOrCreate()
 
 
-    //val medias = spark.read.format("parquet").load(medias_path)
-    val plays = getPlays(playsProcessedPath,spark)
-    val orders = getOrders(ordersProcessedPath,spark)
+
+    val plays = getProcessedPlays(spark,playsProcessedPath)
+    val orders = getProcessedOrders(spark,ordersProcessedPath)
+    val medias=getProcessedMedias(spark,mediasProcessedPath)
+
     printDf("输入 plays",plays)
     printDf("输入 orders",orders)
 
     val orderList=getUserOrdersList(orders,now)
-    val playList=getUserPlaysList(plays,now)
+    val playList=getUserPlaysList(plays,now,medias)
     printDf("输出 orderList",orderList)
     printDf("输出 playList",playList)
     val orderListSavePath=hdfsPath+"data/train/common/processed/orderList"+args(0)
@@ -56,27 +60,36 @@ object UserOrderAndPlayHistory {
   def getPlays(playsProcessedPath:String,spark:SparkSession)={
     spark.read.format("parquet").load(playsProcessedPath)
   }
-  def getUserPlaysList(plays:DataFrame,now:String)={
+  def getUserPlaysList(plays:DataFrame,now:String,medias:DataFrame)={
     //选取最近一周的观看历史
-    print(calDate(now,-7))
-    val playsSelect=plays.filter(
+   // print(calDate(now,-7))
+   val joinKeysVideoId=Seq(Dic.colVideoId)
+    var playsList=plays.join(medias.select(col(Dic.colVideoId),
+      col(Dic.colVideoOneLevelClassification),col(Dic.colIsPaid)),joinKeysVideoId,"inner")
+    val playsSelect=playsList.filter(
       col(Dic.colPlayEndTime).<(now)
       && col(Dic.colPlayEndTime).>(calDate(now,-7))
-    ).withColumn("row_number",
-      row_number().over(Window.partitionBy(Dic.colUserId).orderBy(col(Dic.colPlayEndTime).desc,col(Dic.colBroadcastTime).desc)))
-    playsSelect.show()
-    //平均每个用户每周会看13个视频
-    playsSelect.groupBy(col(Dic.colUserId)).agg(collect_list(col(Dic.colVideoId)).as("play_list"))
+        && col(Dic.colBroadcastTime).>(360)
+        && (col(Dic.colIsPaid).===(1) || col(Dic.colVideoOneLevelClassification).===("电影"))
+    ).groupBy(col(Dic.colUserId))
+      .agg(udfSortByPlayTime(collect_list(struct(col(Dic.colVideoId),col(Dic.colPlayEndTime)))).as("play_list"))
+      .select(col(Dic.colUserId),col("play_list"))
+
+    //平均每个用户每周会看个视频
+    playsSelect
   }
   def getUserOrdersList(orders:DataFrame,now:String)={
 
     val orderSinglePoint=orders.filter(
       col(Dic.colOrderStartTime).<(now)
-      && col(Dic.colOrderStatus).>(1)
+     // && col(Dic.colOrderStatus).>(1)  是否要考虑未支付订单的作用
       && col(Dic.colResourceType).===(0)
     )
   //orderSinglePoint.withColumn("row_number",row_number().over(Window.partitionBy(Dic.colUserId).orderBy(col(Dic.colCreationTime).desc))).show()
-    orderSinglePoint.groupBy(col(Dic.colUserId)).agg(collect_list(col(Dic.colResourceId)).as("order_list"))
+    orderSinglePoint
+      .groupBy(col(Dic.colUserId))
+      .agg(udfSortByPlayTime(collect_list(struct(col(Dic.colResourceId),col(Dic.colCreationTime)))).as("order_list"))
+      .select(col(Dic.colUserId),col("order_list"))
 
 
   }

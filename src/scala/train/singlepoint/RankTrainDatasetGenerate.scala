@@ -5,7 +5,7 @@ import mam.Utils
 import mam.Utils.{calDate, printDf, udfAddOrderStatus}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
-import org.apache.spark.sql.{SaveMode, SparkSession}
+import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -17,14 +17,14 @@ object RankTrainDatasetGenerate {
 
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("RankTrainDatasetGenerate")
-      .master("local[6]")
+      //.master("local[6]")
       .config("spark.sql.crossJoin.enabled","true")  //spark2.x默认不能进行笛卡尔积的操作需要进行设置
       .getOrCreate()
     import spark.implicits._
     import org.apache.spark.sql.functions._
 
-    //val hdfsPath="hdfs:///pay_predict/"
-    val hdfsPath=""
+    val hdfsPath="hdfs:///pay_predict/"
+    //val hdfsPath=""
     val ordersProcessedPath=hdfsPath+"data/train/common/processed/orders"
     val orders=spark.read.format("parquet").load(ordersProcessedPath)
 
@@ -82,7 +82,7 @@ object RankTrainDatasetGenerate {
     //第一部分的负样本
     val temp=dataset1.select(col(Dic.colUserId),col(Dic.colVideoId))
     //设置负样本中选择多少个video作为负样本中的video
-    val negativeN=10
+    val negativeN=20
     val popularVideo=temp.groupBy(col(Dic.colVideoId))
       .agg(countDistinct(col(Dic.colUserId)).as("count"))
       .orderBy(col("count").desc)
@@ -98,7 +98,8 @@ object RankTrainDatasetGenerate {
 
     //第二部分的负样本
     //开始构造第三部分的样本,用户选自没有在订单中出现过的用户
-    val negativeUserN=10*temp.select(col(Dic.colUserId)).distinct().count()
+    val negativeSample=10
+    val negativeUserN=negativeSample*temp.select(col(Dic.colUserId)).distinct().count()
     val negativeUsers=userProfile.select(col(Dic.colUserId)).except(temp.select(col(Dic.colUserId))).limit(negativeUserN.toInt)
     //val negativeVideos=temp.select(col(Dic.colVideoId)).distinct()
     var dataset3=negativeUsers.crossJoin(popularVideo)//.sample(false,1/negativeVideos.count())
@@ -108,7 +109,7 @@ object RankTrainDatasetGenerate {
     dataset3=dataset3.join(userProfile,joinKeysUserId,"inner")
     dataset3=dataset3.join(videoProfile,joinKeysVideoId,"inner")
     //dataset3.show()
-    var result=dataset1.union(dataset2)//.union(dataset3)
+    var result=dataset1.union(dataset2).union(dataset3)
 
     result=result.join(videoVector,joinKeysVideoId,"left")
 
@@ -372,22 +373,34 @@ object RankTrainDatasetGenerate {
     //result.show()
     println("总样本的条数"+result.count())
 
+
+    val orderListSavePath=hdfsPath+"data/train/common/processed/orderList"+args(0)
+    val playListSavePath=hdfsPath+"data/train/common/processed/playList"+args(0)
+
+//    var userAndVideos=result.select(col(Dic.colUserId),col(Dic.colVideoId))
+//    var usersHistory=historyToVector(spark,userAndVideos,videoVector,orderListSavePath,playListSavePath)
+//    printDf("输出  userHistory",usersHistory)
+
     printDf("输出  rankTrainData",result)
 
     val resultSavePath=hdfsPath+"data/train/singlepoint/ranktraindata"
-    //result.write.mode(SaveMode.Overwrite).format("parquet").save(resultSavePath+args(0)+"-"+args(2))
+    result.write.mode(SaveMode.Overwrite).format("parquet").save(resultSavePath+args(0)+"-"+args(2))
     //val csvData=spark.read.format("parquet").load(resultSavePath+args(0)+"-"+args(2))
     //csvData.write.mode(SaveMode.Overwrite).option("header","true").csv(resultSavePath+args(0)+"-"+args(2)+".csv")
     //result.write.mode(SaveMode.Overwrite).format("tfrecords").option("recordType", "Example").save(resultSavePath+args(0)+"-"+args(2)+".tfrecords")
 
 
 
-
-
-
-
-
-
+  }
+  def historyToVector(spark:SparkSession,userAndVideos:DataFrame,videoVector:DataFrame,orderListSavePath:String,playListSavePath:String)={
+    val orderList=spark.read.format("parquet").load(orderListSavePath)
+    val playList=spark.read.format("parquet").load(playListSavePath)
+    val joinKeysUserId=Dic.colUserId
+    val joinKeysVideoId=Dic.colVideoId
+    var usersHistory=userAndVideos.join(orderList,Seq(Dic.colUserId),"left")
+      .join(playList,Seq(Dic.colVideoId),"left")
+      .join(videoVector,Seq(Dic.colVideoId),"left")
+    usersHistory
 
 
 

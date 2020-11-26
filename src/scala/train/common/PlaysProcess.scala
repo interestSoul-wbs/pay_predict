@@ -1,6 +1,7 @@
 package train.common
 
 import mam.Dic
+import mam.GetSaveData.getRawPlays
 import mam.Utils.{printDf, udfAddSuffix}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
@@ -21,9 +22,9 @@ object PlaysProcess {
 
     val hdfsPath="hdfs:///pay_predict/"
     //val hdfsPath=""
-    val playRawPath=hdfsPath+"data/train/common/raw/plays/behavior_*.txt"
+    val playRawPath=hdfsPath+"data/train/common/raw/plays/*"
     val playProcessedPath=hdfsPath+"data/train/common/processed/plays"
-    val playRaw=getRawPlays(playRawPath,spark)
+    val playRaw=getRawPlays(spark,playRawPath)
 
     printDf("输入 playRaw",playRaw)
 
@@ -35,23 +36,7 @@ object PlaysProcess {
     playsProcessed.write.mode(SaveMode.Overwrite).format("parquet").save(playProcessedPath)
      println("播放数据处理完成！")
   }
-  def getRawPlays(playRawPath:String,spark:SparkSession)={
-    val schema = StructType(
-      List(
-        StructField(Dic.colUserId, StringType),
-        StructField(Dic.colPlayEndTime, StringType),
-        StructField(Dic.colVideoId, StringType),
-        StructField(Dic.colBroadcastTime, FloatType)
-      )
-    )
-    val df = spark.read
-      .option("delimiter", "\t")
-      .option("header", false)
-      .schema(schema)
-      .csv(playRawPath)
-    df
 
-  }
   def playsProcess(playRaw:DataFrame)={
     var playProcessed=playRaw
       .withColumn(Dic.colPlayEndTime,substring(col(Dic.colPlayEndTime),0,10))
@@ -63,7 +48,8 @@ object PlaysProcess {
       .filter(col(Dic.colBroadcastTime)<time_max_limit && col(Dic.colBroadcastTime)>time_min_limit )
       .orderBy(col(Dic.colUserId),col(Dic.colPlayEndTime))
       .withColumn(Dic.colPlayEndTime,udfAddSuffix(col(Dic.colPlayEndTime)))
-    playProcessed
+    //去空去重
+    playProcessed.na.drop().dropDuplicates()
 
   }
 

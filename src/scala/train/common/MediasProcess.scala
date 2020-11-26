@@ -8,6 +8,7 @@ import java.io.{File, PrintWriter}
 import java.text.SimpleDateFormat
 
 import mam.Dic
+import mam.GetSaveData.getRawMedias
 import mam.Utils.{printArray, printDf, udfLongToTimestamp, udfLongToTimestampV2}
 import org.apache.log4j.{Level, Logger}
 import org.apache.parquet.schema.Types.ListBuilder
@@ -37,7 +38,7 @@ object MediasProcess {
 
     val hdfsPath="hdfs:///pay_predict/"
     //val hdfsPath=""
-    val mediasRawPath=hdfsPath+"data/train/common/raw/medias/medias.txt"
+    val mediasRawPath=hdfsPath+"data/train/common/raw/medias/*"
     val mediasProcessedPath=hdfsPath+"data/train/common/processed/mediastemp"
     val videoFirstCategoryTempPath=hdfsPath+"data/train/common/processed/videofirstcategorytemp.txt"
     val videoSecondCategoryTempPath=hdfsPath+"data/train/common/processed/videosecondcategorytemp.txt"
@@ -68,46 +69,6 @@ object MediasProcess {
   }
 
 
-  def getRawMedias(spark:SparkSession,rawMediasPath:String)={
-    /**
-    *@author wj
-    *@param [spark, rawMediasPath]
-    *@return org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
-    *@description  读取原始文件
-    */
-    val schema= StructType(
-      List(
-        StructField(Dic.colVideoId, StringType),
-        StructField(Dic.colVideoTitle, StringType),
-        StructField(Dic.colVideoOneLevelClassification, StringType),
-        StructField(Dic.colVideoTwoLevelClassificationList, StringType),
-        StructField(Dic.colVideoTagList, StringType),
-        StructField(Dic.colDirectorList, StringType),
-        StructField(Dic.colActorList, StringType),
-        StructField(Dic.colCountry, StringType),
-        StructField(Dic.colLanguage, StringType),
-        StructField(Dic.colReleaseDate, StringType),
-        StructField(Dic.colStorageTime, StringType),
-        //视频时长
-        StructField(Dic.colVideoTime, StringType),
-        StructField(Dic.colScore, StringType),
-        StructField(Dic.colIsPaid, StringType),
-        StructField(Dic.colPackageId, StringType),
-        StructField(Dic.colIsSingle, StringType),
-        //是否片花
-        StructField(Dic.colIsTrailers, StringType),
-        StructField(Dic.colSupplier, StringType),
-        StructField(Dic.colIntroduction, StringType)
-      )
-    )
-    val dfRawMedias = spark.read
-      .option("delimiter", "\t")
-      .option("header", false)
-      .schema(schema)
-      .csv(rawMediasPath)
-
-    dfRawMedias
-  }
 
 
   def mediasProcess(rawMediasData:DataFrame)={
@@ -129,16 +90,16 @@ object MediasProcess {
       when(col(Dic.colLanguage)==="NULL",null).otherwise(col(Dic.colLanguage)).as(Dic.colLanguage),
       when(col(Dic.colReleaseDate)==="NULL",null).otherwise(col(Dic.colReleaseDate) ).as(Dic.colReleaseDate),
       when(col(Dic.colStorageTime)==="NULL",null).otherwise(udfLongToTimestampV2(col(Dic.colStorageTime ))).as(Dic.colStorageTime),
-      when(col(Dic.colVideoTime)==="NULL",Double.NaN).otherwise(col(Dic.colVideoTime) cast DoubleType).as(Dic.colVideoTime),
-      when(col(Dic.colScore)==="NULL",Double.NaN).otherwise(col(Dic.colScore) cast DoubleType).as(Dic.colScore),
-      when(col(Dic.colIsPaid)==="NULL",Double.NaN).otherwise(col(Dic.colIsPaid) cast DoubleType).as(Dic.colIsPaid),
+      when(col(Dic.colVideoTime)==="NULL",null).otherwise(col(Dic.colVideoTime) cast DoubleType).as(Dic.colVideoTime),
+      when(col(Dic.colScore)==="NULL",null).otherwise(col(Dic.colScore) cast DoubleType).as(Dic.colScore),
+      when(col(Dic.colIsPaid)==="NULL",null).otherwise(col(Dic.colIsPaid) cast DoubleType).as(Dic.colIsPaid),
       when(col(Dic.colPackageId)==="NULL",null).otherwise(col(Dic.colPackageId)).as(Dic.colPackageId),
-      when(col(Dic.colIsSingle)==="NULL",Double.NaN).otherwise(col(Dic.colIsSingle) cast DoubleType).as(Dic.colIsSingle),
-      when(col(Dic.colIsTrailers)==="NULL",Double.NaN).otherwise(col(Dic.colIsTrailers) cast DoubleType).as(Dic.colIsTrailers),
+      when(col(Dic.colIsSingle)==="NULL",null).otherwise(col(Dic.colIsSingle) cast DoubleType).as(Dic.colIsSingle),
+      when(col(Dic.colIsTrailers)==="NULL",null).otherwise(col(Dic.colIsTrailers) cast DoubleType).as(Dic.colIsTrailers),
       when(col(Dic.colSupplier)==="NULL",null).otherwise(col(Dic.colSupplier)).as(Dic.colSupplier),
       when(col(Dic.colIntroduction)==="NULL",null).otherwise(col(Dic.colIntroduction)).as(Dic.colIntroduction)
     )
-    dfModifiedFormat
+    dfModifiedFormat.dropDuplicates().na.drop("all")
 
   }
 
