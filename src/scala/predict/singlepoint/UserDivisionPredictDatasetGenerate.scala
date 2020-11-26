@@ -47,7 +47,8 @@ object UserDivisionPredictDatasetGenerate {
       .join(df_user_profile_order_part, joinKeysUserId, "left")
 
     printDf("df_user_profile", df_user_profile)
-
+    //将全部用户作为预测的样本，这时候标签是未知的，所以不用构造样本
+ /**
     val predictWindowStart = fifteenDaysAgo
 
     val predictWindowEnd = oneDayAgo
@@ -95,15 +96,20 @@ object UserDivisionPredictDatasetGenerate {
     //将正负样本组合在一起并shuffle
     val df_all_users = df_user_paid_with_label.union(df_neg_users_with_label).sample(fraction = 1.0)
     println("总样本的条数为：" + df_all_users.count())
-
+    **/
+    
+    //过滤掉偏好
+    val seqColList = getFilteredColList(df_user_profile)
+    val df_all_users=df_user_profile.select(seqColList.map(df_user_profile.col(_)): _*)
     printDf("df_all_users", df_all_users)
-
+    
+    
     val df_all_users_not_null = df_all_users
       .na.fill(30, Seq(Dic.colDaysSinceLastPurchasePackage, Dic.colDaysSinceLastClickPackage,
       Dic.colDaysFromLastActive, Dic.colDaysSinceFirstActiveInTimewindow))
       .na.fill(0)
       .na.drop()
-
+   
     printDf("df_all_users_not_null", df_all_users_not_null)
 
     saveSinglepointUserDivisionData(spark, df_all_users_not_null, partitiondate, license, "valid")
