@@ -280,5 +280,6 @@ object Dic {
   val colFeatures: String = "features"
   val colScaledFeatures: String = "scaled_features"
   val colKeepOriginalFeatures: String = "keep_original_features"
+  val colTmp: String = "tmp"
 
 }

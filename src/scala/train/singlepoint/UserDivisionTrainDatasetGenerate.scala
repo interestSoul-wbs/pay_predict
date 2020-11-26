@@ -111,7 +111,6 @@ object UserDivisionTrainDatasetGenerate {
 
     println("df_all_users_not_null count: ", df_all_users_not_null.count())
 
-
     // MinMaxScaler
     val exclude_cols = Array(Dic.colUserId)
 
@@ -119,6 +118,6 @@ object UserDivisionTrainDatasetGenerate {
 
     printDf("df_result", df_result)
 
-    saveSinglepointUserDivisionData(spark, df_all_users_not_null, partitiondate, license, "train")
+    saveSinglepointUserDivisionData(spark, df_result, partitiondate, license, "train")
   }
 }

@@ -69,8 +69,10 @@ object RankTrainDatasetGenerate {
           && col(Dic.colCreationTime).>=(predictWindowStart)
           && col(Dic.colCreationTime).<=(predictWindowEnd)
           && col(Dic.colOrderStatus).>(1))
-      .select(col(Dic.colUserId), col(Dic.colResourceId), col(Dic.colOrderStatus))
-      .withColumnRenamed(Dic.colResourceId, Dic.colVideoId)
+      .select(
+        col(Dic.colUserId),
+        col(Dic.colResourceId).as(Dic.colVideoId),
+        udfConvertLabel(col(Dic.colOrderStatus)).as(Dic.colOrderStatus))
 
     printDf("df_order_single_point", df_order_single_point)
 
@@ -154,7 +156,7 @@ object RankTrainDatasetGenerate {
 
     println("总样本的条数" + df_result.count())
 
-    printDf("df_result", df_result)
+//    printDf("df_result", df_result)
 
     saveSinglepointRankData(spark, df_result, partitiondate, license, "train")
   }
@@ -171,4 +173,18 @@ object RankTrainDatasetGenerate {
     w2vColList.toArray
   }
 
+  def udfConvertLabel = udf(convertLabel _)
+
+  def convertLabel(input_value: Double) = {
+
+    var result = 0.0
+
+    if (input_value > 1) {
+      result = 1.0
+    } else {
+      result = 0.0
+    }
+
+    result
+  }
 }
