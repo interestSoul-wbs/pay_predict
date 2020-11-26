@@ -60,7 +60,6 @@ object RankPredictDatasetGenerate {
 
     printDf("df_user_profile", df_user_profile)
 
-
     //在order订单中选出正样本
     val df_order_single_point = df_orders
       .filter(
@@ -68,8 +67,10 @@ object RankPredictDatasetGenerate {
           && col(Dic.colCreationTime).>=(predictWindowStart)
           && col(Dic.colCreationTime).<=(predictWindowEnd)
           && col(Dic.colOrderStatus).>(1))
-      .select(col(Dic.colUserId), col(Dic.colResourceId), col(Dic.colOrderStatus))
-      .withColumnRenamed(Dic.colResourceId, Dic.colVideoId)
+      .select(
+        col(Dic.colUserId),
+        col(Dic.colResourceId).as(Dic.colVideoId),
+        col(Dic.colOrderStatus))
 
     printDf("df_order_single_point", df_order_single_point)
 
