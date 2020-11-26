@@ -145,5 +145,4 @@ object RankPredictDatasetGenerate {
 
     saveSinglepointRankData(spark, df_result, partitiondate, license, "valid")
   }
-
 }
