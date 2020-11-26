@@ -59,7 +59,62 @@ object RankPredictDatasetGenerate {
       .join(df_user_profile_order_part, joinKeysUserId, "left")
 
     printDf("df_user_profile", df_user_profile)
+    
+    //这一部分是用户划分模型通过预测得到的结果，主要是一份用户清单，表示会购买单点视频的用户，需要改写一下
+    val userDivisionResultPath=hdfsPath+"data/predict/singlepoint/userdivisionresult"+args(0)+"-"+args(2)
+    val userDivisionResult=spark.read.format("parquet").load(userDivisionResultPath)
+    
+    
+    //由于内存的限制，设置预测的单点视频的数量，如果内存足够大可以将单点视频的数量设置为媒资中所有单点视频的数量
+    val selectN=20
+    var selectSinglePoint=orders.filter(
+      col(Dic.colResourceType).===(0)
+      && col(Dic.colCreationTime).<(args(0))
+      && col(Dic.colOrderStatus).>(1)
+    ).groupBy(col(Dic.colResourceId))
+      .agg(count(col(Dic.colUserId)).as("count"))
+      .orderBy(col("count").desc)
+      .limit(selectN)
+      .select(col(Dic.colResourceId))
+      .withColumnRenamed(Dic.colResourceId,Dic.colVideoId)
+    var selectVideos=selectSinglePoint.join(videoProfile,joinKeysVideoId,"inner")
 
+
+    var selectUsers=userDivisionResult.select(col(Dic.colUserId)).join(userProfile,joinKeysUserId,"inner")
+    println("预测的用户的数量："+selectUsers.count())
+    var result=selectUsers.crossJoin(selectVideos)
+    result=result.join(videoVector,joinKeysVideoId,"left")
+    println("预测的数据的条数："+result.count())
+
+
+
+    val colTypeList=result.dtypes.toList
+    val colList=ArrayBuffer[String]()
+    colList.append(Dic.colUserId)
+    colList.append(Dic.colVideoId)
+    for(elem<- colTypeList){
+      if(elem._2.equals("IntegerType") || elem._2.equals("DoubleType") || elem._2.equals("LongType")){
+        colList.append(elem._1)
+      }
+    }
+    colList-=Dic.colIsSingle
+    colList-=Dic.colIsTrailers
+    colList-=Dic.colIsPaid
+   
+    val seqColList=colList.toSeq
+    val df_result=result.select(seqColList.map(result.col(_)):_*)
+      .na.fill(30,List(Dic.colDaysSinceLastPurchasePackage,Dic.colDaysSinceLastClickPackage,
+      Dic.colDaysFromLastActive,Dic.colDaysSinceFirstActiveInTimewindow,Dic.colAbsOfNumberOfDaysBetweenStorageAndCurrent))
+      .na.fill(0)
+      .na.drop()
+    //result.show()
+    println("总样本的条数"+result.count())
+
+    
+    
+    
+    
+     /*
     //在order订单中选出正样本
     val df_order_single_point = df_orders
       .filter(
@@ -140,6 +195,7 @@ object RankPredictDatasetGenerate {
       .na.fill(0)
 
     println("总样本的条数" + df_result.count())
+    */
 
     printDf("df_result", df_result)
 
