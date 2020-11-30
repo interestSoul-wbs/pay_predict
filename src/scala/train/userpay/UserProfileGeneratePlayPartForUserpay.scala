@@ -1,7 +1,7 @@
 package train.userpay
 
 import mam.Dic
-import mam.Utils.{calDate, printDf, udfGetDays}
+import mam.Utils.{calDate, getData, printDf, udfGetDays}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
 import org.apache.spark.sql.{SaveMode, SparkSession}
@@ -15,7 +15,7 @@ object UserProfileGeneratePlayPartForUserpay {
     Logger.getLogger("org").setLevel(Level.ERROR)
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("UserProfileGeneratePlayPartForUserpayTrain")
-      //.master("local[6]")
+      .master("local[6]")
       .getOrCreate()
 
     import org.apache.spark.sql.functions._
@@ -30,10 +30,14 @@ object UserProfileGeneratePlayPartForUserpay {
 
     //全部用户
     //    val userListPath = hdfsPath + "data/train/userpay/all_users"  //自己生成的 allUsers hisense提供的
+//
+//    val userListPath = hdfsPath + "data/train/userpay/allUsers/user_id.txt"
+//    var result = spark.read.format("csv").load(userListPath).toDF(Dic.colUserId)
+//    printDf("全部用户: ", result)
+    val allUsersSavePath = hdfsPath + "data/train/common/processed/userpay/all_users"
+    val df_allUsers = getData(spark, allUsersSavePath)
+    printDf("allUsers", df_allUsers)
 
-    val userListPath = hdfsPath + "data/train/userpay/allUsers/user_id.txt"
-    var result = spark.read.format("csv").load(userListPath).toDF(Dic.colUserId)
-    printDf("全部用户: ", result)
 
 
     val pre_30 = calDate(now, -30)
@@ -96,7 +100,7 @@ object UserProfileGeneratePlayPartForUserpay {
       .withColumn(Dic.colTotalTimeLast3Days, round(col(Dic.colTotalTimeLast3Days) / 60, 0))
 
     val joinKeysUserId = Seq(Dic.colUserId)
-    result = result.join(play_part_1, joinKeysUserId, "left")
+    var result = df_allUsers.join(play_part_1, joinKeysUserId, "left")
       .join(play_part_2, joinKeysUserId, "left")
       .join(play_part_3, joinKeysUserId, "left")
       .join(play_part_4, joinKeysUserId, "left")
@@ -315,11 +319,11 @@ object UserProfileGeneratePlayPartForUserpay {
 
 
   def main(args: Array[String]): Unit = {
-    val hdfsPath = "hdfs:///pay_predict/"
-    //val hdfsPath=""
+//    val hdfsPath = "hdfs:///pay_predict/"
+    val hdfsPath=""
     val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
     val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3" //userpay
-    val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders" //userpay
+    val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders3" //userpay
 
 
     val now = args(0) + " " + args(1)

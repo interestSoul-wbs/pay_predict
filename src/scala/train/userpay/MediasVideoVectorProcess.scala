@@ -1,194 +1,228 @@
 package train.userpay
 
 import mam.Dic
-import mam.Utils.{printArray, printDf, udfBreak, udfConcatLabels, udfGetDays, udfLongToTimestamp, udfLongToTimestampV2}
+import mam.Utils.{getData, printDf, saveProcessedData, udfBreak}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.{SparkConf, SparkContext, sql}
-import org.apache.spark.sql.types._
-import org.apache.spark.sql.{Column, DataFrame, SaveMode, SparkSession}
-import org.apache.spark.ml.feature.{Imputer, Word2Vec}
-import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.functions._
-import train.common.MediasProcess.{getArrayStrColLabelAndSave, getSingleStrColLabelAndSave}
+import org.apache.spark.ml.feature.Word2Vec
+import org.apache.spark.sql
+import org.apache.spark.sql.functions.{col, collect_list, explode, lit, when}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
-import scala.collection.JavaConversions.asJavaCollection
-import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
 
 /**
  * @author wx
  * @param
  * @return
- * @describe  medias 中 video vector生成
+ * @describe medias 中 video vector生成
  */
 object MediasVideoVectorProcess {
 
 
   def main(args: Array[String]): Unit = {
-    System.setProperty("hadoop.home.dir","c:\\winutils")
+    System.setProperty("hadoop.home.dir", "c:\\winutils")
     Logger.getLogger("org").setLevel(Level.ERROR)
     val spark: SparkSession = new sql.SparkSession.Builder()
-      .master("local[4]")
-      .appName("MediasVideoVectorProcess")
+//      .master("local[4]")
+      .appName("MediasVideoLabelsVectorProcess")
       .getOrCreate()
 
-    //val now = args(0)+" "+args(1)
-    val now = "2020-04-23 00:00:00"
-
-    //val hdfsPath = "hdfs:///pay_predict/"
-    val hdfsPath = ""
-
-    //val mediasProcessedPath = hdfsPath + "data/predict/common/processed/mediastemp" //HDFS路径
-    val mediasProcessedPath = "data/train/common/raw/medias/medias.txt"
-
-    var mediasProcessed = getProcessedMedias(mediasProcessedPath, spark, now) // getData 放在HDFS
+    val hdfsPath = "hdfs:///pay_predict/"
+//    val hdfsPath = ""
+    val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp" //HDFS路径
+    val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3"
+    val mediasVectorSavePath = hdfsPath + "data/train/common/processed/userpay/mediasVector"
 
 
-    mediasProcessed = mediasProcess(mediasProcessed)  // !!!!!!!!!!!!!!!! 记得去掉
-    printDf("获取 medias", mediasProcessed)
+    var df_medias = getData(spark, mediasProcessedPath)
+    println("Get Medias data", df_medias.count())
+    val df_plays = getData(spark, playsProcessedPath)
+    println("Get play data", df_plays.count())
+
+    printDf("medias", df_medias)
+
+    // Medias further process about Labels
+    val df_mediasLabels = df_medias.dropDuplicates(Dic.colVideoId)
+      .na.drop("all")
+      // Deal with the NullPointerException
+      .na.fill(Map((Dic.colVideoOneLevelClassification, "其他")))
+      .withColumn(Dic.colVideoTwoLevelClassificationList,
+        when(col(Dic.colVideoTwoLevelClassificationList).isNotNull, col(Dic.colVideoTwoLevelClassificationList)).otherwise(Array("其他")))
+      .withColumn(Dic.colVideoTagList, when(col(Dic.colVideoTagList).isNotNull, col(Dic.colVideoTagList)).otherwise(Array("其他")))
+      .select(Dic.colVideoId, Dic.colVideoOneLevelClassification, Dic.colVideoTwoLevelClassificationList, Dic.colVideoTagList)
+
+    // 选择有play记录的video embedding
+    val df_playsVideoId = df_plays.select(Dic.colVideoId).distinct()
+    val df_mediasPlayed = df_mediasLabels.join(df_playsVideoId, Seq(Dic.colVideoId), "inner")
+    println("Medias' videos played by users: ", df_mediasPlayed.count())
 
 
-
-    //对标签进行合并
-
-    mediasProcessed = mediasProcessed.withColumn("labels", udfConcatLabels(col(Dic.colVideoOneLevelClassification), col(Dic.colVideoTwoLevelClassificationList), col(Dic.colVideoTagList)))
-
-    // 标签和其对应的vector
     val vectorDimension = 32
-    var labelVector = getVector(mediasProcessed, vectorDimension)
-    printDf("Label vector", labelVector)
 
-
-
-
-//    val videoVector = mediasProcessed.withColumn("video_vector", udfGetVideoVector(col(Dic.colLabels), labelVector))
-//    var labels = mediasProcessed.select(collect_list("labels"))
-//
-//    val mutableset = ArrayBuffer[String]()
-//    var nums: Map[String, Int] = Map()
-//
-//      labels.foreach(row=>{
-//      val rs = row.getList(0)  //只有一行
-//        println(rs)
-//      for (i <- 0 to rs.size() - 1) {
-//        val temp:mutable.WrappedArray[String] = rs.get(i)
-//        temp.foreach({ i =>
-//          nums += (i -> 1)
-//        })
-//      }
-//      })
-//
-//    println(nums.keys.size)
-
-}
-
-  def getProcessedMedias(mediasProcessedPath: String, spark: SparkSession, now: String): DataFrame = {
-
-    val mediaSchema = StructType(
-      List(
-        StructField(Dic.colVideoId, StringType),
-        StructField(Dic.colVideoTitle, StringType),
-        StructField(Dic.colVideoOneLevelClassification, StringType),
-        StructField(Dic.colVideoTwoLevelClassificationList, StringType),
-        StructField(Dic.colVideoTagList, StringType),
-        StructField(Dic.colDirectorList, StringType),
-        StructField(Dic.colActorList, StringType),
-        StructField(Dic.colCountry, StringType),
-        StructField(Dic.colLanguage, StringType),
-        StructField(Dic.colReleaseDate, StringType),
-        StructField(Dic.colStorageTime, StringType),
-        //视频时长
-        StructField(Dic.colVideoTime, StringType),
-        StructField(Dic.colScore, StringType),
-        StructField(Dic.colIsPaid, StringType),
-        StructField(Dic.colPackageId, StringType),
-        StructField(Dic.colIsSingle, StringType),
-        //是否片花
-        StructField(Dic.colIsTrailers, StringType),
-        StructField(Dic.colSupplier, StringType),
-        StructField(Dic.colIntroduction, StringType)
-        //StructField(Dic.colInPackage, IntegerType)
-
-      )
-    )
-
-    var medias = spark.read
-      .option("delimiter", "\t")
-      .option("header", false)
-      .schema(mediaSchema)
-      .csv(mediasProcessedPath)
-
-    //距今入库时间
-    medias = medias
-      .withColumn("now", lit(now))
-      .withColumn(Dic.colStorageTimeGap, udfGetDays(col(Dic.colStorageTime),col("now")))
-      .drop("now")
-
-    medias
-
-  }
-
-  def mediasProcess(rawMediasData:DataFrame)={
     /**
-     *@author wj
-     *@param [rawMediasData]
-     *@return org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
-     *@description  更改数据格式，主要将NULL字符串转化为null或者NaN
+     * Get vectors for level one
      */
-    var dfModifiedFormat = rawMediasData.select(
-      when(col(Dic.colVideoId)==="NULL",null).otherwise(col(Dic.colVideoId)).as(Dic.colVideoId),
-      when(col(Dic.colVideoTitle)==="NULL",null).otherwise(col(Dic.colVideoTitle)).as(Dic.colVideoTitle),
-      when(col(Dic.colVideoOneLevelClassification)==="NULL",null).otherwise(col(Dic.colVideoOneLevelClassification)).as(Dic.colVideoOneLevelClassification),
-      from_json(col(Dic.colVideoTwoLevelClassificationList), ArrayType(StringType, containsNull = true)).as(Dic.colVideoTwoLevelClassificationList),
-      from_json(col(Dic.colVideoTagList), ArrayType(StringType, containsNull = true)).as(Dic.colVideoTagList),
-      from_json(col(Dic.colDirectorList), ArrayType(StringType, containsNull = true)).as(Dic.colDirectorList),
-      from_json(col(Dic.colActorList), ArrayType(StringType, containsNull = true)).as(Dic.colActorList),
-      when(col(Dic.colCountry)==="NULL",null).otherwise(col(Dic.colCountry)).as(Dic.colCountry),
-      when(col(Dic.colLanguage)==="NULL",null).otherwise(col(Dic.colLanguage)).as(Dic.colLanguage),
-      when(col(Dic.colReleaseDate)==="NULL",null).otherwise(col(Dic.colReleaseDate) ).as(Dic.colReleaseDate),
-      when(col(Dic.colStorageTime)==="NULL",null).otherwise(udfLongToTimestampV2(col(Dic.colStorageTime ))).as(Dic.colStorageTime),
-      when(col(Dic.colVideoTime)==="NULL",null).otherwise(col(Dic.colVideoTime) cast DoubleType).as(Dic.colVideoTime),
-      when(col(Dic.colScore)==="NULL",null).otherwise(col(Dic.colScore) cast DoubleType).as(Dic.colScore),
-      when(col(Dic.colIsPaid)==="NULL",null).otherwise(col(Dic.colIsPaid) cast DoubleType).as(Dic.colIsPaid),
-      when(col(Dic.colPackageId)==="NULL",null).otherwise(col(Dic.colPackageId)).as(Dic.colPackageId),
-      when(col(Dic.colIsSingle)==="NULL",null).otherwise(col(Dic.colIsSingle) cast DoubleType).as(Dic.colIsSingle),
-      when(col(Dic.colIsTrailers)==="NULL",null).otherwise(col(Dic.colIsTrailers) cast DoubleType).as(Dic.colIsTrailers),
-      when(col(Dic.colSupplier)==="NULL",null).otherwise(col(Dic.colSupplier)).as(Dic.colSupplier),
-      when(col(Dic.colIntroduction)==="NULL",null).otherwise(col(Dic.colIntroduction)).as(Dic.colIntroduction)
-    )
+    val df_levelOneVector = getLevelOneVector(vectorDimension, df_mediasPlayed)
+    printDf("Level one classification vector", df_levelOneVector)
+
+    /**
+     * Get mean vectors for level two classification list
+     */
+    val df_levelTwoMeanVector = getMeanVector(vectorDimension, df_mediasPlayed, Dic.colVideoTwoLevelClassificationList)
+    printDf("Level two classification mean vector", df_levelTwoMeanVector)
 
 
-    //是否单点 是否付费填充
-    dfModifiedFormat = dfModifiedFormat.na.fill(Map((Dic.colIsSingle, 0),(Dic.colIsPaid, 0), (Dic.colIsTrailers, 0)))
-      .withColumn("video_hours", col(Dic.colVideoTime) / 60)
-      //添加新列 是否在套餐内
+    /**
+     * Get mean vectors for tags list
+     */
+
+    val df_tagsMeanVector = getMeanVector(vectorDimension, df_mediasPlayed, Dic.colVideoTagList)
+    printDf("Tags mean vector", df_tagsMeanVector)
+
+
+    /**
+     * Get video vector (vectorDimension is 37)
+     */
+
+    val df_videoVector = getVideoVector(vectorDimension, df_levelOneVector, df_levelTwoMeanVector, df_tagsMeanVector, df_mediasPlayed)
+    printDf("video all labels vector", df_videoVector)
+
+
+    /**
+     * Video Vector include video hours and score, is_paid, in_package, Labels word2vector
+     * storage_date_gap of train and predict time(add in TrainSet/PredictSet file)
+     */
+
+    df_medias = df_medias
+      .withColumn(Dic.colVideoHour, col(Dic.colVideoTime) / 3600)
       .withColumn(Dic.colInPackage, when(col(Dic.colPackageId).>(0), 1).otherwise(0))
+      .withColumn(Dic.colScore, col(Dic.colScore) / 10)
+      .na.fill(Map((Dic.colIsPaid, 0), (Dic.colInPackage, 0)))
+
+    // colVideoOneLevelClassification is used in file TrainSetProcess
+    val df_mediasPart = df_medias.select(Dic.colVideoId, Dic.colScore, Dic.colIsPaid, Dic.colInPackage, Dic.colVideoHour, Dic.colStorageTime, Dic.colVideoOneLevelClassification)
+
+    val df_mediasVecMultiCol = df_mediasPart.join(df_videoVector, Seq(Dic.colVideoId), "right")
+
+    printDf("Medias' Vector Multiple Columns", df_mediasVecMultiCol)
 
 
-    dfModifiedFormat
+    // Save data to HDFS
+    saveProcessedData(df_mediasVecMultiCol, mediasVectorSavePath)
+    println("Media's video vector saved !!! ")
 
   }
 
 
-  def getVector(df:DataFrame, vectorDimension:Int) ={
+  def getVector(df: DataFrame, vectorDimension: Int, colName: String) = {
     /**
-     *@author wj
-     *@param [playsList]
-     *@return org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
-     *@description  训练Word2vector模型，得到视频的嵌入向量
+     * @author wj
+     * @return org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
+     * @description 训练Word2vector模型，得到视频的嵌入向量
      */
-    //val windowSize = 10  //默认参数为5，这里尝试设置为10，在一定程度上，windowSize越大，训练越慢,但是向量表达更准确
+    val windowSize = 10 //默认参数为5，这里尝试设置为10，在一定程度上，windowSize越大，训练越慢,但是向量表达更准确
     val w2vModel = new Word2Vec()
-      .setInputCol("labels")
-      .setOutputCol("labels_vector")
+      .setInputCol(colName) //编码的列名
+      .setOutputCol("label_vector") //输出的对应向量
       .setVectorSize(vectorDimension)
       .setMinCount(0)
-      //.setWindowSize(windowSize)
+      .setWindowSize(windowSize)
+
+    printDf(colName + " getVector DataFrame", df)
+
     val model = w2vModel.fit(df)
 
-    //print("滑动窗口的大小："+w2vModel.getWindowSize)
-    //val result=model.transform(playsList)
     model.getVectors
   }
 
+
+  def getLevelOneVector(vectorDimension: Int, df_mediasPlayed: DataFrame) = {
+    /**
+     * @description: get vectors of video's colVideoOneLevelClassification
+     * @param: vectorDimension
+     * @param: df_mediasPlayed : medias videos played by users
+     * @return: org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
+     * @author: wx
+     * @Date: 2020/11/25
+     */
+
+    // In function getVector fit() need to br Array[String] type
+    val df_videoLevelOne = df_mediasPlayed
+      .groupBy(col(Dic.colVideoId))
+      .agg(collect_list(col(Dic.colVideoOneLevelClassification)).as(Dic.colVideoOneLevelClassification + "_list"))
+
+    val df_labelVector_1 = getVector(df_videoLevelOne, vectorDimension, Dic.colVideoOneLevelClassification + "_list")
+      .withColumnRenamed("word", Dic.colVideoOneLevelClassification)
+    printDf("get level one vector", df_labelVector_1)
+
+    //medias dataframe join with level one vector
+    var df_levelOneBreak = df_mediasPlayed.join(df_labelVector_1, Seq(Dic.colVideoOneLevelClassification), "inner")
+      .select(Dic.colVideoId, "vector")
+
+    //拆分
+    for (i <- 0 to vectorDimension - 1) {
+      df_levelOneBreak = df_levelOneBreak.withColumn("v_" + i, udfBreak(col("vector"), lit(i)))
+    }
+
+
+    df_levelOneBreak.drop("vector")
+  }
+
+
+  def getMeanVector(vectorDimension: Int, df_mediasPlayed: DataFrame, colName: String) = {
+    /**
+     * @description: get mean vector of colVideoTwoLevelClassification labels and colVideoTagList labels
+     * @param: vectorDimension
+     * @param: df_mediasPlayed:  medias video played by users
+     * @param: colName : colVideoTwoLevelClassification, colVideoTagList
+     * @return: org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
+     * @author: wx
+     * @Date: 2020/11/25
+     */
+
+    val df_videoListExplode = df_mediasPlayed.select(df_mediasPlayed(Dic.colVideoId),
+      explode(df_mediasPlayed(colName))).toDF(Dic.colVideoId, "word")
+
+    val df_mediaPart = df_mediasPlayed.select(Dic.colVideoId, colName)
+
+    val df_labelVector = getVector(df_mediaPart, vectorDimension, colName)
+
+    var df_videoIdWithVector = df_videoListExplode.join(df_labelVector, Seq("word"))
+      .drop("word")
+
+    //拆分
+    for (i <- 0 to vectorDimension - 1) {
+      df_videoIdWithVector = df_videoIdWithVector.withColumn("v_" + i, udfBreak(col("vector"), lit(i)))
+    }
+
+    df_videoIdWithVector.groupBy(Dic.colVideoId).mean()
+
+  }
+
+  def getVideoVector(vectorDimension: Int, df_levelOneVector: DataFrame, df_levelTwoMeanVector: DataFrame, df_tagsMeanVector: DataFrame, df_mediasPlayed: DataFrame) = {
+    /**
+     * @description: Union video's level one vector, level two vector and tags vector, get mean vector to be the result
+     * @param: df_levelOneVector
+     * @param: df_levelTwoMeanVector
+     * @param: df_tagsMeanVector
+     * @param: df_mediasPlayed : medias videos played by users
+     * @return: org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
+     * @author: wx
+     * @Date: 2020/11/25
+     */
+
+    var df_videoLabelsVector = df_levelOneVector.union(df_levelTwoMeanVector).union(df_tagsMeanVector).groupBy(Dic.colVideoId).mean()
+
+
+    for (i <- 0 to vectorDimension - 1) {
+      df_videoLabelsVector = df_videoLabelsVector.withColumnRenamed("avg(v_" + i + ")", "v_" + i)
+
+    }
+
+    //It's  multiple columns of vector, not assemble yet, cause we need to process further in file TrainSetProcess
+    df_videoLabelsVector
+  }
+
+
 }
+
+

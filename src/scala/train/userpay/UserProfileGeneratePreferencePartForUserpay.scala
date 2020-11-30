@@ -1,7 +1,7 @@
 package train.userpay
 
 import mam.Dic
-import mam.Utils.{calDate, printDf, udfGetLabelAndCount, udfGetLabelAndCount2}
+import mam.Utils.{calDate, getData, printDf, udfGetLabelAndCount, udfGetLabelAndCount2}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
 import org.apache.spark.sql.{SaveMode, SparkSession}
@@ -13,7 +13,7 @@ object UserProfileGeneratePreferencePartForUserpay {
     Logger.getLogger("org").setLevel(Level.ERROR)
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("UserProfileGeneratePreferencePartForUserpayTrain")
-      //.master("local[6]")
+      .master("local[6]")
       .getOrCreate()
     //设置shuffle过程中分区数
     // spark.sqlContext.setConf("spark.sql.shuffle.partitions", "1000")
@@ -27,9 +27,12 @@ object UserProfileGeneratePreferencePartForUserpay {
     printDf("输入  plays", plays)
 
 
-    val userListPath = hdfsPath + "data/train/userpay/allUsers/user_id.txt"
-    var result = spark.read.format("csv").load(userListPath).toDF(Dic.colUserId)
-    printDf("全部用户: ", result)
+    //    val userListPath = hdfsPath + "data/train/userpay/allUsers/user_id.txt"
+    //    var result = spark.read.format("csv").load(userListPath).toDF(Dic.colUserId)
+    //    printDf("全部用户: ", result)
+    val allUsersSavePath = hdfsPath + "data/train/common/processed/userpay/all_users"
+    val df_allUsers = getData(spark, allUsersSavePath)
+    printDf("allUsers", df_allUsers)
 
 
     val pre_30 = calDate(now, -30)
@@ -100,7 +103,7 @@ object UserProfileGeneratePreferencePartForUserpay {
       )
       .withColumn(Dic.colTotalTimeMoviesLast1Days, round(col(Dic.colTotalTimeMoviesLast1Days) / 60, 0))
 
-    result = result.join(play_medias_part_41, joinKeysUserId, "left")
+    var result = df_allUsers.join(play_medias_part_41, joinKeysUserId, "left")
       .join(play_medias_part_42, joinKeysUserId, "left")
       .join(play_medias_part_43, joinKeysUserId, "left")
       .join(play_medias_part_44, joinKeysUserId, "left")
@@ -310,11 +313,11 @@ object UserProfileGeneratePreferencePartForUserpay {
 
 
   def main(args: Array[String]): Unit = {
-    val hdfsPath = "hdfs:///pay_predict/"
-    //val hdfsPath=""
+//    val hdfsPath = "hdfs:///pay_predict/"
+    val hdfsPath=""
     val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
     val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3" //userpay
-    val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders" //userpay
+    val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders3" //userpay
 
     val now = args(0) + " " + args(1)
     userProfileGeneratePreferencePart(now, 30, mediasProcessedPath, playsProcessedPath, ordersProcessedPath, hdfsPath)

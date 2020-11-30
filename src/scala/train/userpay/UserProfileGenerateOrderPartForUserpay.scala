@@ -1,7 +1,7 @@
 package train.userpay
 
 import mam.Dic
-import mam.Utils.{calDate, printDf, udfGetDays}
+import mam.Utils.{calDate, getData, printDf, udfGetDays}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
 import org.apache.spark.sql.functions._
@@ -14,7 +14,7 @@ object UserProfileGenerateOrderPartForUserpay {
     Logger.getLogger("org").setLevel(Level.ERROR)
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("UserProfileGenerateOrderPartForUserpayTrain")
-      //.master("local[6]")
+      .master("local[6]")
       .getOrCreate()
 
 
@@ -25,10 +25,14 @@ object UserProfileGenerateOrderPartForUserpay {
     printDf("输入 plays", plays)
     printDf("输入 orders", orders)
 
-    //全部用户
-    val userListPath = hdfsPath + "data/train/userpay/allUsers/user_id.txt"
-    var result = spark.read.format("csv").load(userListPath).toDF(Dic.colUserId)
-    printDf("全部用户: ", result)
+    //    //全部用户
+    //    val userListPath = hdfsPath + "data/train/userpay/allUsers/user_id.txt"
+    //    var result = spark.read.format("csv").load(userListPath).toDF(Dic.colUserId)
+    //    printDf("全部用户: ", result)
+
+    val allUsersSavePath = hdfsPath + "data/train/common/processed/userpay/all_users"
+    val df_allUsers = getData(spark, allUsersSavePath)
+    printDf("allUsers", df_allUsers)
 
 
     val pre_30 = calDate(now, -30)
@@ -191,7 +195,7 @@ object UserProfileGenerateOrderPartForUserpay {
       )
 
 
-    result = result.join(order_part_1, joinKeysUserId, "left")
+    var result = df_allUsers.join(order_part_1, joinKeysUserId, "left")
       .join(order_part_2, joinKeysUserId, "left")
       .join(order_part_3, joinKeysUserId, "left")
       .join(order_part_4, joinKeysUserId, "left")
@@ -215,12 +219,12 @@ object UserProfileGenerateOrderPartForUserpay {
 
 
   def main(args: Array[String]): Unit = {
-    val hdfsPath = "hdfs:///pay_predict/"
-    //val hdfsPath=""
-
+//    val hdfsPath = "hdfs:///pay_predict/"
+    val hdfsPath=""
+//
     val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
     val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3" //userpay
-    val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders" //userpay
+    val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders3" //userpay
 
 
     val now = args(0) + " " + args(1)
