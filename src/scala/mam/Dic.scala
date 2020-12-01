@@ -28,6 +28,8 @@ object Dic {
   val colSessionSign = "session_sign"
   val colConvertTime = "convert_time"
   val colCreationGap = "creation_gap"
+  val colPlayDate = "play_date"
+
   //还有一个video_id  colVideoId
 
   /**

@@ -4,9 +4,9 @@ import mam.Dic
 import mam.Utils.{calDate, getData, printDf, saveProcessedData, udfGetDays}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
-import org.apache.spark.sql.{SaveMode, SparkSession}
+import org.apache.spark.sql.{SparkSession}
 
-import scala.collection.mutable.ListBuffer
+
 
 object UserProfileGeneratePlayPartForUserpay {
 
@@ -22,22 +22,15 @@ object UserProfileGeneratePlayPartForUserpay {
 
     val df_medias = getData(spark, medias_path)
     val df_plays = getData(spark, plays_path)
+
+
     val df_trainUsers = getData(spark, trainUserPath)
     val df_trainId = df_trainUsers.select(Dic.colUserId)
 
     val df_trainUserPlays = df_plays.join(df_trainId, Seq(Dic.colUserId), "inner")
+      .withColumn(Dic.colPlayDate, col(Dic.colPlayStartTime).substr(1, 10))
 
-
-
-    //全部用户
-    //    val userListPath = hdfsPath + "data/train/userpay/all_users"  //自己生成的 allUsers hisense提供的
-    //
-    //    val userListPath = hdfsPath + "data/train/userpay/allUsers/user_id.txt"
-    //    var result = spark.read.format("csv").load(userListPath).toDF(Dic.colUserId)
-    //    printDf("全部用户: ", result)
-    //    val allUsersSavePath = hdfsPath + "data/train/common/processed/userpay/all_users"
-    //    val df_allUsers = getData(spark, allUsersSavePath)
-    //    printDf("allUsers", df_allUsers)
+    printDf("df_trainUserPlays", df_trainUserPlays)
 
 
     val pre_30 = calDate(now, -30)
@@ -45,9 +38,6 @@ object UserProfileGeneratePlayPartForUserpay {
     val pre_7 = calDate(now, -7)
     val pre_3 = calDate(now, -3)
     val pre_1 = calDate(now, -1)
-
-    //设置DataFrame列表
-    val dataFrameList = ListBuffer()
 
 
     /**
@@ -59,7 +49,7 @@ object UserProfileGeneratePlayPartForUserpay {
           && col(Dic.colPlayStartTime).>=(pre_30))
       .groupBy(col(Dic.colUserId))
       .agg(
-        countDistinct(col(Dic.colPlayStartTime)).as(Dic.colActiveDaysLast30Days),
+        countDistinct(col(Dic.colPlayDate)).as(Dic.colActiveDaysLast30Days),
         sum(col(Dic.colTimeSum)).as(Dic.colTotalTimeLast30Days),
         udfGetDays(max(col(Dic.colPlayStartTime)), lit(now)).as(Dic.colDaysFromLastActive),
         udfGetDays(min(col(Dic.colPlayStartTime)), lit(now)).as(Dic.colDaysSinceFirstActiveInTimewindow))
@@ -72,7 +62,7 @@ object UserProfileGeneratePlayPartForUserpay {
           && col(Dic.colPlayStartTime).>=(pre_14))
       .groupBy(col(Dic.colUserId))
       .agg(
-        countDistinct(col(Dic.colPlayStartTime)).as(Dic.colActiveDaysLast14Days),
+        countDistinct(col(Dic.colPlayDate)).as(Dic.colActiveDaysLast14Days),
         sum(col(Dic.colTimeSum)).as(Dic.colTotalTimeLast14Days)
       ).withColumn(Dic.colTotalTimeLast14Days, round(col(Dic.colTotalTimeLast14Days) / 60, 0))
 
@@ -83,7 +73,7 @@ object UserProfileGeneratePlayPartForUserpay {
           && col(Dic.colPlayStartTime).>=(pre_7))
       .groupBy(col(Dic.colUserId))
       .agg(
-        countDistinct(col(Dic.colPlayStartTime)).as(Dic.colActiveDaysLast7Days),
+        countDistinct(col(Dic.colPlayDate)).as(Dic.colActiveDaysLast7Days),
         sum(col(Dic.colTimeSum)).as(Dic.colTotalTimeLast7Days)
       )
       .withColumn(Dic.colTotalTimeLast7Days, round(col(Dic.colTotalTimeLast7Days) / 60, 0))
@@ -94,7 +84,7 @@ object UserProfileGeneratePlayPartForUserpay {
           && col(Dic.colPlayStartTime).>=(pre_3))
       .groupBy(col(Dic.colUserId))
       .agg(
-        countDistinct(col(Dic.colPlayStartTime)).as(Dic.colActiveDaysLast3Days),
+        countDistinct(col(Dic.colPlayDate)).as(Dic.colActiveDaysLast3Days),
         sum(col(Dic.colTimeSum)).as(Dic.colTotalTimeLast3Days)
       )
       .withColumn(Dic.colTotalTimeLast3Days, round(col(Dic.colTotalTimeLast3Days) / 60, 0))
