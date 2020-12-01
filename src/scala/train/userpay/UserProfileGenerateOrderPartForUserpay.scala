@@ -1,7 +1,7 @@
 package train.userpay
 
 import mam.Dic
-import mam.Utils.{calDate, getData, printDf, udfGetDays}
+import mam.Utils.{calDate, getData, printDf, saveProcessedData, udfGetDays}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
 import org.apache.spark.sql.functions._
@@ -9,7 +9,7 @@ import org.apache.spark.sql.{SaveMode, SparkSession}
 
 object UserProfileGenerateOrderPartForUserpay {
 
-  def userProfileGenerateOrderPart(now: String, timeWindow: Int, medias_path: String, plays_path: String, orders_path: String, hdfsPath: String): Unit = {
+  def userProfileGenerateOrderPart(now: String, timeWindow: Int, medias_path: String, plays_path: String, orders_path: String, trainUserPath: String, hdfsPath: String): Unit = {
     System.setProperty("hadoop.home.dir", "c:\\winutils")
     Logger.getLogger("org").setLevel(Level.ERROR)
     val spark: SparkSession = new sql.SparkSession.Builder()
@@ -19,20 +19,10 @@ object UserProfileGenerateOrderPartForUserpay {
 
 
     //val medias = spark.read.format("parquet").load(medias_path)
-    val plays = spark.read.format("parquet").load(plays_path)
-    val orders = spark.read.format("parquet").load(orders_path)
-
-    printDf("输入 plays", plays)
-    printDf("输入 orders", orders)
-
-    //    //全部用户
-    //    val userListPath = hdfsPath + "data/train/userpay/allUsers/user_id.txt"
-    //    var result = spark.read.format("csv").load(userListPath).toDF(Dic.colUserId)
-    //    printDf("全部用户: ", result)
-
-    val allUsersSavePath = hdfsPath + "data/train/common/processed/userpay/all_users"
-    val df_allUsers = getData(spark, allUsersSavePath)
-    printDf("allUsers", df_allUsers)
+    val df_plays = spark.read.format("parquet").load(plays_path)
+    val df_orders = spark.read.format("parquet").load(orders_path)
+    val df_trainUser = getData(spark, trainUserPath)
+    val df_trainId = df_trainUser.select(Dic.colUserId)
 
 
     val pre_30 = calDate(now, -30)
@@ -43,12 +33,12 @@ object UserProfileGenerateOrderPartForUserpay {
     val joinKeysUserId = Seq(Dic.colUserId)
 
     // 选取订单为训练时间前三个月的数据
-    val user_order = orders.filter(col(Dic.colCreationTime).<(now) and (col(Dic.colCreationTime)) < calDate(now, -30 * 3))
-
+    val df_trainUserOrder = df_orders.filter(col(Dic.colCreationTime).<(now) and (col(Dic.colCreationTime)) < calDate(now, -30 * 3))
+      .join(df_trainId, Seq(Dic.colUserId), "inner")
     /**
      * 已支付套餐数量 金额总数 最大金额 最小金额 平均金额 并对金额进行标准化
      */
-    val order_part_1 = user_order
+    val order_part_1 = df_trainUserOrder
       .filter(
         col(Dic.colResourceType).>(0)
           && col(Dic.colOrderStatus).>(1)
@@ -65,7 +55,7 @@ object UserProfileGenerateOrderPartForUserpay {
     /**
      * 单点视频
      */
-    val order_part_2 = user_order
+    val order_part_2 = df_trainUserOrder
       .filter(
         col(Dic.colResourceType).===(0)
           && col(Dic.colOrderStatus).>(1)
@@ -78,7 +68,7 @@ object UserProfileGenerateOrderPartForUserpay {
     /**
      * 已购买的所有订单金额
      */
-    val order_part_3 = user_order
+    val order_part_3 = df_trainUserOrder
       .filter(
         col(Dic.colOrderStatus).>(1)
       )
@@ -89,7 +79,7 @@ object UserProfileGenerateOrderPartForUserpay {
     /**
      * 未购买套餐
      */
-    val order_part_4 = user_order
+    val order_part_4 = df_trainUserOrder
       .filter(
         col(Dic.colResourceType).>(0)
           && col(Dic.colOrderStatus).<=(1)
@@ -102,7 +92,7 @@ object UserProfileGenerateOrderPartForUserpay {
     /**
      * 未购买单点
      */
-    val order_part_5 = user_order
+    val order_part_5 = df_trainUserOrder
       .filter(
         col(Dic.colResourceType).===(0)
           && col(Dic.colOrderStatus).<=(1)
@@ -117,7 +107,7 @@ object UserProfileGenerateOrderPartForUserpay {
      * 距离上次购买最大天数
      */
 
-    val order_part_6 = user_order
+    val order_part_6 = df_trainUserOrder
       .filter(
         col(Dic.colResourceType).>(0)
           && col(Dic.colOrderStatus).>(1)
@@ -129,7 +119,7 @@ object UserProfileGenerateOrderPartForUserpay {
     /**
      * 距离上次点击套餐最大天数
      */
-    val order_part_7 = user_order
+    val order_part_7 = df_trainUserOrder
       .filter(
         col(Dic.colResourceType).>(0)
       )
@@ -140,7 +130,7 @@ object UserProfileGenerateOrderPartForUserpay {
     /**
      * 30天前产生的订单总数
      */
-    val order_part_8 = user_order
+    val order_part_8 = df_trainUserOrder
       .filter(
         col(Dic.colCreationTime).>=(pre_30)
       )
@@ -151,7 +141,7 @@ object UserProfileGenerateOrderPartForUserpay {
     /**
      * 30天前支付的订单数
      */
-    val order_part_9 = user_order
+    val order_part_9 = df_trainUserOrder
       .filter(
         col(Dic.colCreationTime).>=(pre_30)
           && col(Dic.colOrderStatus).>(1)
@@ -160,7 +150,7 @@ object UserProfileGenerateOrderPartForUserpay {
       .agg(
         count(col(Dic.colUserId)).as(Dic.colNumberPaidOrdersLast30Days)
       )
-    val order_part_10 = user_order
+    val order_part_10 = df_trainUserOrder
       .filter(
         col(Dic.colCreationTime).>=(pre_30)
           && col(Dic.colOrderStatus).>(1)
@@ -170,7 +160,7 @@ object UserProfileGenerateOrderPartForUserpay {
       .agg(
         count(col(Dic.colUserId)).as(Dic.colNumberPaidPackageLast30Days)
       )
-    val order_part_11 = user_order
+    val order_part_11 = df_trainUserOrder
       .filter(
         col(Dic.colCreationTime).>=(pre_30)
           && col(Dic.colOrderStatus).>(1)
@@ -183,7 +173,7 @@ object UserProfileGenerateOrderPartForUserpay {
     /**
      * 仍然有效的套餐
      */
-    val order_part_12 = user_order
+    val order_part_12 = df_trainUserOrder
       .filter(
         col(Dic.colOrderEndTime).>(now)
           && col(Dic.colResourceType).>(0)
@@ -195,7 +185,7 @@ object UserProfileGenerateOrderPartForUserpay {
       )
 
 
-    var result = df_allUsers.join(order_part_1, joinKeysUserId, "left")
+    var df_trainUserProfileOrder = df_trainId.join(order_part_1, joinKeysUserId, "left")
       .join(order_part_2, joinKeysUserId, "left")
       .join(order_part_3, joinKeysUserId, "left")
       .join(order_part_4, joinKeysUserId, "left")
@@ -209,26 +199,28 @@ object UserProfileGenerateOrderPartForUserpay {
       .join(order_part_12, joinKeysUserId, "left")
 
 
-    printDf("输出  userprofileOrderPart", result)
+    printDf("输出  userprofileOrderPart", df_trainUserProfileOrder)
     val userProfileOrderPartSavePath = hdfsPath + "data/train/common/processed/userpay/userprofileorderpart" + now.split(" ")(0)
+
     //大约有85万用户
-    result.write.mode(SaveMode.Overwrite).format("parquet").save(userProfileOrderPartSavePath)
+    saveProcessedData(df_trainUserProfileOrder, userProfileOrderPartSavePath)
 
 
   }
 
 
   def main(args: Array[String]): Unit = {
-//    val hdfsPath = "hdfs:///pay_predict/"
-    val hdfsPath=""
-//
+    val now = args(0) + " " + args(1)
+
+    //    val hdfsPath = "hdfs:///pay_predict/"
+    val hdfsPath = ""
+
     val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
     val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3" //userpay
     val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders3" //userpay
+    val trainSetUsersPath = hdfsPath + "data/train/userpay/trainUsers" + args(0)
 
-
-    val now = args(0) + " " + args(1)
-    userProfileGenerateOrderPart(now, 30, mediasProcessedPath, playsProcessedPath, ordersProcessedPath, hdfsPath)
+    userProfileGenerateOrderPart(now, 30, mediasProcessedPath, playsProcessedPath, ordersProcessedPath, trainSetUsersPath, hdfsPath)
 
 
   }

@@ -29,7 +29,7 @@ object UserSplitForTrain {
     val hdfsPath = ""
     val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3"
     val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders3"
-    val trainSetUsersPath = hdfsPath + "data/train/userpay/"
+    val trainSetUsersPath = hdfsPath + "data/train/userpay/trainUsers" + args(0)
 
 
     //所有用户id的dataframe  Hisense data
@@ -50,7 +50,7 @@ object UserSplitForTrain {
 
     printDf("TrainUsers", df_allTrainUsers)
 
-    saveProcessedData(df_allTrainUsers, trainSetUsersPath + "trainUsers" + args(0))
+    saveProcessedData(df_allTrainUsers, trainSetUsersPath)
 
 
   }

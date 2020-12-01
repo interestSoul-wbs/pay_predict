@@ -33,6 +33,7 @@ object OrderAndPlayHistoryProcess {
     val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp" //HDFS路径
     val mediasVideoVectorPath = hdfsPath + "data/train/common/processed/userpay/mediasVector"
     val historyPath = hdfsPath + "data/train/common/processed/userpay/history/"
+    val trainSetUsersPath = hdfsPath + "data/train/userpay/trainUsers" + args(0)
 
     /**
      * Get Files
@@ -40,12 +41,13 @@ object OrderAndPlayHistoryProcess {
     val df_orders = getData(spark, orderProcessedPath)
     val df_plays = getData(spark, playsProcessedPath)
     val df_medias = getData(spark, mediasProcessedPath)
-
+    val df_trainUser = getData(spark, trainSetUsersPath)
+    val df_trainId = df_trainUser.select(Dic.colUserId)
 
     /**
      * Get play history during train time to express package as package vector
      */
-    val df_playTimesTrain = getVideoPlaysTimes(df_plays, now, 7, df_medias)
+    val df_playTimesTrain = getVideoPlaysTimes(df_trainId, df_plays, now, 7, df_medias)
     printDf("df_playsHistoryTrainIn2Pack", df_playTimesTrain)
 
     saveProcessedData(df_playTimesTrain, historyPath + "videoInPackagePlayTimes")
@@ -55,7 +57,7 @@ object OrderAndPlayHistoryProcess {
      * include payed and clicked history
      */
 
-    val df_orderHistoryInPast = getOrderHistoryList(df_orders, now, - 90)
+    val df_orderHistoryInPast = getOrderHistoryList(df_trainId, df_orders, now, -90)
     printDf("Users' orders history in past three months", df_orderHistoryInPast)
 
     saveProcessedData(df_orderHistoryInPast, historyPath + "orderHistory" + args(0))
@@ -64,30 +66,23 @@ object OrderAndPlayHistoryProcess {
 
     /**
      * Play history
-     */
-    val timeWindowPlay = 14 //过去14天的
-
-    //play数据获取
-    printDf("plays", df_plays)
-
-
-    /**
      * 对于每个用户生成播放历史，14天内的播放历史，最多取n条
      */
+    val timeWindowPlay = 14 //过去14天的
     val topNPlay = 50
-    val df_playsVideo = getPlaySeqList(df_plays, Dic.colVideoId, now, -timeWindowPlay, topNPlay)
+    val df_playsVideo = getPlaySeqList(df_trainId, df_plays, Dic.colVideoId, now, -timeWindowPlay, topNPlay)
     printDf("df_playVideo", df_playsVideo)
 
     saveProcessedData(df_playsVideo, historyPath + "playHistory" + args(0))
 
 
 
-      // play time, not use yet
-//    val df_playsTime = getPlaySeqVector(df_plays, Dic.colTimeSum, now, -timeWindowPlay, topNPlay)
-//    val df_playsHistory = df_playsVideo.join(df_playsTime, Dic.colUserId)
+    // play time, not use yet
+    //    val df_playsTime = getPlaySeqList(df_trainId, df_plays, Dic.colTimeSum, now, -timeWindowPlay, topNPlay)
+    //    val df_playsHistory = df_playsVideo.join(df_playsTime, Dic.colUserId)
 
-//    printDf("plays_list", df_playsHistory)
-//    saveProcessedData(df_playsHistory, savePath + "playHistory" + args(0))
+    //    printDf("plays_list", df_playsHistory)
+    //    saveProcessedData(df_playsHistory, savePath + "playHistory" + args(0))
 
     println("Play history process done!!")
 
@@ -95,18 +90,20 @@ object OrderAndPlayHistoryProcess {
   }
 
 
-  def getOrderHistoryList(df_orders: DataFrame, now: String, timeLength: Int) = {
+  def getOrderHistoryList(df_trainId: DataFrame, df_orders: DataFrame, now: String, timeLength: Int) = {
 
     /**
      * Select order history during now and now-timeLength
      * Create a new column called CreationTimeGap
      */
-    val df_orderPart = df_orders.filter(col(Dic.colCreationTime) < now and col(Dic.colCreationTime) >= calDate(now, timeLength))
+    val df_orderPart = df_orders.join(df_trainId, Seq(Dic.colUserId), "inner")
+      .filter(col(Dic.colCreationTime) < now and col(Dic.colCreationTime) >= calDate(now, timeLength))
       .withColumn("now", lit(now))
       .withColumn(Dic.colCreationTimeGap, udfGetDays(col(Dic.colCreationTime), col("now")))
-//      .withColumn(Dic.colIsMoneyError, udfGetErrorMoneySign(col(Dic.colResourceType), col(Dic.colMoney)))
+      //.withColumn(Dic.colIsMoneyError, udfGetErrorMoneySign(col(Dic.colResourceType), col(Dic.colMoney)))
       .withColumn(Dic.colTimeValidity, udfUniformTimeValidity(col(Dic.colTimeValidity), col(Dic.colResourceType)))
       .select(Dic.colUserId, Dic.colMoney, Dic.colResourceType, Dic.colCreationTimeGap, Dic.colTimeValidity, Dic.colOrderStatus, Dic.colCreationTime)
+      .join(df_trainId, Seq(Dic.colUserId), "inner")
 
     printDf("df_orderPart", df_orderPart)
 
@@ -136,22 +133,26 @@ object OrderAndPlayHistoryProcess {
     df_orderHistoryUnionSameUser
 
   }
+
   /**
    * We need to do the same for predict!!!!!!!!!!!!!!!!!!
    */
-    def getVideoPlaysTimes(df_plays: DataFrame, train_time: String, timeLength: Int, df_medias: DataFrame) = {
+  def getVideoPlaysTimes(df_UserId: DataFrame, df_plays: DataFrame, train_time: String, timeLength: Int, df_medias: DataFrame) = {
 
-      val df_playPart = df_plays.filter(col(Dic.colPlayStartTime).<(train_time) and col(Dic.colPlayStartTime) >= calDate(train_time, days = -timeLength))
-      val df_videoInPredictPack = df_medias.filter(col(Dic.colPackageId) === 100201 or col(Dic.colPackageId) === 100202)
-      val df_playHistory = df_playPart.join(df_videoInPredictPack, Seq(Dic.colVideoId))
+    // train users' play history in train time
+    val df_trainUserPlay = df_plays.filter(col(Dic.colPlayStartTime).<(train_time) and col(Dic.colPlayStartTime) >= calDate(train_time, days = -timeLength))
+      .join(df_UserId, Seq(Dic.colUserId), "inner")
+    //video in package that need to predict
+    val df_videoInPredictPack = df_medias.filter(col(Dic.colPackageId) === 100201 or col(Dic.colPackageId) === 100202)
+    val df_trainPlayHistory = df_trainUserPlay.join(df_videoInPredictPack, Seq(Dic.colVideoId))
 
 
-      // Get video played times by users
-      val df_videoPlayTimes = df_playHistory.groupBy(Dic.colVideoId).agg(count(Dic.colPlayStartTime).as(Dic.colPlayTimes))
-      df_videoPlayTimes
-    }
+    // Get video played times by users
+    val df_videoPlayTimes = df_trainPlayHistory.groupBy(Dic.colVideoId).agg(count(Dic.colPlayStartTime).as(Dic.colPlayTimes))
+    df_videoPlayTimes
+  }
 
-  def getPlaySeqList(df_play: DataFrame, colName: String, now: String, timeWindowPlay: Int, topNPlay: Int) = {
+  def getPlaySeqList(df_trainId: DataFrame, df_play: DataFrame, colName: String, now: String, timeWindowPlay: Int, topNPlay: Int) = {
     /**
      * @describe 按照userid和播放起始时间逆向排序 选取 now - timewindow 到 now的播放历史和播放时长
      * @author wx
@@ -160,7 +161,8 @@ object OrderAndPlayHistoryProcess {
      * @return {@link org.apache.spark.sql.Dataset< org.apache.spark.sql.Row > }
      * */
 
-    var df_playList = df_play.filter(col(Dic.colPlayStartTime).<(now) && col(Dic.colPlayStartTime) >= calDate(now, days = timeWindowPlay))
+    var df_playList = df_play.join(df_trainId, Seq(Dic.colUserId), "inner")
+      .filter(col(Dic.colPlayStartTime).<(now) && col(Dic.colPlayStartTime) >= calDate(now, days = timeWindowPlay))
 
     //获取数字位数
     val rowCount = df_playList.count().toString.length
