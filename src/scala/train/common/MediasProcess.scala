@@ -10,6 +10,8 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 
+import scala.collection.mutable
+
 object MediasProcess {
 
   //将字符串属性转化为
@@ -33,23 +35,23 @@ object MediasProcess {
     val labelTempPath = hdfsPath + "data/train/common/processed/labeltemp.txt" ///pay_predict/data/train/common/processed
 
 
-    //1.获取原始数据
+    // 获取原始数据
     val df_rawMedias = getRawMedias(spark, mediasRawPath)
 
     printDf("输入 mediasRaw", df_rawMedias)
 
-    //2、对数据进行处理
+    // 对数据进行处理
     val df_mediasProcessed = mediasProcess(df_rawMedias)
     saveProcessedData(df_mediasProcessed, mediasProcessedPath)
 
     printDf("输出  mediasProcessed", df_mediasProcessed)
 
-    //4、保存标签
+    // 保存标签
     getSingleStrColLabelAndSave(df_mediasProcessed, Dic.colVideoOneLevelClassification, videoFirstCategoryTempPath)
     getArrayStrColLabelAndSave(df_mediasProcessed, Dic.colVideoTwoLevelClassificationList, videoSecondCategoryTempPath)
     getArrayStrColLabelAndSave(df_mediasProcessed, Dic.colVideoTagList, labelTempPath)
 
-    //     导演 演员尚未处理 目前还未使用到
+    // 导演 演员尚未处理 目前还未使用到
 
 
     println("媒资数据处理完成！")
@@ -142,10 +144,9 @@ object MediasProcess {
     println("正在填充空值....")
 
     // 根据一级分类填充空值
-//    val dfMeanScoreFill = meanFillAccordLevelOne(dfModifiedFormat, Dic.colScore)
-//    var dfMeanVideoTimeFill = meanFillAccordLevelOne(dfMeanScoreFill, Dic.colVideoTime)
+    val dfMeanScoreFill = meanFillAccordLevelOne(dfModifiedFormat, Dic.colScore)
+    val dfMeanVideoTimeFill = meanFillAccordLevelOne(dfMeanScoreFill, Dic.colVideoTime)
 
-    var dfMeanVideoTimeFill = meanFill(dfModifiedFormat, Array(Dic.colScore, Dic.colVideoTime))
     printDf("填充空值之后", dfMeanVideoTimeFill)
 
 
@@ -173,7 +174,8 @@ object MediasProcess {
   }
 
 
-  def meanFillAccordLevelOne(mediasDf: DataFrame, colName: String): DataFrame = {
+
+  def meanFillAccordLevelOne(df_medias: DataFrame, colName: String): DataFrame = {
     /**
      * @describe 根据video的视频一级分类进行相关列空值的填充
      * @author wx
@@ -181,26 +183,34 @@ object MediasProcess {
      * @param [spark]
      * @return {@link DataFrame }
      * */
-    val df_mean = mediasDf.groupBy(Dic.colVideoOneLevelClassification).agg(mean(col(colName)))
+    val df_mean = df_medias.groupBy(Dic.colVideoOneLevelClassification).agg(mean(col(colName)))
       .withColumnRenamed("avg(" + colName + ")", "mean" + colName + "AccordLevelOne")
 
-    printDf("medias中一级分类的" + colName + "平均值", df_mean)
+    val meanValue = df_medias.agg(mean(colName)).collectAsList().get(0).get(0)
+    println("Mean " + colName, meanValue)
 
-    // video的colName全部video平均值
-    val meanValue = mediasDf.agg(mean(colName)).collectAsList().get(0).get(0)
-    println("mean " + colName, meanValue)
+    var meanMap = df_mean.rdd //Dataframe转化为RDD
+      .map(row => row.getAs(Dic.colVideoOneLevelClassification).toString -> row.getAs("mean" + colName + "AccordLevelOne").toString)
+      .collectAsMap() //将key-value对类型的RDD转化成Map
+      .asInstanceOf[mutable.HashMap[String, String]]
 
+    meanMap ++ Map(("meanValue", meanValue))
 
-    val df_mediasJoinMean = mediasDf.join(df_mean, Seq(Dic.colVideoOneLevelClassification), "inner")
-    printDf("df_mediasJoinMean", df_mediasJoinMean)
-
-
-    val df_meanFilled = df_mediasJoinMean.withColumn(colName, when(col(colName).>(0.0), col(colName))
-      .otherwise(col("mean" + colName + "AccordLevelOne")))
-      .na.fill(Map((colName, meanValue)))
-      .drop("mean" + colName + "AccordLevelOne")
-
-    df_meanFilled
+    // 还没改完。。。。。。。。。。
+//    val df_mediasFilled = df_medias.withColumn(colName, fillUseMap(meanMap)(col(colName)))
+//
+//
+//
+//    val df_mediasJoinMean = df_medias.join(df_mean, Seq(Dic.colVideoOneLevelClassification), "inner")
+//    printDf("df_mediasJoinMean", df_mediasJoinMean)
+//
+//
+//    val df_meanFilled = df_mediasJoinMean.withColumn(colName, when(col(colName).>(0.0), col(colName))
+//      .otherwise(col("mean" + colName + "AccordLevelOne")))
+//      .na.fill(Map((colName, meanValue)))
+//      .drop("mean" + colName + "AccordLevelOne")
+//
+//    df_meanFilled
   }
 
 

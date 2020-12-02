@@ -18,16 +18,15 @@ object UserSplitForTrain {
 
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("UserSplitForTrain")
-      .master("local[6]")
+      //.master("local[6]")
       .getOrCreate()
 
     val trainTime = args(0) + " " + args(1)
     println(trainTime)
 
 
-    //val hdfsPath="hdfs:///pay_predict/"
-    val hdfsPath = ""
-    val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3"
+    val hdfsPath="hdfs:///pay_predict/"
+    //val hdfsPath = ""
     val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders3"
     val trainSetUsersPath = hdfsPath + "data/train/userpay/trainUsers" + args(0)
 
@@ -35,9 +34,6 @@ object UserSplitForTrain {
     //所有用户id的dataframe  Hisense data
     val allUserPath = hdfsPath + "data/train/userpay/allUsers/user_id.txt"
     val df_allUsers = spark.read.format("csv").load(allUserPath).toDF(Dic.colUserId)
-
-//    val allUsersSavePath = hdfsPath + "data/train/common/processed/userpay/all_users"
-//    val df_allUsers = getData(spark, allUsersSavePath)
     printDf("全部用户: ", df_allUsers)
 
 
@@ -51,7 +47,6 @@ object UserSplitForTrain {
     printDf("TrainUsers", df_allTrainUsers)
 
     saveProcessedData(df_allTrainUsers, trainSetUsersPath)
-
 
   }
 
@@ -68,9 +63,6 @@ object UserSplitForTrain {
      */
 
     val df_order = df_orders.withColumn(Dic.colIsMoneyError, udfGetErrorMoneySign(col(Dic.colResourceType), col(Dic.colMoney)))
-    printDf("Order after sign error money ", df_order)
-
-
 
     val predictResourceId = Array(100201, 100202) //要预测的套餐id
     //金额异常用户
@@ -98,7 +90,7 @@ object UserSplitForTrain {
 
 
     //去掉金额异常用户
-    df_trainPosUsers = df_trainPosUsers.except(df_illegalUsers.select(Dic.colUserId))
+    df_trainPosUsers = df_trainPosUsers.except(df_illegalUsers)
       .withColumn(Dic.colOrderStatus, lit(1))
 
     printDf("trainPosUsers", df_trainPosUsers)

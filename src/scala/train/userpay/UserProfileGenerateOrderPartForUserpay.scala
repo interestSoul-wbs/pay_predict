@@ -5,31 +5,18 @@ import mam.Utils.{calDate, getData, printDf, saveProcessedData, udfGetDays}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{SaveMode, SparkSession}
+import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
 object UserProfileGenerateOrderPartForUserpay {
 
-  def userProfileGenerateOrderPart(now: String, timeWindow: Int, medias_path: String, plays_path: String, orders_path: String, trainUserPath: String, hdfsPath: String): Unit = {
-    System.setProperty("hadoop.home.dir", "c:\\winutils")
-    Logger.getLogger("org").setLevel(Level.ERROR)
-    val spark: SparkSession = new sql.SparkSession.Builder()
-      .appName("UserProfileGenerateOrderPartForUserpayTrain")
-      .master("local[6]")
-      .getOrCreate()
+  def userProfileGenerateOrderPart(now: String, df_orders: DataFrame, df_trainUsers: DataFrame, userProfileOrderPartSavePath: String): Unit = {
 
 
-    //val medias = spark.read.format("parquet").load(medias_path)
-    val df_plays = spark.read.format("parquet").load(plays_path)
-    val df_orders = spark.read.format("parquet").load(orders_path)
-    val df_trainUser = getData(spark, trainUserPath)
-    val df_trainId = df_trainUser.select(Dic.colUserId)
+    val df_trainId = df_trainUsers.select(Dic.colUserId)
 
 
     val pre_30 = calDate(now, -30)
-    val pre_14 = calDate(now, days = -14)
-    val pre_7 = calDate(now, -7)
-    val pre_3 = calDate(now, -3)
-    val pre_1 = calDate(now, -1)
+
     val joinKeysUserId = Seq(Dic.colUserId)
 
     // 选取订单为训练时间前三个月的数据
@@ -200,27 +187,40 @@ object UserProfileGenerateOrderPartForUserpay {
 
 
     printDf("输出  userprofileOrderPart", df_trainUserProfileOrder)
-    val userProfileOrderPartSavePath = hdfsPath + "data/train/common/processed/userpay/userprofileorderpart" + now.split(" ")(0)
 
     //大约有85万用户
     saveProcessedData(df_trainUserProfileOrder, userProfileOrderPartSavePath)
-
 
   }
 
 
   def main(args: Array[String]): Unit = {
+
+    System.setProperty("hadoop.home.dir", "c:\\winutils")
+    Logger.getLogger("org").setLevel(Level.ERROR)
+    val spark: SparkSession = new sql.SparkSession.Builder()
+      .appName("UserProfileGenerateOrderPartForUserpayTrain")
+      .master("local[6]")
+      .getOrCreate()
+
+
     val now = args(0) + " " + args(1)
 
-    //    val hdfsPath = "hdfs:///pay_predict/"
+    //val hdfsPath = "hdfs:///pay_predict/"
     val hdfsPath = ""
 
-    val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
-    val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3" //userpay
     val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders3" //userpay
-    val trainSetUsersPath = hdfsPath + "data/train/userpay/trainUsers" + args(0)
+    val trainUsersPath = hdfsPath + "data/train/userpay/trainUsers" + args(0)
+    val userProfileOrderPartSavePath = hdfsPath + "data/train/common/processed/userpay/userprofileorderpart" + now.split(" ")(0)
 
-    userProfileGenerateOrderPart(now, 30, mediasProcessedPath, playsProcessedPath, ordersProcessedPath, trainSetUsersPath, hdfsPath)
+    /**
+     * Get Data
+     */
+    val df_orders = getData(spark, ordersProcessedPath)
+    val df_trainUsers = getData(spark, trainUsersPath)
+
+
+    userProfileGenerateOrderPart(now, df_orders, df_trainUsers, userProfileOrderPartSavePath)
 
 
   }

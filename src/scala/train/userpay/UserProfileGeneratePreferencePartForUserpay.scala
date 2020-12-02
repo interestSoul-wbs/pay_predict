@@ -1,39 +1,19 @@
 package train.userpay
 
 import mam.Dic
-import mam.Utils.{calDate, getData, getString, printDf, saveProcessedData, udfGetLabelAndCount, udfGetLabelAndCount2}
+import mam.Utils.{calDate, getData, saveProcessedData, udfGetLabelAndCount, udfGetLabelAndCount2}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
-import org.apache.spark.sql.{SaveMode, SparkSession}
+import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
+import org.apache.spark.sql.functions._
 
 object UserProfileGeneratePreferencePartForUserpay {
 
-  def userProfileGeneratePreferencePart(now: String, timeWindow: Int, medias_path: String, plays_path: String, orders_path: String, trainUsersPath: String, hdfsPath: String): Unit = {
-    System.setProperty("hadoop.home.dir", "c:\\winutils")
-    Logger.getLogger("org").setLevel(Level.ERROR)
-    val spark: SparkSession = new sql.SparkSession.Builder()
-      .appName("UserProfileGeneratePreferencePartForUserpayTrain")
-      .master("local[6]")
-      .getOrCreate()
-    //设置shuffle过程中分区数
-    // spark.sqlContext.setConf("spark.sql.shuffle.partitions", "1000")
-    import org.apache.spark.sql.functions._
+  def userProfileGeneratePreferencePart(now: String, df_medias: DataFrame, df_plays: DataFrame, df_trainUsers: DataFrame, userProfilePreferencePartSavePath: String) = {
 
-    val df_medias = getData(spark, medias_path)
-    val df_plays = getData(spark, plays_path)
-    val df_trainUsers = getData(spark, trainUsersPath)
+
     val df_trainId = df_trainUsers.select(Dic.colUserId)
-
     val df_trainUserPlays = df_plays.join(df_trainId, Seq(Dic.colUserId), "inner")
-
-
-    //    val userListPath = hdfsPath + "data/train/userpay/allUsers/user_id.txt"
-    //    var result = spark.read.format("csv").load(userListPath).toDF(Dic.colUserId)
-    //    printDf("全部用户: ", result)
-//    val allUsersSavePath = hdfsPath + "data/train/common/processed/userpay/all_users"
-//    val df_allUsers = getData(spark, allUsersSavePath)
-//    printDf("allUsers", df_allUsers)
-
 
     val pre_30 = calDate(now, -30)
     val pre_14 = calDate(now, days = -14)
@@ -304,26 +284,40 @@ object UserProfileGeneratePreferencePartForUserpay {
       .join(play_medias_part_74, joinKeysUserId, "left")
 
 
-    val userProfilePreferencePartSavePath = hdfsPath + "data/train/common/processed/userpay/userprofilepreferencepart" + now.split(" ")(0)
     //大约有85万用户
     saveProcessedData(df_trainUserProfilePref, userProfilePreferencePartSavePath)
-
+    println("df_trainUserProfilePref Save Done!")
 
   }
 
 
   def main(args: Array[String]): Unit = {
+    System.setProperty("hadoop.home.dir", "c:\\winutils")
+    Logger.getLogger("org").setLevel(Level.ERROR)
+    val spark: SparkSession = new sql.SparkSession.Builder()
+      .appName("UserProfileGeneratePreferencePartForUserpayTrain")
+      .master("local[6]")
+      .getOrCreate()
+
 
     val now = args(0) + " " + args(1)
 
-    //    val hdfsPath = "hdfs:///pay_predict/"
+    //val hdfsPath = "hdfs:///pay_predict/"
     val hdfsPath=""
     val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
     val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3" //userpay
-    val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders3" //userpay
     val trainUsersPath = hdfsPath + "data/train/userpay/trainUsers" + args(0)
+    val userProfilePreferencePartSavePath = hdfsPath + "data/train/common/processed/userpay/userprofilepreferencepart" + args(0)
 
-    userProfileGeneratePreferencePart(now, 30, mediasProcessedPath, playsProcessedPath, ordersProcessedPath, trainUsersPath, hdfsPath)
+    /**
+     * Get Data
+     */
+    val df_medias = getData(spark, mediasProcessedPath)
+    val df_plays = getData(spark, playsProcessedPath)
+    val df_trainUsers = getData(spark, trainUsersPath)
+
+
+    userProfileGeneratePreferencePart(now, df_medias, df_plays, df_trainUsers, userProfilePreferencePartSavePath)
 
 
   }

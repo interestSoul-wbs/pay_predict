@@ -1,230 +1,232 @@
 package train.userpay
 
-
 import mam.Dic
-import mam.Utils.{getData, mapIdToMediasVector, printDf, saveProcessedData, udfGetDays, udfLog, udfWeightVector}
+import mam.Utils.{getData, printDf, saveProcessedData}
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.ml.feature.VectorAssembler
 import org.apache.spark.sql
-import org.apache.spark.sql.functions.{col, lit, mean, when}
-import org.apache.spark.sql.types.StringType
+import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
+import scala.collection.mutable.ArrayBuffer
 
 object TrainSetProcess {
+
+  def trainSetProcess(df_userProfilePlayPart: DataFrame, df_userProfilePreferencePart: DataFrame, df_userProfileOrderPart: DataFrame,
+                      df_videoFirstCategory: DataFrame, df_videoSecondCategory: DataFrame, df_label: DataFrame, df_playVector: DataFrame, df_orderHistory: DataFrame,
+                      trainUserProfileSavePath: String, trainSetSavePath: String) = {
+
+
+    /**
+     * Process User Profile Data
+     */
+    val joinKeysUserId = Seq(Dic.colUserId)
+    val df_userPlayAndPref = df_userProfilePlayPart.join(df_userProfilePreferencePart, joinKeysUserId, "left")
+    val df_userProfile = df_userPlayAndPref.join(df_userProfileOrderPart, joinKeysUserId, "left")
+
+
+    val colList = df_userProfile.columns.toList
+    val colTypeList = df_userProfile.dtypes.toList
+    val mapColList = ArrayBuffer[String]()
+    for (elem <- colTypeList) {
+      if (!elem._2.equals("StringType") && !elem._2.equals("IntegerType")
+        && !elem._2.equals("DoubleType") && !elem._2.equals("LongType")) {
+        mapColList.append(elem._1)
+      }
+    }
+
+
+    val numColList = colList.diff(mapColList)
+
+    val df_userProfileFill = df_userProfile
+      .na.fill(-1, List(Dic.colDaysSinceLastPurchasePackage, Dic.colDaysSinceLastClickPackage,
+      Dic.colDaysFromLastActive, Dic.colDaysSinceFirstActiveInTimewindow))
+
+    val df_userProfileFilled = df_userProfileFill.na.fill(0, numColList)
+
+
+    var videoFirstCategoryMap: Map[String, Int] = Map()
+    var videoSecondCategoryMap: Map[String, Int] = Map()
+    var labelMap: Map[String, Int] = Map()
+
+
+    // 一级分类
+
+    var conList = df_videoFirstCategory.collect()
+    for (elem <- conList) {
+      val s = elem.toString()
+      videoFirstCategoryMap += (s.substring(1, s.length - 1).split("\t")(1) -> s.substring(1, s.length - 1).split("\t")(0).toInt)
+
+    }
+    //二级分类
+    conList = df_videoSecondCategory.collect()
+    for (elem <- conList) {
+      val s = elem.toString()
+      videoSecondCategoryMap += (s.substring(1, s.length - 1).split("\t")(1) -> s.substring(1, s.length - 1).split("\t")(0).toInt)
+
+    }
+    //标签
+    conList = df_label.collect()
+    for (elem <- conList) {
+      val s = elem.toString()
+      labelMap += (s.substring(1, s.length - 1).split("\t")(1) -> s.substring(1, s.length - 1).split("\t")(0).toInt)
+
+    }
+
+
+    val pre = List(Dic.colVideoOneLevelPreference, Dic.colVideoTwoLevelPreference,
+      Dic.colMovieTwoLevelPreference, Dic.colSingleTwoLevelPreference, Dic.colInPackageVideoTwoLevelPreference)
+
+    var df_userProfileSplitPref = df_userProfileFilled
+
+    def udfFillPreference = udf(fillPreference _)
+
+    def fillPreference(prefer: Map[String, Int], offset: Int) = {
+      if (prefer == null) {
+        null
+      } else {
+        val mapArray = prefer.toArray
+        if (mapArray.length > offset - 1) {
+          mapArray(offset - 1)._1
+        } else {
+          null
+        }
+      }
+    }
+
+    for (elem <- pre) {
+      df_userProfileSplitPref = df_userProfileSplitPref.withColumn(elem + "_1", udfFillPreference(col(elem), lit(1)))
+        .withColumn(elem + "_2", udfFillPreference(col(elem), lit(2)))
+        .withColumn(elem + "_3", udfFillPreference(col(elem), lit(3)))
+    }
+
+
+    def udfFillPreferenceIndex = udf(fillPreferenceIndex _)
+
+    def fillPreferenceIndex(prefer: String, mapLine: String) = {
+      if (prefer == null) {
+        null
+      } else {
+        var tempMap: Map[String, Int] = Map()
+        val lineIterator1 = mapLine.split(",")
+        lineIterator1.foreach(m => tempMap += (m.split(" -> ")(0) -> m.split(" -> ")(1).toInt))
+        tempMap.get(prefer)
+      }
+    }
+
+
+    for (elem <- pre) {
+      if (elem.contains(Dic.colVideoOneLevelPreference)) {
+        df_userProfileSplitPref = df_userProfileSplitPref.withColumn(elem + "_1", udfFillPreferenceIndex(col(elem + "_1"), lit(videoFirstCategoryMap.mkString(","))))
+          .withColumn(elem + "_2", udfFillPreferenceIndex(col(elem + "_2"), lit(videoFirstCategoryMap.mkString(","))))
+          .withColumn(elem + "_3", udfFillPreferenceIndex(col(elem + "_3"), lit(videoFirstCategoryMap.mkString(","))))
+      } else {
+        df_userProfileSplitPref = df_userProfileSplitPref.withColumn(elem + "_1", udfFillPreferenceIndex(col(elem + "_1"), lit(videoSecondCategoryMap.mkString(","))))
+          .withColumn(elem + "_2", udfFillPreferenceIndex(col(elem + "_2"), lit(videoSecondCategoryMap.mkString(","))))
+          .withColumn(elem + "_3", udfFillPreferenceIndex(col(elem + "_3"), lit(videoSecondCategoryMap.mkString(","))))
+      }
+    }
+
+    for (elem <- pre) {
+      if (elem.equals(Dic.colVideoOneLevelPreference)) {
+        df_userProfileSplitPref = df_userProfileSplitPref.na.fill(videoFirstCategoryMap.size, List(elem + "_1", elem + "_2", elem + "_3"))
+      } else {
+        df_userProfileSplitPref = df_userProfileSplitPref.na.fill(videoSecondCategoryMap.size, List(elem + "_1", elem + "_2", elem + "_3"))
+      }
+    }
+
+
+    val columnTypeList = df_userProfileSplitPref.dtypes.toList
+    val columnList = ArrayBuffer[String]()
+    for (elem <- columnTypeList) {
+      if (elem._2.equals("StringType") || elem._2.equals("IntegerType")
+        || elem._2.equals("DoubleType") || elem._2.equals("LongType")) {
+        columnList.append(elem._1)
+      }
+    }
+
+    val df_trainUserProfile = df_userProfileSplitPref.select(columnList.map(df_userProfileSplitPref.col(_)): _*)
+
+    // Save Train User Profile
+    saveProcessedData(df_trainUserProfile, trainUserProfileSavePath)
+
+    /**
+     * Train User Profile Merge with Order History And Play History to be Train Set
+     */
+
+    val df_userProfileAndOrderHistory = df_trainUserProfile.join(df_orderHistory, joinKeysUserId, "left")
+    val df_trainSet = df_userProfileAndOrderHistory.join(df_playVector, joinKeysUserId, "left")
+
+    saveProcessedData(df_trainSet, trainSetSavePath)
+    println("Done！")
+
+
+  }
+
+
   def main(args: Array[String]): Unit = {
     System.setProperty("hadoop.home.dir", "c:\\winutils")
     Logger.getLogger("org").setLevel(Level.ERROR)
 
     val spark: SparkSession = new sql.SparkSession.Builder()
-      //.master("local[4]")
+      .master("local[6]")
       .appName("TrainSetProcess")
       .getOrCreate()
 
 
-    val trainTime = args(0) + " " + args(1)
-    println(trainTime)
+    val time = args(0) + " " + args(1)
+    println(time)
 
+    //val hdfsPath = "hdfs:///pay_predict/"
+    val hdfsPath = ""
 
-    val hdfsPath = "hdfs:///pay_predict/"
-    //val hdfsPath = ""
-
-    val mediasVideoVectorPath = hdfsPath + "data/train/common/processed/userpay/mediasVector"
-
-    val playHistoryPath = hdfsPath + "data/train/common/processed/userpay/history/playHistory" + args(0)
-    val orderHistoryPath = hdfsPath + "data/train/common/processed/userpay/history/orderHistory" + args(0)
-    val videoPlayedTimesPath = hdfsPath + "data/train/common/processed/userpay/history/videoInPackagePlayTimes"
-
-    val trainUsersPath = hdfsPath + "data/train/userpay/trainUsers" + args(0)
+    /**
+     * Data Save Path
+     */
     val trainUserProfileSavePath = hdfsPath + "data/train/userpay/trainUserProfile" + args(0)
-
-    val packageExpByVideoSavePath = hdfsPath + "data/train/userpay/packageExpByVideoSavePath" + args(0)
     val trainSetSavePath = hdfsPath + "data/train/userpay/trainSet" + args(0)
 
-    val playHistoryVectorSavePath = hdfsPath + "data/train/common/processed/userpay/history/playHistoryVector" + args(0)
+    /**
+     * User Profile Data Path
+     */
+    val userProfilePlayPartPath = hdfsPath + "data/train/common/processed/userpay/userprofileplaypart" + args(0)
+    val userProfilePreferencePartPath = hdfsPath + "data/train/common/processed/userpay/userprofilepreferencepart" + args(0)
+    val userProfileOrderPartPath = hdfsPath + "data/train/common/processed/userpay/userprofileorderpart" + args(0)
 
     /**
-     * Get processed user profile and merge with train users dataframe
+     * Medias Label Info Path
      */
-
-    // Get train users
-    val df_trainUsers = getData(spark, trainUsersPath)
-    printDf("TrainUsers", df_trainUsers)
-
-    // Get users' play history
-    var df_playHistory = getData(spark, playHistoryPath)
-    printDf("df_playHistory", df_playHistory)
-
-    var df_trainPartUserPlayHistory = df_trainUsers.join(df_playHistory, Seq(Dic.colUserId), "inner")
-      .drop(Dic.colOrderStatus)
-    printDf("df_trainPartUserPlayHistory", df_trainPartUserPlayHistory)
+    val videoFirstCategoryTempPath = hdfsPath + "data/train/common/processed/videofirstcategorytemp.txt"
+    val videoSecondCategoryTempPath = hdfsPath + "data/train/common/processed/videosecondcategorytemp.txt"
+    val labelTempPath = hdfsPath + "data/train/common/processed/labeltemp.txt"
 
 
     /**
-     * Medias vector add storage time gap info
-     * Assemble all columns of medias to be video vector
-     * videoVectorDimension is 37
+     * User History Data Path
      */
-
-    val df_mediasVectorPart = getData(spark, mediasVideoVectorPath)
-    printDf("df_mediasVectorPart", df_mediasVectorPart)
-
-    val df_videoVector = mediasVectorProcess(df_mediasVectorPart, trainTime)
-    printDf("df_videoVector", df_videoVector)
+    val userPlayVectorPath = hdfsPath + "data/train/common/processed/userpay/history/playHistoryVector" + args(0)
+    val orderHistoryPath = hdfsPath + "data/train/common/processed/userpay/history/orderHistory" + args(0)
 
 
-    //Map train users' video id list to medias' video vector
-    val df_trainUserPlayHistoryVector = mapVideoVector(df_trainPartUserPlayHistory, df_videoVector, topNPlayHistory = 50)
+    /**
+     * Get Data
+     */
+    val df_userProfilePlayPart = getData(spark, userProfilePlayPartPath)
+    val df_userProfilePreferencePart = getData(spark, userProfilePreferencePartPath)
+    val df_userProfileOrderPart = getData(spark, userProfileOrderPartPath)
 
-    saveProcessedData(df_trainUserPlayHistoryVector.limit(10000), playHistoryVectorSavePath)
+    val df_videoFirstCategory = spark.read.format("csv").load(videoFirstCategoryTempPath)
+    val df_videoSecondCategory = spark.read.format("csv").load(videoSecondCategoryTempPath)
+    val df_label = spark.read.format("csv").load(labelTempPath)
 
-    println("Train Users' Play History Vector Save Done...")
-
-    // Get users' order history
+    val df_playVector = getData(spark, userPlayVectorPath)
     val df_orderHistory = getData(spark, orderHistoryPath)
-    printDf("df_orderHistory", df_orderHistory)
-
-    val df_trainUserOrderHistory = df_trainUsers.join(df_orderHistory, Seq(Dic.colUserId), "left")
-    printDf("df_trainUserOrderHistory", df_trainUserOrderHistory)
 
 
-    //User Profile
-    val df_trainUserProfile = getData(spark, trainUserProfileSavePath)
-    printDf("df_trainUserProfile", df_trainUserProfile)
-
-    val df_trainSet = df_trainUserOrderHistory.join(df_trainUserProfile, Seq(Dic.colUserId), "left")
-    printDf("df_trainSet", df_trainSet)
-
-    /**
-     * Save data
-     */
-
-    saveProcessedData(df_trainSet, trainSetSavePath)
-    println("Train Users Left Join with Order History and User Profile Data Save Done!")
-
-
-    /**
-     * Use videos' vector in package to express package
-     */
-    //   Video played times
-    val df_playVideoTimes = getData(spark, videoPlayedTimesPath) // Video in package 100201 and 100202
-    var df_packageExpByVideo = df_videoVector.join(df_playVideoTimes, Seq(Dic.colVideoId), "inner") //video vector is played video
-
-
-    // Video vector and play times weighted
-    df_packageExpByVideo = df_packageExpByVideo.withColumn("log_count", when(col(Dic.colPlayTimes) > 0, udfLog(col(Dic.colPlayTimes))).otherwise(0))
-      .withColumn("vector", col("vector").cast(StringType))
-      .withColumn("weighted_vector", udfWeightVector(col("vector"), col("log_count")))
-      .select(Dic.colVideoId, "weighted_vector")
-
-    printDf("df_packageExpByVideo", df_packageExpByVideo)
-
-
-    //    Use python to select "weighted_vector" to be a Matrix then merge with every user
-    saveProcessedData(df_packageExpByVideo, packageExpByVideoSavePath)
-    println("packageExpByVideo dataframe save done!")
+    trainSetProcess(df_userProfilePlayPart, df_userProfilePreferencePart, df_userProfileOrderPart,
+      df_videoFirstCategory, df_videoSecondCategory, df_label, df_playVector, df_orderHistory,
+      trainUserProfileSavePath, trainSetSavePath)
 
 
   }
-
-
-  def mediasVectorProcess(df_mediasVectorPart: DataFrame, trainTime: String) = {
-    /**
-     * @description: Add storage time gap to medias info then assemble to video vector
-     * @param: df_mediasVectorPart : medias dataframe
-     * @param: trainTime
-     * @return: org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
-     * @author: wx
-     * @Date: 2020/11/30
-     */
-
-    val df_mediasVector = df_mediasVectorPart.withColumn("trainTime", lit(trainTime))
-      .withColumn(Dic.colStorageTimeGap, udfGetDays(col(Dic.colStorageTime), col("trainTime")))
-      .drop("trainTime", Dic.colStorageTime)
-
-    // fill na colStorageTime with colLevelOne mean storage time
-    val df_fillGapMedias = fillStorageGap(df_mediasVector)
-
-    printDf("df_mediasVector", df_fillGapMedias)
-
-    // Concat columns to be vector of the videos
-    val mergeCols = df_fillGapMedias.columns.filter(!_.contains(Dic.colVideoId)) //remove column videoId
-    val assembler = new VectorAssembler()
-      .setInputCols(mergeCols)
-      .setHandleInvalid("keep")
-      .setOutputCol("vector")
-
-    assembler.transform(df_fillGapMedias).select(Dic.colVideoId, "vector")
-
-  }
-
-
-  def fillStorageGap(df_medias: DataFrame): DataFrame = {
-    /**
-     * @describe 根据video的视频一级分类进行相关列空值的填充
-     * @author wx
-     * @param [mediasDf]
-     * @param [spark]
-     * @return {@link DataFrame }
-     * */
-    val df_mean = df_medias.groupBy(Dic.colVideoOneLevelClassification).agg(mean(col(Dic.colStorageTimeGap)))
-      .withColumnRenamed("avg(" + Dic.colStorageTimeGap + ")", "mean_" + Dic.colStorageTimeGap)
-
-    printDf("medias中一级分类的" + Dic.colStorageTimeGap + "平均值", df_mean)
-
-    // video的colName全部video平均值
-    val meanValue = df_medias.agg(mean(Dic.colStorageTimeGap)).collectAsList().get(0).get(0)
-    println("mean " + Dic.colStorageTimeGap, meanValue)
-
-
-    val df_mediasJoinMean = df_medias.join(df_mean, Seq(Dic.colVideoOneLevelClassification), "inner")
-    printDf("df_mediasJoinMean", df_mediasJoinMean)
-
-
-    val df_meanFilled = df_mediasJoinMean.withColumn(Dic.colStorageTimeGap, when(col(Dic.colStorageTimeGap).>=(0.0), col(Dic.colStorageTimeGap))
-      .otherwise(col("mean_" + Dic.colStorageTimeGap)))
-      .na.fill(Map((Dic.colStorageTimeGap, meanValue)))
-      .drop("mean_" + Dic.colStorageTimeGap)
-
-    df_meanFilled.withColumn(Dic.colStorageTimeGap, udfLog(col(Dic.colStorageTimeGap)))
-      .drop(Dic.colVideoOneLevelClassification)
-  }
-
-  def mapVideoVector(df_trainUserPlayHistory: DataFrame, df_videoVector: DataFrame, topNPlayHistory: Int) = {
-    /**
-     * @description: Map the video id list to vector
-     * @param:df_playHistory : df_playHistory Dataframe which has video id list
-     * @param: df_videoVector  : Video Vector Dataframe, (columns video_id, vector)
-     * @param: topNPlayHistory : play history video's number
-     * @return: org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
-     * @author: wx
-     * @Date: 2020/11/26
-     */
-
-    import scala.collection.mutable
-
-    /**
-     * Medias to Map( video_id -> vector)
-     */
-    // medias map( id-> vector )
-    val mediasMap = df_videoVector.rdd //Dataframe转化为RDD
-      .map(row => row.getAs(Dic.colVideoId).toString -> row.getAs("vector").toString)
-      .collectAsMap() //将key-value对类型的RDD转化成Map
-      .asInstanceOf[mutable.HashMap[String, String]]
-
-    println("Medias Map size", mediasMap.size)
-
-    printDf("df_trainUserPlayHistory", df_trainUserPlayHistory)
-
-    val df_playVector = df_trainUserPlayHistory.withColumn("play_vector", mapIdToMediasVector(mediasMap)(col(Dic.colVideoId + "_list")))
-      .drop(Dic.colVideoId + "_list")
-
-
-    printDf("df_playVector", df_playVector)
-
-    df_playVector
-
-  }
-
 
 }
