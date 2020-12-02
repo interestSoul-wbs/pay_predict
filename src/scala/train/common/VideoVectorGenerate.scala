@@ -17,10 +17,10 @@ object VideoVectorGenerate {
     Logger.getLogger("org").setLevel(Level.ERROR)
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("VideoVectorGenerate")
-      //.master("local[6]")
+      .master("local[6]")
       .getOrCreate()
-    //val hdfsPath=""
-    val hdfsPath="hdfs:///pay_predict/"
+    val hdfsPath=""
+    //val hdfsPath="hdfs:///pay_predict/"
     val playsProcessedPath=hdfsPath+"data/train/common/processed/plays"
     val now=args(0)+" "+args(1)
     val plays = getData(spark,playsProcessedPath)
@@ -36,7 +36,7 @@ object VideoVectorGenerate {
 
     printDf("videoVector",videoDict)
     val videoVectorPath=hdfsPath+"data/train/common/processed/videovector"+args(0)
-    videoDict.write.mode(SaveMode.Overwrite).format("parquet").save(videoVectorPath)
+    //videoDict.write.mode(SaveMode.Overwrite).format("parquet").save(videoVectorPath)
     //wordDict
 
   }
@@ -63,6 +63,7 @@ object VideoVectorGenerate {
       .agg(collect_list(col(Dic.colVideoId)).as("video_list"))
     playsList
   }
+
   def getVector(playsList:DataFrame) ={
     /**
      *@author wj

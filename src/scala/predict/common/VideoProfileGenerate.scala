@@ -184,6 +184,7 @@ object VideoProfileGenerate {
     val mediasProcessedPath=hdfsPath+"data/predict/common/processed/mediastemp"
     val playsProcessedPath=hdfsPath+"data/predict/common/processed/plays"
     val ordersProcessedPath=hdfsPath+"data/predict/common/processed/orders"
+
     //val now=args(0)+" "+args(1)
     val now = "2020-04-23 00:00:00"
     videoProfileGenerate(now,30,mediasProcessedPath,playsProcessedPath,ordersProcessedPath,hdfsPath)

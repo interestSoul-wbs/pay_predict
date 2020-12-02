@@ -1,7 +1,7 @@
 package predict.userpay
 
 import mam.Dic
-import mam.Utils.{calDate, printDf, udfGetDays}
+import mam.Utils.{calDate, getData, printDf, saveProcessedData, udfGetDays}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
 import org.apache.spark.sql.{SaveMode, SparkSession}
@@ -10,25 +10,23 @@ import scala.collection.mutable.ListBuffer
 
 object UserProfileGeneratePlayPartForUserpay {
 
-  def userProfileGeneratePlayPart(now: String, timeWindow: Int, medias_path: String, plays_path: String, orders_path: String, hdfsPath: String): Unit = {
+  def userProfileGeneratePlayPart(now: String, mediasPath: String, playsPath: String, predictUserPath: String, userProfilePlayPartSavePath: String): Unit = {
     System.setProperty("hadoop.home.dir", "c:\\winutils")
     Logger.getLogger("org").setLevel(Level.ERROR)
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("UserProfileGeneratePlayPartForUserpayPredict")
-      //.master("local[6]")
+      .master("local[6]")
       .getOrCreate()
-    //设置shuffle过程中分区数
-    // spark.sqlContext.setConf("spark.sql.shuffle.partitions", "1000")
+
     import org.apache.spark.sql.functions._
 
-    val medias = spark.read.format("parquet").load(medias_path)
-    val plays = spark.read.format("parquet").load(plays_path)
-    val orders = spark.read.format("parquet").load(orders_path)
+    val df_medias = getData(spark, mediasPath)
+    val df_plays = getData(spark, playsPath)
+    val df_predictUsers = getData(spark, predictUserPath)
+    val df_predictId = df_predictUsers.select(Dic.colUserId)
 
-    val userListPath = hdfsPath + "data/train/userpay/allUsers/user_id.txt"
-    var result = spark.read.format("csv").load(userListPath).toDF(Dic.colUserId)
-    printDf("全部用户: ", result)
-
+    val df_predictUserPlay = df_predictId.join(df_plays, Seq(Dic.colUserId), "inner")
+      .withColumn(Dic.colPlayDate, col(Dic.colPlayStartTime).substr(1,10))
 
     val pre_30 = calDate(now, -30)
     val pre_14 = calDate(now, days = -14)
@@ -36,77 +34,64 @@ object UserProfileGeneratePlayPartForUserpay {
     val pre_3 = calDate(now, -3)
     val pre_1 = calDate(now, -1)
 
-    //设置DataFrame列表
-    val dataFrameList = ListBuffer()
 
 
-    val play_part_1 = plays
+    val play_part_1 = df_predictUserPlay
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_30))
       .groupBy(col(Dic.colUserId))
       .agg(
-        countDistinct(col(Dic.colPlayStartTime)).as(Dic.colActiveDaysLast30Days),
+        countDistinct(col(Dic.colPlayDate)).as(Dic.colActiveDaysLast30Days),
         sum(col(Dic.colTimeSum)).as(Dic.colTotalTimeLast30Days),
         udfGetDays(max(col(Dic.colPlayStartTime)), lit(now)).as(Dic.colDaysFromLastActive),
         udfGetDays(min(col(Dic.colPlayStartTime)), lit(now)).as(Dic.colDaysSinceFirstActiveInTimewindow))
       .withColumn(Dic.colTotalTimeLast30Days, round(col(Dic.colTotalTimeLast30Days) / 60, 0))
 
 
-    val play_part_2 = plays
+    val play_part_2 = df_predictUserPlay
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_14))
       .groupBy(col(Dic.colUserId))
       .agg(
-        countDistinct(col(Dic.colPlayStartTime)).as(Dic.colActiveDaysLast14Days),
+        countDistinct(col(Dic.colPlayDate)).as(Dic.colActiveDaysLast14Days),
         sum(col(Dic.colTimeSum)).as(Dic.colTotalTimeLast14Days)
       ).withColumn(Dic.colTotalTimeLast14Days, round(col(Dic.colTotalTimeLast14Days) / 60, 0))
 
 
-    val play_part_3 = plays
+    val play_part_3 = df_predictUserPlay
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_7))
       .groupBy(col(Dic.colUserId))
       .agg(
-        countDistinct(col(Dic.colPlayStartTime)).as(Dic.colActiveDaysLast7Days),
+        countDistinct(col(Dic.colPlayDate)).as(Dic.colActiveDaysLast7Days),
         sum(col(Dic.colTimeSum)).as(Dic.colTotalTimeLast7Days)
       )
       .withColumn(Dic.colTotalTimeLast7Days, round(col(Dic.colTotalTimeLast7Days) / 60, 0))
 
-    val play_part_4 = plays
+    val play_part_4 = df_predictUserPlay
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_3))
       .groupBy(col(Dic.colUserId))
       .agg(
-        countDistinct(col(Dic.colPlayStartTime)).as(Dic.colActiveDaysLast3Days),
+        countDistinct(col(Dic.colPlayDate)).as(Dic.colActiveDaysLast3Days),
         sum(col(Dic.colTimeSum)).as(Dic.colTotalTimeLast3Days)
       )
       .withColumn(Dic.colTotalTimeLast3Days, round(col(Dic.colTotalTimeLast3Days) / 60, 0))
-    //
-    //    dataFrameList:+(play_part_1)
-    //    dataFrameList:+(play_part_2)
-    //    dataFrameList:+(play_part_3)
-    //    dataFrameList:+(play_part_4)
-    //    val joinKeysUserId = Seq(Dic.colUserId)
-    //    var play_part_result=result
-    //    for(elem <- dataFrameList){
-    //        play_part_result=play_part_result.join(elem,joinKeysUserId,"left")
-    //    }
-    //    play_part_result.show()
 
     val joinKeysUserId = Seq(Dic.colUserId)
-    result = result.join(play_part_1, joinKeysUserId, "left")
+    var df_predictUserProfilePlay = df_predictId.join(play_part_1, joinKeysUserId, "left")
       .join(play_part_2, joinKeysUserId, "left")
       .join(play_part_3, joinKeysUserId, "left")
       .join(play_part_4, joinKeysUserId, "left")
 
     val joinKeyVideoId = Seq(Dic.colVideoId)
-    val user_medias = plays.join(medias, joinKeyVideoId, "inner")
+    val df_predictUserPlayMedias = df_predictUserPlay.join(df_medias, joinKeyVideoId, "inner")
 
-    val play_medias_part_11 = user_medias
+    val play_medias_part_11 = df_predictUserPlayMedias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_30)
@@ -117,7 +102,7 @@ object UserProfileGeneratePlayPartForUserpay {
       )
       .withColumn(Dic.colTotalTimePaidVideosLast30Days, round(col(Dic.colTotalTimePaidVideosLast30Days) / 60, 0))
 
-    val play_medias_part_12 = user_medias
+    val play_medias_part_12 = df_predictUserPlayMedias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_14)
@@ -128,7 +113,7 @@ object UserProfileGeneratePlayPartForUserpay {
       )
       .withColumn(Dic.colTotalTimePaidVideosLast14Days, round(col(Dic.colTotalTimePaidVideosLast14Days) / 60, 0))
 
-    val play_medias_part_13 = user_medias
+    val play_medias_part_13 = df_predictUserPlayMedias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_7)
@@ -139,7 +124,7 @@ object UserProfileGeneratePlayPartForUserpay {
       )
       .withColumn(Dic.colTotalTimePaidVideosLast7Days, round(col(Dic.colTotalTimePaidVideosLast7Days) / 60, 0))
 
-    val play_medias_part_14 = user_medias
+    val play_medias_part_14 = df_predictUserPlayMedias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_3)
@@ -150,7 +135,7 @@ object UserProfileGeneratePlayPartForUserpay {
       )
       .withColumn(Dic.colTotalTimePaidVideosLast3Days, round(col(Dic.colTotalTimePaidVideosLast3Days) / 60, 0))
 
-    val play_medias_part_15 = user_medias
+    val play_medias_part_15 = df_predictUserPlayMedias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_1)
@@ -161,14 +146,14 @@ object UserProfileGeneratePlayPartForUserpay {
       )
       .withColumn(Dic.colTotalTimePaidVideosLast1Days, round(col(Dic.colTotalTimePaidVideosLast1Days) / 60, 0))
 
-    result = result.join(play_medias_part_11, joinKeysUserId, "left")
+    df_predictUserProfilePlay = df_predictUserProfilePlay.join(play_medias_part_11, joinKeysUserId, "left")
       .join(play_medias_part_12, joinKeysUserId, "left")
       .join(play_medias_part_13, joinKeysUserId, "left")
       .join(play_medias_part_14, joinKeysUserId, "left")
       .join(play_medias_part_15, joinKeysUserId, "left")
 
 
-    val play_medias_part_21 = user_medias
+    val play_medias_part_21 = df_predictUserPlayMedias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_30)
@@ -181,7 +166,7 @@ object UserProfileGeneratePlayPartForUserpay {
       )
       .withColumn(Dic.colTotalTimeInPackageVideosLast30Days, round(col(Dic.colTotalTimeInPackageVideosLast30Days) / 60, 0))
 
-    val play_medias_part_22 = user_medias
+    val play_medias_part_22 = df_predictUserPlayMedias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_14)
@@ -194,7 +179,7 @@ object UserProfileGeneratePlayPartForUserpay {
       )
       .withColumn(Dic.colTotalTimeInPackageVideosLast14Days, round(col(Dic.colTotalTimeInPackageVideosLast14Days) / 60, 0))
 
-    val play_medias_part_23 = user_medias
+    val play_medias_part_23 = df_predictUserPlayMedias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_7)
@@ -207,7 +192,7 @@ object UserProfileGeneratePlayPartForUserpay {
       )
       .withColumn(Dic.colTotalTimeInPackageVideosLast7Days, round(col(Dic.colTotalTimeInPackageVideosLast7Days) / 60, 0))
 
-    val play_medias_part_24 = user_medias
+    val play_medias_part_24 = df_predictUserPlayMedias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_3)
@@ -220,7 +205,7 @@ object UserProfileGeneratePlayPartForUserpay {
       )
       .withColumn(Dic.colTotalTimeInPackageVideosLast3Days, round(col(Dic.colTotalTimeInPackageVideosLast3Days) / 60, 0))
 
-    val play_medias_part_25 = user_medias
+    val play_medias_part_25 = df_predictUserPlayMedias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_1)
@@ -233,14 +218,14 @@ object UserProfileGeneratePlayPartForUserpay {
       )
       .withColumn(Dic.colTotalTimeInPackageVideosLast1Days, round(col(Dic.colTotalTimeInPackageVideosLast1Days) / 60, 0))
 
-    result = result.join(play_medias_part_21, joinKeysUserId, "left")
+    df_predictUserProfilePlay = df_predictUserProfilePlay.join(play_medias_part_21, joinKeysUserId, "left")
       .join(play_medias_part_22, joinKeysUserId, "left")
       .join(play_medias_part_23, joinKeysUserId, "left")
       .join(play_medias_part_24, joinKeysUserId, "left")
       .join(play_medias_part_25, joinKeysUserId, "left")
 
 
-    val play_medias_part_31 = user_medias
+    val play_medias_part_31 = df_predictUserPlayMedias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_30)
@@ -252,7 +237,7 @@ object UserProfileGeneratePlayPartForUserpay {
       )
       .withColumn(Dic.colTotalTimeChildrenVideosLast30Days, round(col(Dic.colTotalTimeChildrenVideosLast30Days) / 60, 0))
 
-    val play_medias_part_32 = user_medias
+    val play_medias_part_32 = df_predictUserPlayMedias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_14)
@@ -264,7 +249,7 @@ object UserProfileGeneratePlayPartForUserpay {
       )
       .withColumn(Dic.colTotalTimeChildrenVideosLast14Days, round(col(Dic.colTotalTimeChildrenVideosLast14Days) / 60, 0))
 
-    val play_medias_part_33 = user_medias
+    val play_medias_part_33 = df_predictUserPlayMedias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_7)
@@ -276,7 +261,7 @@ object UserProfileGeneratePlayPartForUserpay {
       )
       .withColumn(Dic.colTotalTimeChildrenVideosLast7Days, round(col(Dic.colTotalTimeChildrenVideosLast7Days) / 60, 0))
 
-    val play_medias_part_34 = user_medias
+    val play_medias_part_34 = df_predictUserPlayMedias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_3)
@@ -288,7 +273,7 @@ object UserProfileGeneratePlayPartForUserpay {
       )
       .withColumn(Dic.colTotalTimeChildrenVideosLast3Days, round(col(Dic.colTotalTimeChildrenVideosLast3Days) / 60, 0))
 
-    val play_medias_part_35 = user_medias
+    val play_medias_part_35 = df_predictUserPlayMedias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_1)
@@ -301,34 +286,33 @@ object UserProfileGeneratePlayPartForUserpay {
       .withColumn(Dic.colTotalTimeChildrenVideosLast1Days, round(col(Dic.colTotalTimeChildrenVideosLast1Days) / 60, 0))
 
 
-    result = result.join(play_medias_part_31, joinKeysUserId, "left")
+    df_predictUserProfilePlay = df_predictUserProfilePlay.join(play_medias_part_31, joinKeysUserId, "left")
       .join(play_medias_part_32, joinKeysUserId, "left")
       .join(play_medias_part_33, joinKeysUserId, "left")
       .join(play_medias_part_34, joinKeysUserId, "left")
       .join(play_medias_part_35, joinKeysUserId, "left")
 
 
-    val userProfilePlayPartSavePath = hdfsPath + "data/predict/common/processed/userpay/userprofileplaypart" + now.split(" ")(0)
     //大约有85万用户
-    result.write.mode(SaveMode.Overwrite).format("parquet").save(userProfilePlayPartSavePath)
+    saveProcessedData(df_predictUserProfilePlay, userProfilePlayPartSavePath)
 
-
+    println("userprofileplaypart done!")
   }
 
 
   def main(args: Array[String]): Unit = {
-    val hdfsPath = "hdfs:///pay_predict/"
-    //val hdfsPath=""
-    /**
-     * 处理后的数据统一放在train下
-     */
-    val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
-    val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3" //userpay
-    val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders" //userpay
 
     val now = args(0) + " " + args(1)
-    userProfileGeneratePlayPart(now, 30, mediasProcessedPath, playsProcessedPath, ordersProcessedPath, hdfsPath)
 
+    //    val hdfsPath = "hdfs:///pay_predict/"
+    val hdfsPath=""
+
+    val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
+    val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3" //userpay
+    val predictUserPath = hdfsPath + "data/predict/userpay/predictUsers" + args(0)
+    val userProfilePlayPartSavePath = hdfsPath + "data/predict/common/processed/userpay/userprofileplaypart" + args(0)
+
+    userProfileGeneratePlayPart(now, mediasProcessedPath, playsProcessedPath, predictUserPath, userProfilePlayPartSavePath)
 
   }
 

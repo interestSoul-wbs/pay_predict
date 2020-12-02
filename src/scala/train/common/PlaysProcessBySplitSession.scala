@@ -1,7 +1,7 @@
 package train.common
 
 import mam.Dic
-import mam.Utils.{getData, printDf, saveProcessedData, udfAddSuffix, udfLongToDateTime}
+import mam.Utils.{getData, printDf, saveProcessedData, udfLongToDateTime}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
 import org.apache.spark.sql.expressions.Window
@@ -33,7 +33,7 @@ object PlaysProcessBySplitSession {
     val playRaw = getRawPlays(playRawPath, spark)
     printDf("输入 playRaw", playRaw)
 
-    val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp" //HDFS路径
+    val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
     val mediasProcessed = getData(spark, mediasProcessedPath)
 
     val playsProcessed = playsProcessBySpiltSession(playRaw, mediasProcessed)

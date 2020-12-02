@@ -17,8 +17,7 @@ object UserProfileGeneratePlayPart {
       .appName("UserProfileGeneratePlayPart")
       //.master("local[6]")
       .getOrCreate()
-    //设置shuffle过程中分区数
-   // spark.sqlContext.setConf("spark.sql.shuffle.partitions", "1000")
+
     import org.apache.spark.sql.functions._
 
     val medias = spark.read.format("parquet").load(medias_path)
@@ -37,9 +36,6 @@ object UserProfileGeneratePlayPart {
     val pre_7 = calDate(now, -7)
     val pre_3 = calDate(now, -3)
     val pre_1 = calDate(now, -1)
-
-    //设置DataFrame列表
-    val dataFrameList=ListBuffer()
 
 
     val play_part_1 = plays
@@ -83,17 +79,6 @@ object UserProfileGeneratePlayPart {
         countDistinct(col(Dic.colPlayEndTime)).as(Dic.colActiveDaysLast3Days),
         sum(col(Dic.colBroadcastTime)).as(Dic.colTotalTimeLast3Days)
       )
-//
-//    dataFrameList:+(play_part_1)
-//    dataFrameList:+(play_part_2)
-//    dataFrameList:+(play_part_3)
-//    dataFrameList:+(play_part_4)
-//    val joinKeysUserId = Seq(Dic.colUserId)
-//    var play_part_result=result
-//    for(elem <- dataFrameList){
-//        play_part_result=play_part_result.join(elem,joinKeysUserId,"left")
-//    }
-//    play_part_result.show()
 
     val joinKeysUserId = Seq(Dic.colUserId)
      result=result.join(play_part_1,joinKeysUserId,"left")

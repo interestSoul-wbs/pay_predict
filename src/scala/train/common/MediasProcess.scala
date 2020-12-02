@@ -4,7 +4,6 @@ import mam.Dic
 import mam.Utils.{printDf, saveProcessedData, udfGetDays, udfLongToTimestampV2}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.ml.feature.Imputer
-import org.apache.spark.{SparkConf, SparkContext, sql}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.expressions.Window
@@ -22,7 +21,7 @@ object MediasProcess {
     val spark = SparkSession
       .builder()
       .master("local[6]") // 上传 master 时，删除
-      .enableHiveSupport()
+//      .enableHiveSupport()
       .getOrCreate()
 
     // 2 - 所有这些 文件 的读取和存储路径，全部包含到函数里，不再当参数传入，见例子 - getRawMediaData
@@ -33,7 +32,7 @@ object MediasProcess {
     val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
     val videoFirstCategoryTempPath = hdfsPath + "data/train/common/processed/videofirstcategorytemp.txt"
     val videoSecondCategoryTempPath = hdfsPath + "data/train/common/processed/videosecondcategorytemp.txt"
-    val labelTempPath = hdfsPath + "data/train/common/processed/labeltemp.txt" ///pay_predict/data/train/common/processed
+    val labelTempPath = hdfsPath + "data/train/common/processed/labeltemp.txt"
 
     // 3 - 获取原始数据
     // 在 GetAndSaveData 中，创建同名的 读取或存储函数 - spark允许，同名但是传入参数不同的 函数存在；
@@ -51,9 +50,9 @@ object MediasProcess {
     printDf("df_medias_processed", df_medias_processed)
 
     // 保存标签
-    getSingleStrColLabelAndSave(df_medias_processed, Dic.colVideoOneLevelClassification, videoFirstCategoryTempPath)
-    getArrayStrColLabelAndSave(df_medias_processed, Dic.colVideoTwoLevelClassificationList, videoSecondCategoryTempPath)
-    getArrayStrColLabelAndSave(df_medias_processed, Dic.colVideoTagList, labelTempPath)
+//    getSingleStrColLabelAndSave(df_medias_processed, Dic.colVideoOneLevelClassification, videoFirstCategoryTempPath)
+//    getArrayStrColLabelAndSave(df_medias_processed, Dic.colVideoTwoLevelClassificationList, videoSecondCategoryTempPath)
+//    getArrayStrColLabelAndSave(df_medias_processed, Dic.colVideoTagList, labelTempPath)
 
     // 导演 演员尚未处理 目前还未使用到
     println("媒资数据处理完成！")
@@ -96,7 +95,6 @@ object MediasProcess {
         (Dic.colVideoOneLevelClassification, "其他")))
       //添加新列 是否在套餐内
       .withColumn(Dic.colInPackage, when(col(Dic.colPackageId).>(0), 1).otherwise(0))
-    //      .na.drop(Array(Dic.colVideoId))   This very very very low !!!
 
 
     printDf("基本处理后的med", df_modified_format)
@@ -115,11 +113,11 @@ object MediasProcess {
   }
 
   /**
-    * @author wj
-    * @param [dfModifiedFormat ]
-    * @return org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
-    * @description 将指定的列使用均值进行填充
-    */
+   * @author wj
+   * @param [dfModifiedFormat ]
+   * @return org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
+   * @description 将指定的列使用均值进行填充
+   */
   def meanFill(dfModifiedFormat: DataFrame, cols: Array[String]) = {
 
 
@@ -134,12 +132,12 @@ object MediasProcess {
   }
 
   /**
-    * @describe 根据video的视频一级分类进行相关列空值的填充
-    * @author wx
-    * @param [mediasDf ]
-    * @param [spark ]
-    * @return { @link DataFrame }
-    **/
+   * @describe 根据video的视频一级分类进行相关列空值的填充
+   * @author wx
+   * @param [mediasDf ]
+   * @param [spark ]
+   * @return { @link DataFrame }
+   * */
   def meanFillAccordLevelOne(df_medias: DataFrame, colName: String) = {
 
     val df_mean = df_medias
@@ -160,6 +158,7 @@ object MediasProcess {
       .asInstanceOf[mutable.HashMap[String, String]]
 
     meanMap ++ Map(("meanValue", meanValue))
+    println(meanMap)
 
     // 还没改完。。。。。。。。。。
     //    val df_mediasFilled = df_medias.withColumn(colName, fillUseMap(meanMap)(col(colName)))
@@ -176,6 +175,7 @@ object MediasProcess {
     //      .drop("mean" + colName + "AccordLevelOne")
     //
     //    df_meanFilled
+    df_mean
   }
 
 
