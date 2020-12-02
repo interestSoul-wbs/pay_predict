@@ -9,21 +9,24 @@ import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-
+import mam.GetSaveData._
 import scala.collection.mutable
 
 object MediasProcess {
 
   def main(args: Array[String]): Unit = {
 
-    System.setProperty("hadoop.home.dir", "c:\\winutils")
-    Logger.getLogger("org").setLevel(Level.ERROR)
-    val spark: SparkSession = new sql.SparkSession.Builder()
-      .appName("MediasProcess")
-      .master("local[6]")
+    System.setProperty("hadoop.home.dir", "c:\\winutils") // 上传 master 时，删除
+    Logger.getLogger("org").setLevel(Level.ERROR) // 上传 master 时，删除
+
+    val spark = SparkSession
+      .builder()
+      .master("local[6]") // 上传 master 时，删除
+      .enableHiveSupport()
       .getOrCreate()
 
-
+    // 2 - 所有这些 文件 的读取和存储路径，全部包含到函数里，不再当参数传入，见例子 - getRawMediaData
+    // 以下的这些 路径， 都不应该在存在于这个文件中， 见例子 - getRawMediaData 的读取方式
     //val hdfsPath="hdfs:///pay_predict/"
     val hdfsPath = ""
 
@@ -32,13 +35,16 @@ object MediasProcess {
     val videoSecondCategoryTempPath = hdfsPath + "data/train/common/processed/videosecondcategorytemp.txt"
     val labelTempPath = hdfsPath + "data/train/common/processed/labeltemp.txt" ///pay_predict/data/train/common/processed
 
-    // 获取原始数据
-    val df_rawMedias = getRawMedias(spark)
+    // 3 - 获取原始数据
+    // 在 GetAndSaveData 中，创建同名的 读取或存储函数 - spark允许，同名但是传入参数不同的 函数存在；
+    // 例： 有 2个getRawMediaData，一个是我调用的，一个是你调用的，它们同名，但是传参不一样；
+    // 参考 Konverse分支中，相关读取、存储数据函数的命名；
+    val df_raw_medias = getRawMediaData(spark)
 
-    printDf("输入 mediasRaw", df_rawMedias)
+    printDf("输入 mediasRaw", df_raw_medias)
 
     // 对数据进行处理
-    val df_medias_processed = mediasProcess(df_rawMedias)
+    val df_medias_processed = mediasProcess(df_raw_medias)
 
     saveProcessedData(df_medias_processed, mediasProcessedPath)
 
@@ -50,81 +56,8 @@ object MediasProcess {
     getArrayStrColLabelAndSave(df_medias_processed, Dic.colVideoTagList, labelTempPath)
 
     // 导演 演员尚未处理 目前还未使用到
-
-
     println("媒资数据处理完成！")
-
   }
-
-  /**
-    * @author wj
-    * @param [spark , rawMediasPath]
-    * @return org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
-    * @description 读取原始文件
-    */
-  def getRawMedias(spark: SparkSession) = {
-
-    val hdfsPath = ""
-
-    val mediasRawPath = hdfsPath + "data/train/common/raw/medias/*"
-
-    val schema = StructType(
-      List(
-        StructField(Dic.colVideoId, StringType),
-        StructField(Dic.colVideoTitle, StringType),
-        StructField(Dic.colVideoOneLevelClassification, StringType),
-        StructField(Dic.colVideoTwoLevelClassificationList, StringType),
-        StructField(Dic.colVideoTagList, StringType),
-        StructField(Dic.colDirectorList, StringType),
-        StructField(Dic.colActorList, StringType),
-        StructField(Dic.colCountry, StringType),
-        StructField(Dic.colLanguage, StringType),
-        StructField(Dic.colReleaseDate, StringType),
-        StructField(Dic.colStorageTime, StringType),
-        //视频时长
-        StructField(Dic.colVideoTime, StringType),
-        StructField(Dic.colScore, StringType),
-        StructField(Dic.colIsPaid, StringType),
-        StructField(Dic.colPackageId, StringType),
-        StructField(Dic.colIsSingle, StringType),
-        //是否片花
-        StructField(Dic.colIsTrailers, StringType),
-        StructField(Dic.colSupplier, StringType),
-        StructField(Dic.colIntroduction, StringType)
-      )
-    )
-
-    // Konverse - 注意 df 的命名 - df_相关属性 - 不要 dfRawMedia
-    val df_raw_media = spark.read
-      .option("delimiter", "\\t")
-      .option("header", false)
-      .schema(schema)
-      .csv(mediasRawPath)
-      .select(
-        when(col(Dic.colVideoId) === "NULL", null).otherwise(col(Dic.colVideoId)).as(Dic.colVideoId),
-        when(col(Dic.colVideoTitle) === "NULL", null).otherwise(col(Dic.colVideoTitle)).as(Dic.colVideoTitle),
-        when(col(Dic.colVideoOneLevelClassification) === "NULL" or (col(Dic.colVideoOneLevelClassification) === ""), null).otherwise(col(Dic.colVideoOneLevelClassification)).as(Dic.colVideoOneLevelClassification),
-        from_json(col(Dic.colVideoTwoLevelClassificationList), ArrayType(StringType, containsNull = true)).as(Dic.colVideoTwoLevelClassificationList),
-        from_json(col(Dic.colVideoTagList), ArrayType(StringType, containsNull = true)).as(Dic.colVideoTagList),
-        from_json(col(Dic.colDirectorList), ArrayType(StringType, containsNull = true)).as(Dic.colDirectorList),
-        from_json(col(Dic.colActorList), ArrayType(StringType, containsNull = true)).as(Dic.colActorList),
-        when(col(Dic.colVideoOneLevelClassification).isNotNull, col(Dic.colVideoOneLevelClassification)), // Konverse - 这一步 相当于缺失值填充，被移动到了 process
-        when(col(Dic.colCountry) === "NULL", null).otherwise(col(Dic.colCountry)).as(Dic.colCountry),
-        when(col(Dic.colLanguage) === "NULL", null).otherwise(col(Dic.colLanguage)).as(Dic.colLanguage),
-        when(col(Dic.colReleaseDate) === "NULL", null).otherwise(col(Dic.colReleaseDate)).as(Dic.colReleaseDate),
-        when(col(Dic.colStorageTime) === "NULL", null).otherwise(col(Dic.colStorageTime)).as(Dic.colStorageTime), // Konverse - 这一步的udf被移动到了 process
-        when(col(Dic.colVideoTime) === "NULL", null).otherwise(col(Dic.colVideoTime) cast DoubleType).as(Dic.colVideoTime),
-        when(col(Dic.colScore) === "NULL", null).otherwise(col(Dic.colScore) cast DoubleType).as(Dic.colScore),
-        when(col(Dic.colIsPaid) === "NULL", null).otherwise(col(Dic.colIsPaid) cast DoubleType).as(Dic.colIsPaid),
-        when(col(Dic.colPackageId) === "NULL", null).otherwise(col(Dic.colPackageId)).as(Dic.colPackageId),
-        when(col(Dic.colIsSingle) === "NULL", null).otherwise(col(Dic.colIsSingle) cast DoubleType).as(Dic.colIsSingle),
-        when(col(Dic.colIsTrailers) === "NULL", null).otherwise(col(Dic.colIsTrailers) cast DoubleType).as(Dic.colIsTrailers),
-        when(col(Dic.colSupplier) === "NULL", null).otherwise(col(Dic.colSupplier)).as(Dic.colSupplier),
-        when(col(Dic.colIntroduction) === "NULL", null).otherwise(col(Dic.colIntroduction)).as(Dic.colIntroduction))
-
-    df_raw_media
-  }
-
 
   def mediasProcess(df_raw_media: DataFrame) = {
 
@@ -172,6 +105,7 @@ object MediasProcess {
 
     // 根据一级分类填充空值
     val dfMeanScoreFill = meanFillAccordLevelOne(df_modified_format, Dic.colScore)
+
     val dfMeanVideoTimeFill = meanFillAccordLevelOne(dfMeanScoreFill, Dic.colVideoTime)
 
     printDf("填充空值之后", dfMeanVideoTimeFill)
