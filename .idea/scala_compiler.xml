@@ -3,8 +3,7 @@
   <component name="ScalaCompilerConfiguration">
     <profile name="Maven 1" modules="pay_predict">
       <parameters>
-        <parameter value="-dependencyfile" />
-        <parameter value="G:\pay_predict\target/.scala_dependencies" />
+        <parameter value="-target:jvm-1.5" />
       </parameters>
     </profile>
   </component>
