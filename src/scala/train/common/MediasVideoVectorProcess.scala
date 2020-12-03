@@ -39,7 +39,7 @@ object MediasVideoVectorProcess {
 
 
     /**
-     *  Process Medias Vector
+     * Process Medias Vector
      */
     val df_mediasVecMultiCol = mediasVectorProces(df_medias, df_plays)
 
@@ -72,10 +72,15 @@ object MediasVideoVectorProcess {
     val df_mediasPlayedProcess = df_mediasPlayed
       .na.drop("all")
       .dropDuplicates(Dic.colVideoId)
-      .na.fill(Map((Dic.colVideoOneLevelClassification, "其他")))
+      .na.fill(
+      Map((Dic.colVideoOneLevelClassification, "其他"))
+    )
       .withColumn(Dic.colVideoTwoLevelClassificationList,
-        when(col(Dic.colVideoTwoLevelClassificationList).isNotNull, col(Dic.colVideoTwoLevelClassificationList)).otherwise(Array("其他")))
-      .withColumn(Dic.colVideoTagList, when(col(Dic.colVideoTagList).isNotNull, col(Dic.colVideoTagList)).otherwise(Array("其他")))
+        when(col(Dic.colVideoTwoLevelClassificationList).isNotNull, col(Dic.colVideoTwoLevelClassificationList))
+          .otherwise(Array("其他")))
+      .withColumn(Dic.colVideoTagList,
+        when(col(Dic.colVideoTagList).isNotNull, col(Dic.colVideoTagList))
+          .otherwise(Array("其他")))
 
     val df_mediasPlayedLabels = df_mediasPlayedProcess.select(Dic.colVideoId, Dic.colVideoOneLevelClassification, Dic.colVideoTwoLevelClassificationList, Dic.colVideoTagList)
 
@@ -124,9 +129,6 @@ object MediasVideoVectorProcess {
 
 
   }
-
-
-
 
 
   def getVector(df: DataFrame, vectorDimension: Int, colName: String) = {

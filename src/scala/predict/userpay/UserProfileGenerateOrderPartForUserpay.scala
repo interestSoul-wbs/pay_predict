@@ -5,6 +5,7 @@ import mam.Utils.{calDate, getData, printDf, saveProcessedData, udfGetDays}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
 import org.apache.spark.sql.{SparkSession}
+
 object UserProfileGenerateOrderPartForUserpay {
 
   def userProfileGenerateOrderPart(now: String, timeWindow: Int, ordersPath: String, predictUserPath: String, userProfileOrderPartSavePath: String): Unit = {
@@ -12,7 +13,7 @@ object UserProfileGenerateOrderPartForUserpay {
     Logger.getLogger("org").setLevel(Level.ERROR)
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("UserProfileGenerateOrderPartForUserpayPredict")
-      .master("local[6]")
+      //.master("local[6]")
       .getOrCreate()
 
     import org.apache.spark.sql.functions._
@@ -20,7 +21,6 @@ object UserProfileGenerateOrderPartForUserpay {
     val df_orders = getData(spark, ordersPath)
     val df_predictUsers = getData(spark, predictUserPath)
     val df_predictId = df_predictUsers.select(Dic.colUserId)
-
 
 
     val pre_30 = calDate(now, -30)
@@ -158,7 +158,7 @@ object UserProfileGenerateOrderPartForUserpay {
 
     //当前是否是连续包月
 
-    var df_predictUserProfileOrder = df_predictId.join(order_part_1, joinKeysUserId, "left")
+    val df_predictUserProfileOrder = df_predictId.join(order_part_1, joinKeysUserId, "left")
       .join(order_part_2, joinKeysUserId, "left")
       .join(order_part_3, joinKeysUserId, "left")
       .join(order_part_4, joinKeysUserId, "left")
@@ -185,16 +185,14 @@ object UserProfileGenerateOrderPartForUserpay {
     val now = args(0) + " " + args(1)
     println(now)
 
-    //    val hdfsPath = "hdfs:///pay_predict/"
-    val hdfsPath = ""
+    val hdfsPath = "hdfs:///pay_predict/"
+    //val hdfsPath = ""
     val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders3" //userpay
     val predictUserPath = hdfsPath + "data/predict/userpay/predictUsers" + args(0)
     val userProfileOrderPartSavePath = hdfsPath + "data/predict/common/processed/userpay/userprofileorderpart" + now.split(" ")(0)
 
 
-
-
-    userProfileGenerateOrderPart(now, 30, ordersProcessedPath, predictUserPath,userProfileOrderPartSavePath)
+    userProfileGenerateOrderPart(now, 30, ordersProcessedPath, predictUserPath, userProfileOrderPartSavePath)
 
 
   }

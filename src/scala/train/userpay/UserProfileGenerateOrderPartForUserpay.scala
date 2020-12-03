@@ -200,14 +200,14 @@ object UserProfileGenerateOrderPartForUserpay {
     Logger.getLogger("org").setLevel(Level.ERROR)
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("UserProfileGenerateOrderPartForUserpayTrain")
-      .master("local[6]")
+      //.master("local[6]")
       .getOrCreate()
 
 
     val now = args(0) + " " + args(1)
 
-    //val hdfsPath = "hdfs:///pay_predict/"
-    val hdfsPath = ""
+    val hdfsPath = "hdfs:///pay_predict/"
+    //val hdfsPath = ""
 
     val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders3" //userpay
     val trainUsersPath = hdfsPath + "data/train/userpay/trainUsers" + args(0)

@@ -20,14 +20,14 @@ object MediasProcess {
 
     val spark = SparkSession
       .builder()
-      .master("local[6]") // 上传 master 时，删除
-//      .enableHiveSupport()
+      //.master("local[6]") // 上传 master 时，删除
+      //      .enableHiveSupport()
       .getOrCreate()
 
     // 2 - 所有这些 文件 的读取和存储路径，全部包含到函数里，不再当参数传入，见例子 - getRawMediaData
     // 以下的这些 路径， 都不应该在存在于这个文件中， 见例子 - getRawMediaData 的读取方式
-    //val hdfsPath="hdfs:///pay_predict/"
-    val hdfsPath = ""
+    val hdfsPath = "hdfs:///pay_predict/"
+    //val hdfsPath = ""
 
     val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
     val videoFirstCategoryTempPath = hdfsPath + "data/train/common/processed/videofirstcategorytemp.txt"
@@ -39,7 +39,6 @@ object MediasProcess {
     // 例： 有 2个getRawMediaData，一个是我调用的，一个是你调用的，它们同名，但是传参不一样；
     // 参考 Konverse分支中，相关读取、存储数据函数的命名；
     val df_raw_medias = getRawMediaData(spark)
-
     printDf("输入 mediasRaw", df_raw_medias)
 
     // 对数据进行处理
@@ -75,7 +74,8 @@ object MediasProcess {
         col(Dic.colActorList),
         col(Dic.colLanguage),
         col(Dic.colReleaseDate),
-        udfLongToTimestampV2(col(Dic.colStorageTime)).as(Dic.colStorageTime),
+        when(col(Dic.colStorageTime).isNotNull, udfLongToTimestampV2(col(Dic.colStorageTime)))
+          .otherwise(null).as(Dic.colStorageTime),
         col(Dic.colVideoTime),
         col(Dic.colScore),
         col(Dic.colIsPaid),
@@ -85,7 +85,7 @@ object MediasProcess {
         col(Dic.colSupplier),
         col(Dic.colIntroduction))
       .dropDuplicates(Dic.colVideoId)
-      .na.drop()
+      .na.drop("all")
       //是否单点 是否付费 是否先导片 一级分类空值
       .na.fill(
       Map(
@@ -102,14 +102,13 @@ object MediasProcess {
     println("正在填充空值....")
 
     // 根据一级分类填充空值
-    val dfMeanScoreFill = meanFillAccordLevelOne(df_modified_format, Dic.colScore)
+    val df_meanScoreFill = meanFillAccordLevelOne(df_modified_format, Dic.colScore)
+    val df_meanVideoTimeFill = meanFillAccordLevelOne(df_meanScoreFill, Dic.colVideoTime)
 
-    val dfMeanVideoTimeFill = meanFillAccordLevelOne(dfMeanScoreFill, Dic.colVideoTime)
-
-    printDf("填充空值之后", dfMeanVideoTimeFill)
+    printDf("填充空值之后", df_meanVideoTimeFill)
 
 
-    dfMeanVideoTimeFill
+    df_meanVideoTimeFill
   }
 
   /**
@@ -142,40 +141,36 @@ object MediasProcess {
 
     val df_mean = df_medias
       .groupBy(Dic.colVideoOneLevelClassification)
-      .agg(mean(col(colName)))
-      .withColumnRenamed("avg(" + colName + ")", "mean" + colName + "AccordLevelOne")
+      .agg(mean(col(colName)).as("mean_" + colName + "_accord_level_one"))
+
+    printDf("df_mean", df_mean)
 
     val meanValue = df_medias
       .agg(mean(colName))
       .collectAsList()
       .get(0)
       .get(0)
-    println("Mean " + colName, meanValue)
 
-    var meanMap = df_mean.rdd //Dataframe转化为RDD
-      .map(row => row.getAs(Dic.colVideoOneLevelClassification).toString -> row.getAs("mean" + colName + "AccordLevelOne").toString)
+    println("Mean " + colName + " of All Videos", meanValue)
+
+    val df_meanNotNull = df_mean.na.fill(Map(("mean_" + colName + "_accord_level_one", meanValue)))
+    printDf("df_meanNotNull", df_meanNotNull)
+
+    val meanMap = df_meanNotNull.rdd //Dataframe转化为RDD
+      .map(row =>
+        row.getAs(Dic.colVideoOneLevelClassification).toString -> row.getAs("mean_" + colName + "_accord_level_one").toString)
       .collectAsMap() //将key-value对类型的RDD转化成Map
-      .asInstanceOf[mutable.HashMap[String, String]]
+      .asInstanceOf[mutable.HashMap[String, Double]]
 
-    meanMap ++ Map(("meanValue", meanValue))
     println(meanMap)
 
-    // 还没改完。。。。。。。。。。
-    //    val df_mediasFilled = df_medias.withColumn(colName, fillUseMap(meanMap)(col(colName)))
-    //
-    //
-    //
-    //    val df_mediasJoinMean = df_medias.join(df_mean, Seq(Dic.colVideoOneLevelClassification), "inner")
-    //    printDf("df_mediasJoinMean", df_mediasJoinMean)
-    //
-    //
-    //    val df_meanFilled = df_mediasJoinMean.withColumn(colName, when(col(colName).>(0.0), col(colName))
-    //      .otherwise(col("mean" + colName + "AccordLevelOne")))
-    //      .na.fill(Map((colName, meanValue)))
-    //      .drop("mean" + colName + "AccordLevelOne")
-    //
-    //    df_meanFilled
-    df_mean
+    val df_meanFilled = df_medias.na.fill(Map((colName, -1)))
+      .withColumn(colName, fillUseMap(meanMap)(col(colName), col(Dic.colVideoOneLevelClassification)))
+
+    printDf("df_meanFilled", df_meanFilled)
+
+
+    df_meanFilled
   }
 
 
@@ -214,4 +209,16 @@ object MediasProcess {
 
     dfLabel.coalesce(1).write.mode(SaveMode.Overwrite).option("header", "false").csv(labelSavedPath)
   }
+
+  def fillUseMap(fillMap: mutable.HashMap[String, Double]) = udf((value: Double, levelOneType: String) =>
+
+    if (value > 0)
+      value
+    else {
+      println(value, levelOneType)
+      fillMap(levelOneType)
+    }
+  )
+
+
 }

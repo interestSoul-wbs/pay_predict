@@ -16,16 +16,16 @@ object UserSplitForPredict {
 
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("UserSplitForPredict")
-      .master("local[6]")
+      //.master("local[6]")
       .getOrCreate()
 
     val predictTime = args(0) + " " + args(1)
     val timeLength = 14
 
-    //val hdfsPath="hdfs:///pay_predict/"
-    val hdfsPath = ""
+    val hdfsPath="hdfs:///pay_predict/"
+    //val hdfsPath = ""
     val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders3"
-    val predictUsersPath = hdfsPath + "data/predict/userpay/predictUsers" + args(0)
+    val predictUsersSavePath = hdfsPath + "data/predict/userpay/predictUsers" + args(0)
 
     //所有用户id的dataframe
     val allUserPath = hdfsPath + "data/train/userpay/allUsers/user_id.txt"
@@ -35,7 +35,7 @@ object UserSplitForPredict {
     val df_orders = getData(spark, ordersProcessedPath)
 
     val df_allPredictUsers = getPredictSetUsers(df_allUsers, df_orders, predictTime, timeLength)
-    saveProcessedData(df_allPredictUsers, predictUsersPath)
+    saveProcessedData(df_allPredictUsers, predictUsersSavePath)
 
 
   }
@@ -47,7 +47,6 @@ object UserSplitForPredict {
     val predictResourceId = Array(100201, 100202) //要预测的套餐id
 
     //金额异常用户
-
     val df_illegalUsers = df_order.filter(
       col(Dic.colCreationTime) >= predictTime and col(Dic.colCreationTime) < calDate(predictTime, timeLength)
         && (col(Dic.colResourceType) > 0 and col(Dic.colResourceType) < 4)

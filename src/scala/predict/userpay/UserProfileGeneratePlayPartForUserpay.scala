@@ -15,7 +15,7 @@ object UserProfileGeneratePlayPartForUserpay {
     Logger.getLogger("org").setLevel(Level.ERROR)
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("UserProfileGeneratePlayPartForUserpayPredict")
-      .master("local[6]")
+      //.master("local[6]")
       .getOrCreate()
 
     import org.apache.spark.sql.functions._
@@ -26,14 +26,13 @@ object UserProfileGeneratePlayPartForUserpay {
     val df_predictId = df_predictUsers.select(Dic.colUserId)
 
     val df_predictUserPlay = df_predictId.join(df_plays, Seq(Dic.colUserId), "inner")
-      .withColumn(Dic.colPlayDate, col(Dic.colPlayStartTime).substr(1,10))
+      .withColumn(Dic.colPlayDate, col(Dic.colPlayStartTime).substr(1, 10))
 
     val pre_30 = calDate(now, -30)
     val pre_14 = calDate(now, days = -14)
     val pre_7 = calDate(now, -7)
     val pre_3 = calDate(now, -3)
     val pre_1 = calDate(now, -1)
-
 
 
     val play_part_1 = df_predictUserPlay
@@ -304,8 +303,8 @@ object UserProfileGeneratePlayPartForUserpay {
 
     val now = args(0) + " " + args(1)
 
-    //    val hdfsPath = "hdfs:///pay_predict/"
-    val hdfsPath=""
+    val hdfsPath = "hdfs:///pay_predict/"
+    //val hdfsPath = ""
 
     val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
     val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3" //userpay

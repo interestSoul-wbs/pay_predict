@@ -154,9 +154,9 @@ object TrainSetProcess {
      */
 
     val df_userProfileAndOrderHistory = df_trainUserProfile.join(df_orderHistory, joinKeysUserId, "left")
-    val df_trainSet = df_userProfileAndOrderHistory.join(df_playVector, joinKeysUserId, "left")
+//    val df_trainSet = df_userProfileAndOrderHistory.join(df_playVector, joinKeysUserId, "left")
 
-    saveProcessedData(df_trainSet, trainSetSavePath)
+    saveProcessedData(df_userProfileAndOrderHistory, trainSetSavePath)
     println("Done！")
 
 
@@ -168,7 +168,7 @@ object TrainSetProcess {
     Logger.getLogger("org").setLevel(Level.ERROR)
 
     val spark: SparkSession = new sql.SparkSession.Builder()
-      .master("local[6]")
+      //.master("local[6]")
       .appName("TrainSetProcess")
       .getOrCreate()
 
@@ -176,14 +176,15 @@ object TrainSetProcess {
     val time = args(0) + " " + args(1)
     println(time)
 
-    //val hdfsPath = "hdfs:///pay_predict/"
-    val hdfsPath = ""
+    val hdfsPath = "hdfs:///pay_predict/"
+    //val hdfsPath = ""
 
     /**
      * Data Save Path
      */
     val trainUserProfileSavePath = hdfsPath + "data/train/userpay/trainUserProfile" + args(0)
-    val trainSetSavePath = hdfsPath + "data/train/userpay/trainSet" + args(0)
+    //    val trainSetSavePath = hdfsPath + "data/train/userpay/trainSet" + args(0)
+    val trainSetSavePath = hdfsPath + "data/train/userpay/OrderAndUserProfile" + args(0)
 
     /**
      * User Profile Data Path

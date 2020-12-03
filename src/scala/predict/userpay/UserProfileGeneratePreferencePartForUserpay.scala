@@ -14,7 +14,7 @@ object UserProfileGeneratePreferencePartForUserpay {
     Logger.getLogger("org").setLevel(Level.ERROR)
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("UserProfileGeneratePreferencePartForUserpayPredict")
-      .master("local[6]")
+      //.master("local[6]")
       .getOrCreate()
 
 
@@ -301,8 +301,8 @@ object UserProfileGeneratePreferencePartForUserpay {
 
     val now = args(0) + " " + args(1)
 
-    //    val hdfsPath = "hdfs:///pay_predict/"
-    val hdfsPath = ""
+    val hdfsPath = "hdfs:///pay_predict/"
+    //val hdfsPath = ""
     val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
     val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3" //userpay
     val predictUserPath = hdfsPath + "data/predict/userpay/predictUsers" + args(0)
