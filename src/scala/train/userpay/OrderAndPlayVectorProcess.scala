@@ -96,7 +96,7 @@ object OrderAndPlayVectorProcess {
     // 因为映射后向量存不下，因此把这个数据存储到HDFS上，然后用python运行的，所以如果后面的映射向量可以存储就不要存了
     saveProcessedData(df_video_vector, videoVectorSavePath)
 
-    val df_user_play_vector = mapVideoVector(df_play_history, df_video_vector, topNPlay)
+    val df_user_play_vector = mapVideoVector(df_play_history, df_video_vector)
 
     printDf("df_user_play_vector", df_user_play_vector)
 
