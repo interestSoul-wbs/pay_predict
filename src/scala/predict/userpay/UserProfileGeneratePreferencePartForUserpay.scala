@@ -1,7 +1,8 @@
 package predict.userpay
 
 import mam.Dic
-import mam.Utils.{calDate, getData, printDf, saveProcessedData, udfGetLabelAndCount, udfGetLabelAndCount2}
+import mam.GetSaveData.saveProcessedData
+import mam.Utils.{calDate, getData, printDf, sysParamSetting, udfGetLabelAndCount, udfGetLabelAndCount2}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
 import org.apache.spark.sql.functions._
@@ -9,18 +10,37 @@ import org.apache.spark.sql.{SaveMode, SparkSession}
 
 object UserProfileGeneratePreferencePartForUserpay {
 
-  def userProfileGeneratePreferencePart(now: String, timeWindow: Int, mediasPath: String, playsPath: String, predictUserPath: String, userProfilePreferencePartSavePath: String): Unit = {
-    System.setProperty("hadoop.home.dir", "c:\\winutils")
-    Logger.getLogger("org").setLevel(Level.ERROR)
+  def main(args: Array[String]): Unit = {
+    sysParamSetting()
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("UserProfileGeneratePreferencePartForUserpayPredict")
       //.master("local[6]")
+//      .enableHiveSupport()
       .getOrCreate()
 
+    val now = args(0) + " " + args(1)
+    userProfileGeneratePreferencePart(spark, now)
 
-    val df_medias = getData(spark, mediasPath)
-    val df_plays = getData(spark, playsPath)
+  }
+
+
+
+  def userProfileGeneratePreferencePart(spark: SparkSession, now: String): Unit = {
+
+    val hdfsPath = "hdfs:///pay_predict/"
+    //val hdfsPath = ""
+    val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
+    val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3"
+    val predictUserPath = hdfsPath + "data/predict/userpay/predictUsers" + now.split(" ")(0)
+
+    val userProfilePreferencePartSavePath = hdfsPath + "data/predict/common/processed/userpay/userprofilepreferencepart" + now.split(" ")(0)
+
+
+
+    val df_medias = getData(spark, mediasProcessedPath)
+    val df_plays = getData(spark, playsProcessedPath)
     val df_predictUsers = getData(spark, predictUserPath)
+
     val df_predictId = df_predictUsers.select(Dic.colUserId)
 
     val pre_30 = calDate(now, -30)
@@ -159,7 +179,7 @@ object UserProfileGeneratePreferencePartForUserpay {
       .withColumn(Dic.colTotalTimePaidMoviesLast1Days, round(col(Dic.colTotalTimePaidMoviesLast1Days) / 60, 0))
 
 
-     df_predictUserProfilePref = df_predictUserProfilePref.join(play_medias_part_51, joinKeysUserId, "left")
+    df_predictUserProfilePref = df_predictUserProfilePref.join(play_medias_part_51, joinKeysUserId, "left")
       .join(play_medias_part_52, joinKeysUserId, "left")
       .join(play_medias_part_53, joinKeysUserId, "left")
       .join(play_medias_part_54, joinKeysUserId, "left")
@@ -215,7 +235,7 @@ object UserProfileGeneratePreferencePartForUserpay {
         avg(col(Dic.colTimeSum)).as(Dic.colAvgRestdailyTimePaidVideosLast30Days)
       )
 
-     df_predictUserProfilePref = df_predictUserProfilePref.join(play_medias_part_61, joinKeysUserId, "left")
+    df_predictUserProfilePref = df_predictUserProfilePref.join(play_medias_part_61, joinKeysUserId, "left")
       .join(play_medias_part_62, joinKeysUserId, "left")
       .join(play_medias_part_63, joinKeysUserId, "left")
       .join(play_medias_part_64, joinKeysUserId, "left")
@@ -296,22 +316,5 @@ object UserProfileGeneratePreferencePartForUserpay {
 
   }
 
-
-  def main(args: Array[String]): Unit = {
-
-    val now = args(0) + " " + args(1)
-
-    val hdfsPath = "hdfs:///pay_predict/"
-    //val hdfsPath = ""
-    val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
-    val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3" //userpay
-    val predictUserPath = hdfsPath + "data/predict/userpay/predictUsers" + args(0)
-    val userProfilePreferencePartSavePath = hdfsPath + "data/predict/common/processed/userpay/userprofilepreferencepart" + args(0)
-
-
-    userProfileGeneratePreferencePart(now, 30, mediasProcessedPath, playsProcessedPath, predictUserPath, userProfilePreferencePartSavePath)
-
-
-  }
 
 }

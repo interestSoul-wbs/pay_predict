@@ -2,7 +2,8 @@ package predict.userpay
 
 
 import mam.Dic
-import mam.Utils.{getData, printDf, saveProcessedData}
+import mam.GetSaveData.saveProcessedData
+import mam.Utils.{getData, printDf}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
 import org.apache.spark.sql.functions._
@@ -172,7 +173,7 @@ object PredictSetProcess {
 
     val df_predictUserProfile = df_tempDataFrame.select(columnList.map(df_tempDataFrame.col(_)): _*)
 
-//    saveProcessedData(df_predictUserProfile, predictUserProfileSavePath)
+    //    saveProcessedData(df_predictUserProfile, predictUserProfileSavePath)
 
 
     /**

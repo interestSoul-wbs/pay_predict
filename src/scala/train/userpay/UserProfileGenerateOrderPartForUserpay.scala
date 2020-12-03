@@ -1,15 +1,50 @@
 package train.userpay
 
 import mam.Dic
-import mam.Utils.{calDate, getData, printDf, saveProcessedData, udfGetDays}
+import mam.GetSaveData.saveProcessedData
+import mam.Utils.{calDate, getData, printDf, sysParamSetting, udfGetDays}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
 object UserProfileGenerateOrderPartForUserpay {
+  val timeWindow = 30
 
-  def userProfileGenerateOrderPart(now: String, df_orders: DataFrame, df_trainUsers: DataFrame, userProfileOrderPartSavePath: String): Unit = {
+  def main(args: Array[String]): Unit = {
+
+    sysParamSetting()
+
+    val spark: SparkSession = new sql.SparkSession.Builder()
+      .appName("UserProfileGenerateOrderPartForUserpayTrain")
+      //.master("local[6]")
+      //      .enableHiveSupport()
+      .getOrCreate()
+
+
+    val now = args(0) + " " + args(1)
+
+    userProfileGenerateOrderPart(spark, now)
+
+
+  }
+
+  def userProfileGenerateOrderPart(spark: SparkSession, now: String): Unit = {
+
+    val hdfsPath = "hdfs:///pay_predict/"
+    //val hdfsPath = ""
+
+    val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders3"
+    val trainUsersPath = hdfsPath + "data/train/userpay/trainUsers" + now.split(" ")(0)
+
+    val userProfileOrderPartSavePath = hdfsPath + "data/train/common/processed/userpay/userprofileorderpart" + now.split(" ")(0)
+
+    /**
+     * Get Data
+     */
+    val df_orders = getData(spark, ordersProcessedPath)
+    val df_trainUsers = getData(spark, trainUsersPath)
+    printDf("df_trainUsers", df_trainUsers)
 
 
     val df_trainId = df_trainUsers.select(Dic.colUserId)
@@ -20,7 +55,7 @@ object UserProfileGenerateOrderPartForUserpay {
     val joinKeysUserId = Seq(Dic.colUserId)
 
     // 选取订单为训练时间前三个月的数据
-    val df_trainUserOrder = df_orders.filter(col(Dic.colCreationTime).<(now) and (col(Dic.colCreationTime)) < calDate(now, -30 * 3))
+    val df_trainUserOrder = df_orders.filter(col(Dic.colCreationTime).<(now) and (col(Dic.colCreationTime)) < calDate(now, -timeWindow * 3))
       .join(df_trainId, Seq(Dic.colUserId), "inner")
     /**
      * 已支付套餐数量 金额总数 最大金额 最小金额 平均金额 并对金额进行标准化
@@ -194,35 +229,5 @@ object UserProfileGenerateOrderPartForUserpay {
   }
 
 
-  def main(args: Array[String]): Unit = {
-
-    System.setProperty("hadoop.home.dir", "c:\\winutils")
-    Logger.getLogger("org").setLevel(Level.ERROR)
-    val spark: SparkSession = new sql.SparkSession.Builder()
-      .appName("UserProfileGenerateOrderPartForUserpayTrain")
-      //.master("local[6]")
-      .getOrCreate()
-
-
-    val now = args(0) + " " + args(1)
-
-    val hdfsPath = "hdfs:///pay_predict/"
-    //val hdfsPath = ""
-
-    val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders3" //userpay
-    val trainUsersPath = hdfsPath + "data/train/userpay/trainUsers" + args(0)
-    val userProfileOrderPartSavePath = hdfsPath + "data/train/common/processed/userpay/userprofileorderpart" + now.split(" ")(0)
-
-    /**
-     * Get Data
-     */
-    val df_orders = getData(spark, ordersProcessedPath)
-    val df_trainUsers = getData(spark, trainUsersPath)
-
-
-    userProfileGenerateOrderPart(now, df_orders, df_trainUsers, userProfileOrderPartSavePath)
-
-
-  }
 
 }

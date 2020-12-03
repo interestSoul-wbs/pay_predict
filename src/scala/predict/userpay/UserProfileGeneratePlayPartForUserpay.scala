@@ -1,28 +1,47 @@
 package predict.userpay
 
 import mam.Dic
-import mam.Utils.{calDate, getData, printDf, saveProcessedData, udfGetDays}
-import org.apache.log4j.{Level, Logger}
+import mam.GetSaveData.saveProcessedData
+import mam.Utils.{calDate, getData, printDf, sysParamSetting, udfGetDays}
 import org.apache.spark.sql
 import org.apache.spark.sql.{SaveMode, SparkSession}
 
-import scala.collection.mutable.ListBuffer
+import org.apache.spark.sql.functions._
+
 
 object UserProfileGeneratePlayPartForUserpay {
 
-  def userProfileGeneratePlayPart(now: String, mediasPath: String, playsPath: String, predictUserPath: String, userProfilePlayPartSavePath: String): Unit = {
-    System.setProperty("hadoop.home.dir", "c:\\winutils")
-    Logger.getLogger("org").setLevel(Level.ERROR)
+
+  def main(args: Array[String]): Unit = {
+    sysParamSetting()
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("UserProfileGeneratePlayPartForUserpayPredict")
       //.master("local[6]")
       .getOrCreate()
 
-    import org.apache.spark.sql.functions._
+    val now = args(0) + " " + args(1)
 
-    val df_medias = getData(spark, mediasPath)
-    val df_plays = getData(spark, playsPath)
+
+    userProfileGeneratePlayPart(spark, now)
+
+  }
+  def userProfileGeneratePlayPart(spark: SparkSession, now: String): Unit = {
+
+
+
+    val hdfsPath = "hdfs:///pay_predict/"
+    //val hdfsPath = ""
+
+    val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
+    val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3"
+    val predictUserPath = hdfsPath + "data/predict/userpay/predictUsers" + now.split(" ")(0)
+
+    val userProfilePlayPartSavePath = hdfsPath + "data/predict/common/processed/userpay/userprofileplaypart" + now.split(" ")(0)
+
+    val df_medias = getData(spark, mediasProcessedPath)
+    val df_plays = getData(spark, playsProcessedPath)
     val df_predictUsers = getData(spark, predictUserPath)
+
     val df_predictId = df_predictUsers.select(Dic.colUserId)
 
     val df_predictUserPlay = df_predictId.join(df_plays, Seq(Dic.colUserId), "inner")
@@ -292,27 +311,11 @@ object UserProfileGeneratePlayPartForUserpay {
       .join(play_medias_part_35, joinKeysUserId, "left")
 
 
-    //大约有85万用户
+    //Save data
     saveProcessedData(df_predictUserProfilePlay, userProfilePlayPartSavePath)
 
     println("userprofileplaypart done!")
   }
 
-
-  def main(args: Array[String]): Unit = {
-
-    val now = args(0) + " " + args(1)
-
-    val hdfsPath = "hdfs:///pay_predict/"
-    //val hdfsPath = ""
-
-    val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
-    val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3" //userpay
-    val predictUserPath = hdfsPath + "data/predict/userpay/predictUsers" + args(0)
-    val userProfilePlayPartSavePath = hdfsPath + "data/predict/common/processed/userpay/userprofileplaypart" + args(0)
-
-    userProfileGeneratePlayPart(now, mediasProcessedPath, playsProcessedPath, predictUserPath, userProfilePlayPartSavePath)
-
-  }
 
 }

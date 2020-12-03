@@ -6,19 +6,18 @@ package predict.userpay
  */
 
 import mam.Dic
-import mam.Utils.{saveProcessedData, _}
+import mam.GetSaveData.saveProcessedData
+import mam.Utils.{calDate, getData, mapIdToMediasVector, printDf, sysParamSetting, udfGetAllHistory, udfGetDays, udfGetTopNHistory, udfLog, udfLpad, udfUniformTimeValidity}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.ml.feature.VectorAssembler
 import org.apache.spark.sql
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.StringType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 object OrderAndPlayVectorProcess {
   def main(args: Array[String]): Unit = {
-    System.setProperty("hadoop.home.dir", "c:\\winutils")
-    Logger.getLogger("org").setLevel(Level.ERROR)
+    sysParamSetting()
 
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("OrderAndPlayVectorProcessPredict")
@@ -48,8 +47,9 @@ object OrderAndPlayVectorProcess {
     val df_plays = getData(spark, playsProcessedPath)
     val df_medias = getData(spark, mediasProcessedPath)
     val df_predictUser = getData(spark, predictUsersPath)
-    val df_predictId = df_predictUser.select(Dic.colUserId)
+    val df_mediasVectorPart = getData(spark, mediasVideoVectorPath)
 
+    val df_predictId = df_predictUser.select(Dic.colUserId)
 
 
     /**
@@ -81,17 +81,14 @@ object OrderAndPlayVectorProcess {
      */
 
     // Get vector of medias' video
-    val df_mediasVectorPart = getData(spark, mediasVideoVectorPath)
     val df_videoVector = mediasVectorProcess(df_mediasVectorPart, predictTime)
     printDf("df_videoVector", df_videoVector)
 
     // 因为映射后向量存不下，因此把这个数据存储到HDFS上，然后用python运行的，所以如果后面的映射向量可以存储就不要存了
-    saveProcessedData(df_videoVector, videoVectorSavePath)
+//    saveProcessedData(df_videoVector, videoVectorSavePath)
 
     //    val df_predictUserPlayHistoryVector = mapVideoVector(df_predictUserPlayHistory, df_videoVector, topNPlayHistory = 50)
-    //
     //    printDf("df_predictUserPlayHistoryVector", df_predictUserPlayHistoryVector)
-    //
     //    saveProcessedData(df_predictUserPlayHistoryVector, playHistoryVectorSavePath)
     //
 
@@ -110,15 +107,15 @@ object OrderAndPlayVectorProcess {
 
 
     /**
-     * Get play history during predict time to express package as package vector
+     * Get All Users' play history during predict time to express package as package vector
      */
-    val df_videoInPackPlayTimes = getVideoPlaysTimes(df_predictId, df_plays, predictTime, 7, df_medias)
+    val df_videoInPackPlayTimes = getVideoPlaysTimes(df_plays, predictTime, 7, df_medias)
     printDf("df_playsHistoryPredictIn2Pack", df_videoInPackPlayTimes)
 
     /**
      * Use videos' vector in package to express package
      */
-    val df_playTimesAndVector = df_videoVector.join(df_videoInPackPlayTimes, Seq(Dic.colVideoId), "inner") //video vector is played video
+    val df_playTimesAndVector = df_videoVector.join(df_videoInPackPlayTimes, Seq(Dic.colVideoId), "inner")
 
     // Video vector and play times weighted
     val df_packageExpByVideo = df_playTimesAndVector.withColumn("log_count", when(col(Dic.colPlayTimes) > 0, udfLog(col(Dic.colPlayTimes))).otherwise(0))
@@ -128,10 +125,9 @@ object OrderAndPlayVectorProcess {
 
 
     //    Use python to select "weighted_vector" to be a Matrix then merge with every user
-    saveProcessedData(df_packageExpByVideo, historyPath + "videoInPackageExpByVideo" + args(0))
+    saveProcessedData(df_packageExpByVideo, historyPath + "packageExpByPlayedVideo" + args(0))
 
     println("packageExpByVideo dataframe save done!")
-
 
   }
 
@@ -181,11 +177,10 @@ object OrderAndPlayVectorProcess {
   }
 
 
-  def getVideoPlaysTimes(df_UserId: DataFrame, df_plays: DataFrame, predict_time: String, timeLength: Int, df_medias: DataFrame) = {
+  def getVideoPlaysTimes(df_plays: DataFrame, predict_time: String, timeLength: Int, df_medias: DataFrame) = {
 
     // predict users' play history in predict time
-    val df_predictUserPlay = df_plays.join(df_UserId, Seq(Dic.colUserId), "inner")
-      .filter(col(Dic.colPlayStartTime).<(predict_time) and col(Dic.colPlayStartTime) >= calDate(predict_time, days = -timeLength))
+    val df_predictUserPlay = df_plays.filter(col(Dic.colPlayStartTime).<(predict_time) and col(Dic.colPlayStartTime) >= calDate(predict_time, days = -timeLength))
 
     //video in package that need to predict
     val df_videoInPredictPack = df_medias.filter(col(Dic.colPackageId) === 100201 or col(Dic.colPackageId) === 100202)

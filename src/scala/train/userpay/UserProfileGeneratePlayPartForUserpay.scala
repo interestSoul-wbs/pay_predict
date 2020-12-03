@@ -1,18 +1,48 @@
 package train.userpay
 
 import mam.Dic
-import mam.Utils.{calDate, getData, printDf, saveProcessedData, udfGetDays}
-import org.apache.log4j.{Level, Logger}
+import mam.GetSaveData.saveProcessedData
+import mam.Utils.{calDate, getData, printDf, sysParamSetting, udfGetDays}
 import org.apache.spark.sql
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.{SparkSession}
 import org.apache.spark.sql.functions._
 
 
 object UserProfileGeneratePlayPartForUserpay {
 
-  def userProfileGeneratePlayPart(now: String, df_medias: DataFrame, df_plays: DataFrame, df_trainUsers: DataFrame, userProfilePlayPartSavePath: String) = {
+  def main(args: Array[String]): Unit = {
+
+    sysParamSetting()
+
+    val spark: SparkSession = new sql.SparkSession.Builder()
+      .appName("UserProfileGeneratePlayPartForUserpayTrain")
+      //.master("local[6]")
+      .getOrCreate()
 
 
+    val now = args(0) + " " + args(1)
+
+    userProfileGeneratePlayPart(spark, now)
+
+
+  }
+
+  def userProfileGeneratePlayPart(spark: SparkSession, now: String) = {
+
+    //val hdfsPath = ""
+    val hdfsPath = "hdfs:///pay_predict/"
+    val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
+    val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3"
+    val trainUsersPath = hdfsPath + "data/train/userpay/trainUsers" +  now.split(" ")(0)
+    val userProfilePlayPartSavePath = hdfsPath + "data/train/common/processed/userpay/userprofileplaypart" + now.split(" ")(0)
+
+
+    /**
+     * Get Data
+     */
+    val df_medias = getData(spark, mediasProcessedPath)
+    val df_plays = getData(spark, playsProcessedPath)
+    val df_trainUsers = getData(spark, trainUsersPath)
     val df_trainId = df_trainUsers.select(Dic.colUserId)
 
     val df_trainUserPlays = df_plays.join(df_trainId, Seq(Dic.colUserId), "inner")
@@ -294,37 +324,5 @@ object UserProfileGeneratePlayPartForUserpay {
 
   }
 
-
-  def main(args: Array[String]): Unit = {
-
-    System.setProperty("hadoop.home.dir", "c:\\winutils")
-    Logger.getLogger("org").setLevel(Level.ERROR)
-    val spark: SparkSession = new sql.SparkSession.Builder()
-      .appName("UserProfileGeneratePlayPartForUserpayTrain")
-      //.master("local[6]")
-      .getOrCreate()
-
-
-    val now = args(0) + " " + args(1)
-
-    //val hdfsPath = ""
-    val hdfsPath = "hdfs:///pay_predict/"
-    val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
-    val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3"
-    val trainUsersPath = hdfsPath + "data/train/userpay/trainUsers" + args(0)
-    val userProfilePlayPartSavePath = hdfsPath + "data/train/common/processed/userpay/userprofileplaypart" + args(0)
-
-
-    /**
-     * Get Data
-     */
-    val df_medias = getData(spark, mediasProcessedPath)
-    val df_plays = getData(spark, playsProcessedPath)
-    val df_trainUsers = getData(spark, trainUsersPath)
-
-    userProfileGeneratePlayPart(now, df_medias, df_plays, df_trainUsers, userProfilePlayPartSavePath)
-
-
-  }
 
 }

@@ -1,35 +1,54 @@
 package predict.userpay
 
 import mam.Dic
-import mam.Utils.{calDate, getData, printDf, saveProcessedData, udfGetDays}
+import mam.GetSaveData.saveProcessedData
+import mam.Utils.{calDate, getData, printDf, sysParamSetting, udfGetDays}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
-import org.apache.spark.sql.{SparkSession}
+import org.apache.spark.sql.SparkSession
 
 object UserProfileGenerateOrderPartForUserpay {
 
-  def userProfileGenerateOrderPart(now: String, timeWindow: Int, ordersPath: String, predictUserPath: String, userProfileOrderPartSavePath: String): Unit = {
-    System.setProperty("hadoop.home.dir", "c:\\winutils")
-    Logger.getLogger("org").setLevel(Level.ERROR)
+  val timeWindow = 30
+
+  def main(args: Array[String]): Unit = {
+    sysParamSetting()
     val spark: SparkSession = new sql.SparkSession.Builder()
-      .appName("UserProfileGenerateOrderPartForUserpayPredict")
-      //.master("local[6]")
+      .master("local[4]")
+      .appName("userProfileGenerateOrderPartUserpayForPredict")
+      //      .enableHiveSupport()
       .getOrCreate()
+
+    val now = args(0) + " " + args(1)
+    println(now)
+
+    userProfileGenerateOrderPart(spark, now)
+
+
+  }
+
+  def userProfileGenerateOrderPart(spark: SparkSession, now: String): Unit = {
 
     import org.apache.spark.sql.functions._
 
-    val df_orders = getData(spark, ordersPath)
+
+    val hdfsPath = "hdfs:///pay_predict/"
+    //val hdfsPath = ""
+    val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders3"
+    val predictUserPath = hdfsPath + "data/predict/userpay/predictUsers" + now.split(" ")(0)
+    val userProfileOrderPartSavePath = hdfsPath + "data/predict/common/processed/userpay/userprofileorderpart" + now.split(" ")(0)
+
+
+
+
+    val df_orders = getData(spark, ordersProcessedPath)
     val df_predictUsers = getData(spark, predictUserPath)
     val df_predictId = df_predictUsers.select(Dic.colUserId)
 
 
     val pre_30 = calDate(now, -30)
-    val pre_14 = calDate(now, days = -14)
-    val pre_7 = calDate(now, -7)
-    val pre_3 = calDate(now, -3)
-    val pre_1 = calDate(now, -1)
-    val joinKeysUserId = Seq(Dic.colUserId)
 
+    val joinKeysUserId = Seq(Dic.colUserId)
     val df_predictUserOrder = df_orders.join(df_predictId, Seq(Dic.colUserId), "inner")
       .filter(col(Dic.colCreationTime).<(now) and (col(Dic.colCreationTime)) < calDate(now, -timeWindow * 3))
 
@@ -180,21 +199,5 @@ object UserProfileGenerateOrderPartForUserpay {
   }
 
 
-  def main(args: Array[String]): Unit = {
-
-    val now = args(0) + " " + args(1)
-    println(now)
-
-    val hdfsPath = "hdfs:///pay_predict/"
-    //val hdfsPath = ""
-    val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders3" //userpay
-    val predictUserPath = hdfsPath + "data/predict/userpay/predictUsers" + args(0)
-    val userProfileOrderPartSavePath = hdfsPath + "data/predict/common/processed/userpay/userprofileorderpart" + now.split(" ")(0)
-
-
-    userProfileGenerateOrderPart(now, 30, ordersProcessedPath, predictUserPath, userProfileOrderPartSavePath)
-
-
-  }
 
 }

@@ -220,8 +220,8 @@ object GetSaveData {
     */
   def getRawMediaData(spark: SparkSession) = {
 
-    val hdfsPath = ""
-
+    //val hdfsPath = ""
+    val hdfsPath = "hdfs:///pay_predict/"
     val mediasRawPath = hdfsPath + "data/train/common/raw/medias/*"
 
     val schema = StructType(
@@ -252,14 +252,15 @@ object GetSaveData {
 
     // Konverse - 注意 df 的命名 - df_相关属性 - 不要 dfRawMedia
     val df_raw_media = spark.read
-      .option("delimiter", "\\t")
+      .option("delimiter", "\t")
       .option("header", false)
       .schema(schema)
       .csv(mediasRawPath)
       .select(
         when(col(Dic.colVideoId) === "NULL", null).otherwise(col(Dic.colVideoId)).as(Dic.colVideoId),
         when(col(Dic.colVideoTitle) === "NULL", null).otherwise(col(Dic.colVideoTitle)).as(Dic.colVideoTitle),
-        when(col(Dic.colVideoOneLevelClassification) === "NULL" or (col(Dic.colVideoOneLevelClassification) === ""), null).otherwise(col(Dic.colVideoOneLevelClassification)).as(Dic.colVideoOneLevelClassification),
+        when(col(Dic.colVideoOneLevelClassification) === "NULL" or (col(Dic.colVideoOneLevelClassification) === ""), null)
+          .otherwise(col(Dic.colVideoOneLevelClassification)).as(Dic.colVideoOneLevelClassification),
         from_json(col(Dic.colVideoTwoLevelClassificationList), ArrayType(StringType, containsNull = true)).as(Dic.colVideoTwoLevelClassificationList),
         from_json(col(Dic.colVideoTagList), ArrayType(StringType, containsNull = true)).as(Dic.colVideoTagList),
         from_json(col(Dic.colDirectorList), ArrayType(StringType, containsNull = true)).as(Dic.colDirectorList),
@@ -2264,6 +2265,9 @@ object GetSaveData {
 
   /**
     * Save play data.
+    *
+    * @param spark
+    * @param
     */
   def saveProcessedPlay(spark: SparkSession, df_play: DataFrame, partitiondate: String, license: String) = {
 
@@ -2348,14 +2352,15 @@ object GetSaveData {
   def saveProcessedPlay(df_play_processed: DataFrame) = {
 
     val hdfsPath = "hdfs:///pay_predict/"
-
     val playProcessedPath = hdfsPath + "data/train/common/processed/plays"
-
     df_play_processed.write.mode(SaveMode.Overwrite).format("parquet").save(playProcessedPath)
   }
 
   /**
     * Save order data.
+    *
+    * @param spark
+    * @param df_order
     */
   def saveProcessedOrder(spark: SparkSession, df_order: DataFrame, partitiondate: String, license: String) = {
 
@@ -2458,9 +2463,7 @@ object GetSaveData {
   def saveProcessedOrder(df_order_processed: DataFrame) = {
 
     val hdfsPath = ""
-
     val orderProcessedPath = hdfsPath + "data/train/common/processed/orders3"
-
     saveProcessedData(df_order_processed, orderProcessedPath)
   }
 
@@ -2494,9 +2497,9 @@ object GetSaveData {
 
   def getRawPlays(spark: SparkSession) = {
 
-    val hdfsPath = "hdfs:///pay_predict/"
-    //val hdfsPath=""
-    val playRawPath = hdfsPath + "data/train/common/raw/plays/behavior_*.txt"
+//    val hdfsPath = "hdfs:///pay_predict/"
+    val hdfsPath=""
+    val playRawPath = hdfsPath + "data/train/common/raw/plays/*"
 
     val schema = StructType(
       List(
@@ -2590,6 +2593,10 @@ object GetSaveData {
     df.write.mode(SaveMode.Overwrite).format("parquet").save(path)
 
   }
+  def saveLabel(df_label: DataFrame, labelSavedPath: String) = {
+
+    df_label.coalesce(1).write.mode(SaveMode.Overwrite).option("header", "false").csv(labelSavedPath)
+  }
 
   def saveProcessedMedia(df_processed_media: DataFrame) = {
 
@@ -2600,6 +2607,7 @@ object GetSaveData {
 
     saveProcessedData(df_processed_media, mediasProcessedPath)
   }
+
 
   /**
     * Save the tag of video_one_level_classification, video_two_level_classification_list, video_tag_list
@@ -2635,6 +2643,5 @@ object GetSaveData {
     spark.sql(insert_sql)
     println("over over........... \n" * 4)
   }
-
 
 }

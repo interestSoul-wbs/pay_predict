@@ -1,7 +1,8 @@
 package train.userpay
 
 import mam.Dic
-import mam.Utils.{calDate, getData, saveProcessedData, udfGetLabelAndCount, udfGetLabelAndCount2}
+import mam.GetSaveData.saveProcessedData
+import mam.Utils.{calDate, getData, sysParamSetting, udfGetLabelAndCount, udfGetLabelAndCount2}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
@@ -9,8 +10,37 @@ import org.apache.spark.sql.functions._
 
 object UserProfileGeneratePreferencePartForUserpay {
 
-  def userProfileGeneratePreferencePart(now: String, df_medias: DataFrame, df_plays: DataFrame, df_trainUsers: DataFrame, userProfilePreferencePartSavePath: String) = {
+  def main(args: Array[String]): Unit = {
+    sysParamSetting()
 
+    val spark: SparkSession = new sql.SparkSession.Builder()
+      .appName("UserProfileGeneratePreferencePartForUserpayTrain")
+      //.master("local[6]")
+      //      .enableHiveSupport()
+      .getOrCreate()
+
+
+    val now = args(0) + " " + args(1)
+    userProfileGeneratePreferencePart(spark, now)
+
+
+  }
+
+  def userProfileGeneratePreferencePart(spark:SparkSession, now: String) = {
+
+    val hdfsPath = "hdfs:///pay_predict/"
+    //val hdfsPath=""
+    val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
+    val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3" //userpay
+    val trainUsersPath = hdfsPath + "data/train/userpay/trainUsers" + now.split(" ")(0)
+    val userProfilePreferencePartSavePath = hdfsPath + "data/train/common/processed/userpay/userprofilepreferencepart" + now.split(" ")(0)
+
+    /**
+     * Get Data
+     */
+    val df_medias = getData(spark, mediasProcessedPath)
+    val df_plays = getData(spark, playsProcessedPath)
+    val df_trainUsers = getData(spark, trainUsersPath)
 
     val df_trainId = df_trainUsers.select(Dic.colUserId)
     val df_trainUserPlays = df_plays.join(df_trainId, Seq(Dic.colUserId), "inner")
@@ -290,36 +320,5 @@ object UserProfileGeneratePreferencePartForUserpay {
 
   }
 
-
-  def main(args: Array[String]): Unit = {
-    System.setProperty("hadoop.home.dir", "c:\\winutils")
-    Logger.getLogger("org").setLevel(Level.ERROR)
-    val spark: SparkSession = new sql.SparkSession.Builder()
-      .appName("UserProfileGeneratePreferencePartForUserpayTrain")
-      //.master("local[6]")
-      .getOrCreate()
-
-
-    val now = args(0) + " " + args(1)
-
-    val hdfsPath = "hdfs:///pay_predict/"
-    //val hdfsPath=""
-    val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
-    val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3" //userpay
-    val trainUsersPath = hdfsPath + "data/train/userpay/trainUsers" + args(0)
-    val userProfilePreferencePartSavePath = hdfsPath + "data/train/common/processed/userpay/userprofilepreferencepart" + args(0)
-
-    /**
-     * Get Data
-     */
-    val df_medias = getData(spark, mediasProcessedPath)
-    val df_plays = getData(spark, playsProcessedPath)
-    val df_trainUsers = getData(spark, trainUsersPath)
-
-
-    userProfileGeneratePreferencePart(now, df_medias, df_plays, df_trainUsers, userProfilePreferencePartSavePath)
-
-
-  }
 
 }

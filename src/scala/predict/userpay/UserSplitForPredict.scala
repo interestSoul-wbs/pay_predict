@@ -1,7 +1,8 @@
 package predict.userpay
 
 import mam.Dic
-import mam.Utils.{calDate, getData, printDf, saveProcessedData, udfGetErrorMoneySign}
+import mam.GetSaveData.saveProcessedData
+import mam.Utils.{calDate, getData, printDf, sysParamSetting, udfGetErrorMoneySign}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
 import org.apache.spark.sql.functions.{col, lit}
@@ -11,12 +12,12 @@ object UserSplitForPredict {
 
 
   def main(args: Array[String]): Unit = {
-    System.setProperty("hadoop.home.dir", "c:\\winutils")
-    Logger.getLogger("org").setLevel(Level.ERROR)
+    sysParamSetting()
 
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("UserSplitForPredict")
       //.master("local[6]")
+//      .enableHiveSupport()
       .getOrCreate()
 
     val predictTime = args(0) + " " + args(1)

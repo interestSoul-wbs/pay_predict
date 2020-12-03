@@ -7,8 +7,8 @@ package train.userpay
 
 
 import mam.Dic
-import mam.Utils.{calDate, getData, mapIdToMediasVector, printDf, saveProcessedData, udfGetAllHistory, udfGetDays, udfGetErrorMoneySign, udfGetTopNHistory, udfLog, udfLpad, udfUniformTimeValidity}
-import org.apache.log4j.{Level, Logger}
+import mam.GetSaveData.saveProcessedData
+import mam.Utils.{calDate, getData, mapIdToMediasVector, printDf, sysParamSetting, udfGetAllHistory, udfGetDays, udfGetErrorMoneySign, udfGetTopNHistory, udfLog, udfLpad, udfUniformTimeValidity}
 import org.apache.spark.ml.feature.VectorAssembler
 import org.apache.spark.sql
 import org.apache.spark.sql.expressions.Window
@@ -16,13 +16,19 @@ import org.apache.spark.sql.functions.{col, collect_list, concat_ws, count, desc
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 object OrderAndPlayVectorProcess {
+
+  val pastDaysForPlayHistory = 14
+  val pastDaysForOrderHistory = 90
+  val pastDaysPlaysForPackage = 7
+  val topNPlay = 50
+
   def main(args: Array[String]): Unit = {
-    System.setProperty("hadoop.home.dir", "c:\\winutils")
-    Logger.getLogger("org").setLevel(Level.ERROR)
+    sysParamSetting()
 
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("OrderAndPlayVectorProcessTrain")
       //.master("local[6]")
+//      .enableHiveSupport()
       .getOrCreate()
 
     val trainTime = args(0) + " " + args(1)
@@ -32,7 +38,7 @@ object OrderAndPlayVectorProcess {
     val hdfsPath = "hdfs:///pay_predict/"
     val orderProcessedPath = hdfsPath + "data/train/common/processed/orders3"
     val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3"
-    val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp" //HDFS路径
+    val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
     val historyPath = hdfsPath + "data/train/common/processed/userpay/history/"
 
     val mediasVideoVectorPath = hdfsPath + "data/train/common/processed/userpay/mediasVector"
@@ -59,10 +65,10 @@ object OrderAndPlayVectorProcess {
      * include payed and clicked history
      */
 
-    val df_orderHistory = getOrderHistoryList(df_trainId, df_orders, trainTime, -90)
+    val df_orderHistory = getOrderHistoryList(df_trainId, df_orders, trainTime, pastDaysForOrderHistory)
     printDf("Users' orders history in past three months", df_orderHistory)
 
-    saveProcessedData(df_orderHistory, historyPath + "orderHistory" + args(0))
+//    saveProcessedData(df_orderHistory, historyPath + "orderHistory" + args(0))
     println("Order history process done! ")
 
 
@@ -70,13 +76,12 @@ object OrderAndPlayVectorProcess {
      * Get train user's play history
      * 对于每个用户生成播放历史，14天内的播放历史，最多取n条
      */
-    val timeWindowPlay = 14 //过去14天的
-    val topNPlay = 50
-    val df_trainUserPlayHistory = getPlaySeqList(df_trainId, df_plays, Dic.colVideoId, trainTime, -timeWindowPlay, topNPlay)
+
+    val df_trainUserPlayHistory = getPlaySeqList(df_trainId, df_plays, Dic.colVideoId, trainTime, pastDaysForPlayHistory, topNPlay)
     printDf("df_trainUserPlayHistory", df_trainUserPlayHistory)
 
     // 因为映射后向量存不下，因此把这个数据存储到HDFS上，然后用python运行的，所以如果后面的映射向量可以存储就不要存了
-    saveProcessedData(df_trainUserPlayHistory, historyPath + "playHistory" + args(0))
+//    saveProcessedData(df_trainUserPlayHistory, historyPath + "playHistory" + args(0))
 
     /**
      * Map Video Id List To Vector !
@@ -88,9 +93,9 @@ object OrderAndPlayVectorProcess {
     printDf("df_videoVector", df_videoVector)
 
     // 因为映射后向量存不下，因此把这个数据存储到HDFS上，然后用python运行的，所以如果后面的映射向量可以存储就不要存了
-    saveProcessedData(df_videoVector, videoVectorSavePath)
+//    saveProcessedData(df_videoVector, videoVectorSavePath)
 
-//    val df_trainUserPlayHistoryVector = mapVideoVector(df_trainUserPlayHistory, df_videoVector, topNPlayHistory = 50)
+//    val df_trainUserPlayHistoryVector = mapVideoVector(df_trainUserPlayHistory, df_videoVector, topNPlay)
 //
 //    printDf("df_trainUserPlayHistoryVector", df_trainUserPlayHistoryVector)
 //
@@ -113,9 +118,9 @@ object OrderAndPlayVectorProcess {
 
 
     /**
-     * Get play history during train time to express package as package vector
+     * Get all User;s play history play history during train time to express package as package vector
      */
-    val df_videoInPackPlayTimes = getVideoPlaysTimes(df_trainId, df_plays, trainTime, 7, df_medias)
+    val df_videoInPackPlayTimes = getVideoPlaysTimes(df_plays, trainTime, pastDaysPlaysForPackage, df_medias)
     printDf("df_playsHistoryTrainIn2Pack", df_videoInPackPlayTimes)
 
     /**
@@ -131,7 +136,7 @@ object OrderAndPlayVectorProcess {
     printDf("df_packageExpByVideo", df_packageExpByVideo)
 
     //    Use python to select "weighted_vector" to be a Matrix then merge with every user
-    saveProcessedData(df_videoInPackPlayTimes, historyPath + "videoInPackageExpByVideo" + args(0))
+    saveProcessedData(df_packageExpByVideo, historyPath + "packageExpByPlayedVideo" + args(0))
 
     println("packageExpByVideo dataframe save done!")
 
@@ -146,7 +151,7 @@ object OrderAndPlayVectorProcess {
      * Create a new column called CreationTimeGap
      */
     val df_orderPart = df_orders.join(df_trainId, Seq(Dic.colUserId), "inner")
-      .filter(col(Dic.colCreationTime) < now and col(Dic.colCreationTime) >= calDate(now, timeLength))
+      .filter(col(Dic.colCreationTime) < now and col(Dic.colCreationTime) >= calDate(now, -timeLength))
       .withColumn("now", lit(now))
       .withColumn(Dic.colCreationTimeGap, udfGetDays(col(Dic.colCreationTime), col("now")))
       //.withColumn(Dic.colIsMoneyError, udfGetErrorMoneySign(col(Dic.colResourceType), col(Dic.colMoney)))
@@ -184,11 +189,10 @@ object OrderAndPlayVectorProcess {
   }
 
 
-  def getVideoPlaysTimes(df_UserId: DataFrame, df_plays: DataFrame, train_time: String, timeLength: Int, df_medias: DataFrame) = {
+  def getVideoPlaysTimes(df_plays: DataFrame, train_time: String, timeLength: Int, df_medias: DataFrame) = {
 
-    // train users' play history in train time
-    val df_trainUserPlay = df_plays .join(df_UserId, Seq(Dic.colUserId), "inner")
-      .filter(col(Dic.colPlayStartTime).<(train_time) and col(Dic.colPlayStartTime) >= calDate(train_time, days = -timeLength))
+    // This show bu all Users' play history to express package info
+    val df_trainUserPlay = df_plays.filter(col(Dic.colPlayStartTime).<(train_time) and col(Dic.colPlayStartTime) >= calDate(train_time, days = -timeLength))
 
     //video in package that need to predict
     val df_videoInPredictPack = df_medias.filter(col(Dic.colPackageId) === 100201 or col(Dic.colPackageId) === 100202)
@@ -211,7 +215,7 @@ object OrderAndPlayVectorProcess {
      * */
 
     var df_playList = df_play.join(df_trainId, Seq(Dic.colUserId), "inner")
-      .filter(col(Dic.colPlayStartTime).<(now) && col(Dic.colPlayStartTime) >= calDate(now, days = timeWindowPlay))
+      .filter(col(Dic.colPlayStartTime).<(now) && col(Dic.colPlayStartTime) >= calDate(now, days = -timeWindowPlay))
 
     //获取数字位数
     val rowCount = df_playList.count().toString.length

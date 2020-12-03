@@ -3,14 +3,13 @@ package mam
 import java.text.SimpleDateFormat
 import java.util.Calendar
 
-import breeze.linalg.DenseVector
+
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.mllib.linalg.Vectors
+
 
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
-import org.apache.spark.sql.functions.{col, split, udf}
-import org.apache.spark.sql.functions._
+import org.apache.spark.sql.functions.{udf}
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
 
@@ -139,6 +138,9 @@ object Utils {
     if (time == "NULL") {
       null
     }
+    if (time == null) {
+      null
+    }
     if (time.length < 10) {
       null
     }
@@ -148,7 +150,6 @@ object Utils {
       new_time
     }
   }
-
 
   def udfGetString = udf(getString _)
 
@@ -488,9 +489,9 @@ object Utils {
   }
 
 
-  def udfGetAllHistoryVector = udf(getAllHistoryVector _)
+  def udfGetAllHistory = udf(getAllHistory _)
 
-  def getAllHistoryVector(array: mutable.WrappedArray[String]) = {
+  def getAllHistory(array: mutable.WrappedArray[String]) = {
 
     /**
      * @description: Split List element by ":" to get tail of the element
@@ -501,12 +502,12 @@ object Utils {
      */
 
 
-    val result = new ListBuffer[String]()
+    val result = new ListBuffer[Double]()
 
     for (ele <- array)
-      result.append(ele.split(":")(1))
+      ele.split(":")(1).split(",").foreach(x => result.append(x.toDouble))
 
-    result.toVector
+    result.toArray
 
   }
 
@@ -550,20 +551,6 @@ object Utils {
     }
 
   }
-
-
-  def udfVectorToString = (vectorToString _)
-
-  def vectorToString(vector: Vector[Double]) = {
-    vector.toString()
-  }
-
-  def udfVectorToArray = (vectorToArray _)
-
-  def vectorToArray(vector: Vector[Double]) = {
-    vector.toArray
-  }
-
 
   def udfLog = udf(getLog _)
 
@@ -616,7 +603,7 @@ object Utils {
 
     /**
      * @description: Map video_id_list to medias video vector
-     * @param: mediaMap : medias video vector to Map( id -> Vector)
+     * @param: mediaMap : medias video vector Map( id -> Vector)
      * @return: org.apache.spark.sql.expressions.UserDefinedFunction
      * @author: wx
      * @Date: 2020/11/30
