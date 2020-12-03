@@ -1,7 +1,8 @@
 package train.common
 
 import mam.Dic
-import mam.Utils.{getData, printDf, saveProcessedData, udfBreak}
+import mam.GetSaveData.saveProcessedData
+import mam.Utils.{getData, printDf, udfBreak}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.ml.feature.Word2Vec
 import org.apache.spark.sql
@@ -16,6 +17,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  */
 object MediasVideoVectorProcess {
 
+  val vectorDimension = 32
 
   def main(args: Array[String]): Unit = {
     System.setProperty("hadoop.home.dir", "c:\\winutils")
@@ -35,19 +37,18 @@ object MediasVideoVectorProcess {
      * Get Data
      */
     val df_medias = getData(spark, mediasProcessedPath)
+    printDf("df_medias", df_medias)
+
     val df_plays = getData(spark, playsProcessedPath)
+    printDf("df_plays", df_plays)
 
 
     /**
      * Process Medias Vector
      */
-    val df_mediasVecMultiCol = mediasVectorProces(df_medias, df_plays)
-
-
-    /**
-     * Save Medias Vector v1 to HDFS
-     */
-    saveProcessedData(df_mediasVecMultiCol, mediasVectorSavePath)
+    val df_medias_vector_v1 = mediasVectorProces(df_medias, df_plays)
+    saveProcessedData(df_medias_vector_v1, mediasVectorSavePath)
+    printDf("df_medias_vector_v1", df_medias_vector_v1)
     println("Media's video vector saved !!! ")
 
   }
@@ -64,41 +65,30 @@ object MediasVideoVectorProcess {
      */
 
     // 选择有play记录的video embedding
-    val df_playsVideoId = df_plays.select(Dic.colVideoId).distinct()
-    val df_mediasPlayed = df_medias.join(df_playsVideoId, Seq(Dic.colVideoId), "inner")
-    println("Medias' videos played by users: ", df_mediasPlayed.count())
+    val df_played_video = df_plays.select(Dic.colVideoId).distinct()
+    val df_medias_played = df_medias.join(df_played_video, Seq(Dic.colVideoId), "inner")
+    println("Medias' videos played by users: ", df_medias_played.count())
 
     // Medias further process about Labels
-    val df_mediasPlayedProcess = df_mediasPlayed
+    val df_medias_played_process = df_medias_played
       .na.drop("all")
       .dropDuplicates(Dic.colVideoId)
-      .na.fill(
-      Map((Dic.colVideoOneLevelClassification, "其他"))
-    )
       .withColumn(Dic.colVideoTwoLevelClassificationList,
         when(col(Dic.colVideoTwoLevelClassificationList).isNotNull, col(Dic.colVideoTwoLevelClassificationList))
           .otherwise(Array("其他")))
       .withColumn(Dic.colVideoTagList,
         when(col(Dic.colVideoTagList).isNotNull, col(Dic.colVideoTagList))
           .otherwise(Array("其他")))
+      .withColumn(Dic.colVideoHour, col(Dic.colVideoTime) / 3600)
+      .withColumn(Dic.colInPackage, when(col(Dic.colPackageId).>(0), 1).otherwise(0))
+      .withColumn(Dic.colScore, col(Dic.colScore) / 10)
+      .na.fill(
+      Map((Dic.colIsPaid, 0),
+        (Dic.colInPackage, 0),
+        (Dic.colVideoOneLevelClassification, "其他"))
+    )
 
-    val df_mediasPlayedLabels = df_mediasPlayedProcess.select(Dic.colVideoId, Dic.colVideoOneLevelClassification, Dic.colVideoTwoLevelClassificationList, Dic.colVideoTagList)
-
-
-    /**
-     * Get vectors for labels
-     */
-    val vectorDimension = 32
-    val df_levelOneVector = getLevelOneVector(vectorDimension, df_mediasPlayedLabels)
-    printDf("Level one classification vector", df_levelOneVector)
-
-
-    val df_levelTwoMeanVector = getMeanVector(vectorDimension, df_mediasPlayedLabels, Dic.colVideoTwoLevelClassificationList)
-    printDf("Level two classification mean vector", df_levelTwoMeanVector)
-
-
-    val df_tagsMeanVector = getMeanVector(vectorDimension, df_mediasPlayedLabels, Dic.colVideoTagList)
-    printDf("Tags mean vector", df_tagsMeanVector)
+    val df_medias_played_labels = df_medias_played_process.select(Dic.colVideoId, Dic.colVideoOneLevelClassification, Dic.colVideoTwoLevelClassificationList, Dic.colVideoTagList)
 
 
     /**
@@ -107,25 +97,29 @@ object MediasVideoVectorProcess {
      * storage_date_gap of train and predict time(add in TrainSet/PredictSet file)
      */
 
-    val df_labelsVector = getMeanVectorOfLabels(vectorDimension, df_levelOneVector, df_levelTwoMeanVector, df_tagsMeanVector, df_mediasPlayedLabels)
-    printDf("df_labelsVector", df_labelsVector)
+    val df_one_vector = getLevelOneVector(vectorDimension, df_medias_played_labels)
+    printDf("Level one classification vector", df_one_vector)
+
+    val df_two_mean_vector = getMeanVector(vectorDimension, df_medias_played_labels, Dic.colVideoTwoLevelClassificationList)
+    printDf("Level two classification mean vector", df_two_mean_vector)
+
+    val df_tags_mean_vector = getMeanVector(vectorDimension, df_medias_played_labels, Dic.colVideoTagList)
+    printDf("Tags mean vector", df_tags_mean_vector)
+
+    val df_labels_vector = getMeanVectorOfLabels(vectorDimension, df_one_vector, df_two_mean_vector, df_tags_mean_vector, df_medias_played_labels)
+    printDf("df_labelsVector", df_labels_vector)
 
 
-    val df_mediasPlayedProcessFurther = df_mediasPlayedProcess
-      .withColumn(Dic.colVideoHour, col(Dic.colVideoTime) / 3600)
-      .withColumn(Dic.colInPackage, when(col(Dic.colPackageId).>(0), 1).otherwise(0))
-      .withColumn(Dic.colScore, col(Dic.colScore) / 10)
-      .na.fill(Map((Dic.colIsPaid, 0), (Dic.colInPackage, 0)))
 
     // colVideoOneLevelClassification will be used in TrainSetProcess
-    val df_mediasPart = df_mediasPlayedProcessFurther.select(Dic.colVideoId, Dic.colScore, Dic.colIsPaid, Dic.colInPackage, Dic.colVideoHour, Dic.colStorageTime, Dic.colVideoOneLevelClassification)
+    val df_medias_part = df_medias_played_process.select(Dic.colVideoId, Dic.colScore, Dic.colIsPaid, Dic.colInPackage, Dic.colVideoHour, Dic.colStorageTime, Dic.colVideoOneLevelClassification)
 
-    val df_mediasVecMultiCol = df_labelsVector.join(df_mediasPart, Seq(Dic.colVideoId), "left")
+    val df_medias_vector_v1 = df_labels_vector.join(df_medias_part, Seq(Dic.colVideoId), "left")
 
-    printDf("Medias' Vector Multiple Columns", df_mediasVecMultiCol)
+    printDf("Medias' Vector Multiple Columns", df_medias_vector_v1)
 
 
-    df_mediasVecMultiCol
+    df_medias_vector_v1
 
 
   }
@@ -150,89 +144,89 @@ object MediasVideoVectorProcess {
   }
 
 
-  def getLevelOneVector(vectorDimension: Int, df_mediasPlayed: DataFrame) = {
+  def getLevelOneVector(vectorDimension: Int, df_medias_played: DataFrame) = {
     /**
      * @description: get vectors of video's colVideoOneLevelClassification
      * @param: vectorDimension
-     * @param: df_mediasPlayed : medias videos played by users
+     * @param: df_medias_played : medias videos played by users
      * @return: org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
      * @author: wx
      * @Date: 2020/11/25
      */
 
     // In function getVector fit() need to br Array[String] type
-    val df_videoLevelOne = df_mediasPlayed
+    val df_level_one = df_medias_played
       .groupBy(col(Dic.colVideoId))
       .agg(collect_list(col(Dic.colVideoOneLevelClassification)).as(Dic.colVideoOneLevelClassification + "_list"))
 
-    val df_labelVector_1 = getVector(df_videoLevelOne, vectorDimension, Dic.colVideoOneLevelClassification + "_list")
+    val df_level_one_vector = getVector(df_level_one, vectorDimension, Dic.colVideoOneLevelClassification + "_list")
       .withColumnRenamed("word", Dic.colVideoOneLevelClassification)
-    printDf("get level one vector", df_labelVector_1)
+    printDf("get level one vector", df_level_one_vector)
 
     //medias dataframe join with level one vector
-    var df_levelOneBreak = df_mediasPlayed.join(df_labelVector_1, Seq(Dic.colVideoOneLevelClassification), "inner")
+    var df_level_one_break = df_medias_played.join(df_level_one_vector, Seq(Dic.colVideoOneLevelClassification), "inner")
       .select(Dic.colVideoId, "vector")
 
     //拆分
     for (i <- 0 to vectorDimension - 1) {
-      df_levelOneBreak = df_levelOneBreak.withColumn("v_" + i, udfBreak(col("vector"), lit(i)))
+      df_level_one_break = df_level_one_break.withColumn("v_" + i, udfBreak(col("vector"), lit(i)))
     }
 
 
-    df_levelOneBreak.drop("vector")
+    df_level_one_break.drop("vector")
   }
 
 
-  def getMeanVector(vectorDimension: Int, df_mediasPlayed: DataFrame, colName: String) = {
+  def getMeanVector(vectorDimension: Int, df_medias_played: DataFrame, colName: String) = {
     /**
      * @description: get mean vector of colVideoTwoLevelClassification labels and colVideoTagList labels
      * @param: vectorDimension
-     * @param: df_mediasPlayed:  medias video played by users
+     * @param: df_medias_played:  medias video played by users
      * @param: colName : colVideoTwoLevelClassification, colVideoTagList
      * @return: org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
      * @author: wx
      * @Date: 2020/11/25
      */
 
-    val df_videoListExplode = df_mediasPlayed.select(df_mediasPlayed(Dic.colVideoId),
-      explode(df_mediasPlayed(colName))).toDF(Dic.colVideoId, "word")
+    val df_video_list_explode = df_medias_played.select(df_medias_played(Dic.colVideoId),
+      explode(df_medias_played(colName))).toDF(Dic.colVideoId, "word")
 
-    val df_mediaPart = df_mediasPlayed.select(Dic.colVideoId, colName)
+    val df_media_part = df_medias_played.select(Dic.colVideoId, colName)
 
-    val df_labelVector = getVector(df_mediaPart, vectorDimension, colName)
+    val df_labelVector = getVector(df_media_part, vectorDimension, colName)
 
-    var df_videoIdWithVector = df_videoListExplode.join(df_labelVector, Seq("word"))
+    var df_video_id_and_Vector = df_video_list_explode.join(df_labelVector, Seq("word"))
       .drop("word")
 
     //拆分
     for (i <- 0 to vectorDimension - 1) {
-      df_videoIdWithVector = df_videoIdWithVector.withColumn("v_" + i, udfBreak(col("vector"), lit(i)))
+      df_video_id_and_Vector = df_video_id_and_Vector.withColumn("v_" + i, udfBreak(col("vector"), lit(i)))
     }
 
-    df_videoIdWithVector.groupBy(Dic.colVideoId).mean()
+    df_video_id_and_Vector.groupBy(Dic.colVideoId).mean()
 
   }
 
-  def getMeanVectorOfLabels(vectorDimension: Int, df_levelOneVector: DataFrame, df_levelTwoMeanVector: DataFrame, df_tagsMeanVector: DataFrame, df_mediasPlayed: DataFrame) = {
+  def getMeanVectorOfLabels(vectorDimension: Int, df_one_vector: DataFrame, df_two_mean_vector: DataFrame, df_tagsMeanVector: DataFrame, df_medias_played: DataFrame) = {
     /**
      * @description: Union video's level one vector, level two vector and tags vector, get mean vector to be the result
-     * @param: df_levelOneVector
-     * @param: df_levelTwoMeanVector
+     * @param: df_one_vector
+     * @param: df_two_mean_vector
      * @param: df_tagsMeanVector
-     * @param: df_mediasPlayed : medias videos played by users
+     * @param: df_medias_played : medias videos played by users
      * @return: org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
      * @author: wx
      * @Date: 2020/11/25
      */
 
-    var df_videoLabelsVector = df_levelOneVector.union(df_levelTwoMeanVector).union(df_tagsMeanVector).groupBy(Dic.colVideoId).mean()
+    var df_labels_vector = df_one_vector.union(df_two_mean_vector).union(df_tagsMeanVector).groupBy(Dic.colVideoId).mean()
 
     for (i <- 0 to vectorDimension - 1) {
-      df_videoLabelsVector = df_videoLabelsVector.withColumnRenamed("avg(v_" + i + ")", "v_" + i)
+      df_labels_vector = df_labels_vector.withColumnRenamed("avg(v_" + i + ")", "v_" + i)
 
     }
     //It's  multiple columns of vector, not assemble yet, cause we need to process further in file TrainSetProcess
-    df_videoLabelsVector
+    df_labels_vector
   }
 
 

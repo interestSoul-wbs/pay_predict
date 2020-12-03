@@ -30,7 +30,6 @@ object TrainSetProcess {
   }
 
 
-
   def trainSetProcess(spark: SparkSession, now: String) = {
 
     val hdfsPath = "hdfs:///pay_predict/"
@@ -44,8 +43,9 @@ object TrainSetProcess {
     val trainSetSavePath = hdfsPath + "data/train/userpay/OrderAndUserProfile" + now.split(" ")(0)
 
     /**
-     * User Profile Data Path
+     * User And Profile Data Path
      */
+    val trainUsersPath = "hdfs:///pay_predict/data/train/userpay/trainUsers" + now.split(" ")(0)
     val userProfilePlayPartPath = hdfsPath + "data/train/common/processed/userpay/userprofileplaypart" + now.split(" ")(0)
     val userProfilePreferencePartPath = hdfsPath + "data/train/common/processed/userpay/userprofilepreferencepart" + now.split(" ")(0)
     val userProfileOrderPartPath = hdfsPath + "data/train/common/processed/userpay/userprofileorderpart" + now.split(" ")(0)
@@ -68,33 +68,44 @@ object TrainSetProcess {
     /**
      * Get Data
      */
-    val df_userProfilePlayPart = getData(spark, userProfilePlayPartPath)
-    val df_userProfilePreferencePart = getData(spark, userProfilePreferencePartPath)
-    val df_userProfileOrderPart = getData(spark, userProfileOrderPartPath)
+    val df_user_profile_play = getData(spark, userProfilePlayPartPath)
+    printDf("df_user_profile_play", df_user_profile_play)
 
-    val df_videoFirstCategory = spark.read.format("csv").load(videoFirstCategoryTempPath)
-    val df_videoSecondCategory = spark.read.format("csv").load(videoSecondCategoryTempPath)
+    val df_user_profile_pref = getData(spark, userProfilePreferencePartPath)
+    printDf("df_user_profile_pref", df_user_profile_pref)
+
+    val df_user_profile_order = getData(spark, userProfileOrderPartPath)
+    printDf("df_user_profile_order", df_user_profile_order)
+
+    val df_video_first_category = spark.read.format("csv").load(videoFirstCategoryTempPath)
+    printDf("df_video_first_category", df_video_first_category)
+
+    val df_video_second_category = spark.read.format("csv").load(videoSecondCategoryTempPath)
+    printDf("df_video_second_category", df_video_second_category)
+
     val df_label = spark.read.format("csv").load(labelTempPath)
+    printDf("df_label", df_label)
 
-    //    val df_playVector = getData(spark, userPlayVectorPath)
-    val df_playVector = getData(spark, orderHistoryPath)
+//    val df_play_vector = getData(spark, userPlayVectorPath)
+//    printDf("df_play_vector", df_play_vector)
 
+    val df_order_history = getData(spark, orderHistoryPath)
+    printDf("df_order_history", df_order_history)
 
-    val df_orderHistory = getData(spark, orderHistoryPath)
-    val trainUsersPath = "hdfs:///pay_predict/data/train/userpay/trainUsers" + now.split(" ")(0)
     val df_train_users = getData(spark, trainUsersPath)
+    printDf("df_train_users", df_train_users)
 
 
     /**
      * Process User Profile Data
      */
     val joinKeysUserId = Seq(Dic.colUserId)
-    val df_userPlayAndPref = df_userProfilePlayPart.join(df_userProfilePreferencePart, joinKeysUserId, "left")
-    val df_userProfile = df_userPlayAndPref.join(df_userProfileOrderPart, joinKeysUserId, "left")
+    val df_profile_play_pref = df_user_profile_play.join(df_user_profile_pref, joinKeysUserId, "left")
+    val df_user_profile = df_profile_play_pref.join(df_user_profile_order, joinKeysUserId, "left")
 
 
-    val colList = df_userProfile.columns.toList
-    val colTypeList = df_userProfile.dtypes.toList
+    val colList = df_user_profile.columns.toList
+    val colTypeList = df_user_profile.dtypes.toList
     val mapColList = ArrayBuffer[String]()
     for (elem <- colTypeList) {
       if (!elem._2.equals("StringType") && !elem._2.equals("IntegerType")
@@ -106,11 +117,10 @@ object TrainSetProcess {
 
     val numColList = colList.diff(mapColList)
 
-    val df_userProfileFill = df_userProfile
+    val df_userProfile_filled = df_user_profile
       .na.fill(-1, List(Dic.colDaysSinceLastPurchasePackage, Dic.colDaysSinceLastClickPackage,
       Dic.colDaysFromLastActive, Dic.colDaysSinceFirstActiveInTimewindow))
-
-    val df_userProfileFilled = df_userProfileFill.na.fill(0, numColList)
+      .na.fill(0, numColList)
 
 
     var videoFirstCategoryMap: Map[String, Int] = Map()
@@ -119,14 +129,14 @@ object TrainSetProcess {
 
 
     // 一级分类
-    var conList = df_videoFirstCategory.collect()
+    var conList = df_video_first_category.collect()
     for (elem <- conList) {
       val s = elem.toString()
       videoFirstCategoryMap += (s.substring(1, s.length - 1).split("\t")(1) -> s.substring(1, s.length - 1).split("\t")(0).toInt)
 
     }
     //二级分类
-    conList = df_videoSecondCategory.collect()
+    conList = df_video_second_category.collect()
     for (elem <- conList) {
       val s = elem.toString()
       videoSecondCategoryMap += (s.substring(1, s.length - 1).split("\t")(1) -> s.substring(1, s.length - 1).split("\t")(0).toInt)
@@ -145,7 +155,7 @@ object TrainSetProcess {
     val prefColumns = List(Dic.colVideoOneLevelPreference, Dic.colVideoTwoLevelPreference,
       Dic.colMovieTwoLevelPreference, Dic.colSingleTwoLevelPreference, Dic.colInPackageVideoTwoLevelPreference)
 
-    var df_userProfileSplitPref = df_userProfileFilled
+    var df_userProfile_split_pref1 = df_userProfile_filled
 
     def udfFillPreference = udf(fillPreference _)
 
@@ -163,7 +173,7 @@ object TrainSetProcess {
     }
 
     for (elem <- prefColumns) {
-      df_userProfileSplitPref = df_userProfileSplitPref.withColumn(elem + "_1", udfFillPreference(col(elem), lit(1)))
+      df_userProfile_split_pref1 = df_userProfile_split_pref1.withColumn(elem + "_1", udfFillPreference(col(elem), lit(1)))
         .withColumn(elem + "_2", udfFillPreference(col(elem), lit(2)))
         .withColumn(elem + "_3", udfFillPreference(col(elem), lit(3)))
     }
@@ -182,29 +192,30 @@ object TrainSetProcess {
       }
     }
 
-
+var df_userProfile_split_pref2 = df_userProfile_split_pref1
     for (elem <- prefColumns) {
       if (elem.contains(Dic.colVideoOneLevelPreference)) {
-        df_userProfileSplitPref = df_userProfileSplitPref.withColumn(elem + "_1", udfFillPreferenceIndex(col(elem + "_1"), lit(videoFirstCategoryMap.mkString(","))))
+        df_userProfile_split_pref2 = df_userProfile_split_pref2.withColumn(elem + "_1", udfFillPreferenceIndex(col(elem + "_1"), lit(videoFirstCategoryMap.mkString(","))))
           .withColumn(elem + "_2", udfFillPreferenceIndex(col(elem + "_2"), lit(videoFirstCategoryMap.mkString(","))))
           .withColumn(elem + "_3", udfFillPreferenceIndex(col(elem + "_3"), lit(videoFirstCategoryMap.mkString(","))))
       } else {
-        df_userProfileSplitPref = df_userProfileSplitPref.withColumn(elem + "_1", udfFillPreferenceIndex(col(elem + "_1"), lit(videoSecondCategoryMap.mkString(","))))
+        df_userProfile_split_pref2 = df_userProfile_split_pref2.withColumn(elem + "_1", udfFillPreferenceIndex(col(elem + "_1"), lit(videoSecondCategoryMap.mkString(","))))
           .withColumn(elem + "_2", udfFillPreferenceIndex(col(elem + "_2"), lit(videoSecondCategoryMap.mkString(","))))
           .withColumn(elem + "_3", udfFillPreferenceIndex(col(elem + "_3"), lit(videoSecondCategoryMap.mkString(","))))
       }
     }
 
+    var df_userProfile_split_pref3 = df_userProfile_split_pref2
     for (elem <- prefColumns) {
       if (elem.equals(Dic.colVideoOneLevelPreference)) {
-        df_userProfileSplitPref = df_userProfileSplitPref.na.fill(videoFirstCategoryMap.size, List(elem + "_1", elem + "_2", elem + "_3"))
+        df_userProfile_split_pref3 = df_userProfile_split_pref3.na.fill(videoFirstCategoryMap.size, List(elem + "_1", elem + "_2", elem + "_3"))
       } else {
-        df_userProfileSplitPref = df_userProfileSplitPref.na.fill(videoSecondCategoryMap.size, List(elem + "_1", elem + "_2", elem + "_3"))
+        df_userProfile_split_pref3 = df_userProfile_split_pref3.na.fill(videoSecondCategoryMap.size, List(elem + "_1", elem + "_2", elem + "_3"))
       }
     }
 
 
-    val columnTypeList = df_userProfileSplitPref.dtypes.toList
+    val columnTypeList = df_userProfile_split_pref3.dtypes.toList
     val columnList = ArrayBuffer[String]()
     for (elem <- columnTypeList) {
       if (elem._2.equals("StringType") || elem._2.equals("IntegerType")
@@ -213,7 +224,7 @@ object TrainSetProcess {
       }
     }
 
-    val df_trainUserProfile = df_userProfileSplitPref.select(columnList.map(df_userProfileSplitPref.col(_)): _*)
+    val df_train_userProfile = df_userProfile_split_pref3.select(columnList.map(df_userProfile_split_pref3.col(_)): _*)
 
     // Save Train User Profile
     //    saveProcessedData(df_trainUserProfile, trainUserProfileSavePath)
@@ -221,17 +232,15 @@ object TrainSetProcess {
     /**
      * Train User Profile Merge with Order History And Play History to be Train Set
      */
-    val df_userProfileAndOrderHistory = df_trainUserProfile.join(df_orderHistory, joinKeysUserId, "left")
-    val df_trainSet = df_train_users.join(df_userProfileAndOrderHistory, Seq(Dic.colUserId), "left")
-    //    val df_trainSet = df_userProfileAndOrderHistory.join(df_playVector, joinKeysUserId, "left")
+    val df_userProfile_Order_history = df_train_userProfile.join(df_order_history, joinKeysUserId, "left")
+    val df_trainSet = df_train_users.join(df_userProfile_Order_history, Seq(Dic.colUserId), "left")
+    //    val df_trainSet = df_userProfile_Order_history.join(df_play_vector, joinKeysUserId, "left")
 
     saveProcessedData(df_trainSet, trainSetSavePath)
     println("Done！")
 
 
   }
-
-
 
 
 }

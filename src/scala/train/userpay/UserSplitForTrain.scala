@@ -28,14 +28,16 @@ object UserSplitForTrain {
     println("trainTime", trainTime)
 
 
-    val hdfsPath="hdfs:///pay_predict/"
+    val hdfsPath = "hdfs:///pay_predict/"
     //val hdfsPath = ""
     val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders3"
     val trainSetUsersPath = hdfsPath + "data/train/userpay/trainUsers" + args(0)
+    val allUserPath = hdfsPath + "data/train/userpay/allUsers/user_id.txt"
 
+    val df_orders = getData(spark, ordersProcessedPath)
+    printDf("df_orders", df_orders)
 
     //所有用户id的dataframe  Hisense data
-    val allUserPath = hdfsPath + "data/train/userpay/allUsers/user_id.txt"
     val df_all_Users = spark.read.format("csv").load(allUserPath).toDF(Dic.colUserId)
     printDf("全部用户: ", df_all_Users)
 
@@ -43,15 +45,13 @@ object UserSplitForTrain {
     /**
      * 训练集正负样本选取
      */
-    val df_orders = getData(spark, ordersProcessedPath)
     val df_all_train_users = getTrainSetUsers(df_all_Users, df_orders, trainTime, timeLength, predictResourceId)
-
     printDf("df_all_train_users", df_all_train_users)
     saveProcessedData(df_all_train_users, trainSetUsersPath)
 
   }
 
-  def getTrainSetUsers(df_allUsers: DataFrame, df_orders: DataFrame, trainTime: String, timeLength: Int,predictResourceId:Array[Int]): DataFrame = {
+  def getTrainSetUsers(df_allUsers: DataFrame, df_orders: DataFrame, trainTime: String, timeLength: Int, predictResourceId: Array[Int]): DataFrame = {
 
     /**
      * 训练集正负样本选取
@@ -65,10 +65,6 @@ object UserSplitForTrain {
     val df_order = df_orders.withColumn(Dic.colIsMoneyError, udfGetErrorMoneySign(col(Dic.colResourceType), col(Dic.colMoney)))
 
     //金额异常用户
-    println("package id index 0", predictResourceId(0))
-    println("package id index 1", predictResourceId(1))
-
-
     val df_illegal_users = df_order.filter(
       col(Dic.colCreationTime) >= trainTime and col(Dic.colCreationTime) < calDate(trainTime, timeLength)
         && col(Dic.colResourceType).>(0) and col(Dic.colResourceType).<(4)
@@ -76,7 +72,7 @@ object UserSplitForTrain {
         && (col(Dic.colIsMoneyError) === 1)
     ).select(Dic.colUserId).distinct()
 
-    println("illegal Users number", df_illegal_users.count())
+    printDf("df_illegal_users", df_illegal_users)
 
 
     //  正样本
@@ -86,7 +82,6 @@ object UserSplitForTrain {
         && (col(Dic.colResourceId) === predictResourceId(0) or col(Dic.colResourceId) === predictResourceId(1))
         && col(Dic.colOrderStatus).>(1)
     ).select(Dic.colUserId).distinct()
-
 
     //去掉金额异常用户
     val df_train_pos_users = df_train_pos.except(df_illegal_users)

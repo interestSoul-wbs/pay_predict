@@ -43,11 +43,12 @@ object UserProfileGenerateOrderPartForUserpay {
      * Get Data
      */
     val df_orders = getData(spark, ordersProcessedPath)
-    val df_trainUsers = getData(spark, trainUsersPath)
-    printDf("df_trainUsers", df_trainUsers)
+    printDf("df_orders", df_orders)
+    val df_train_users = getData(spark, trainUsersPath)
+    printDf("df_trainUsers", df_train_users)
 
 
-    val df_trainId = df_trainUsers.select(Dic.colUserId)
+    val df_train_id = df_train_users.select(Dic.colUserId)
 
 
     val pre_30 = calDate(now, -30)
@@ -55,12 +56,12 @@ object UserProfileGenerateOrderPartForUserpay {
     val joinKeysUserId = Seq(Dic.colUserId)
 
     // 选取订单为训练时间前三个月的数据
-    val df_trainUserOrder = df_orders.filter(col(Dic.colCreationTime).<(now) and (col(Dic.colCreationTime)) < calDate(now, -timeWindow * 3))
-      .join(df_trainId, Seq(Dic.colUserId), "inner")
+    val df_train_order = df_orders.filter(col(Dic.colCreationTime).<(now) and (col(Dic.colCreationTime)) < calDate(now, -timeWindow * 3))
+      .join(df_train_id, Seq(Dic.colUserId), "inner")
     /**
      * 已支付套餐数量 金额总数 最大金额 最小金额 平均金额 并对金额进行标准化
      */
-    val order_part_1 = df_trainUserOrder
+    val df_order_part_1 = df_train_order
       .filter(
         col(Dic.colResourceType).>(0)
           && col(Dic.colOrderStatus).>(1)
@@ -77,7 +78,7 @@ object UserProfileGenerateOrderPartForUserpay {
     /**
      * 单点视频
      */
-    val order_part_2 = df_trainUserOrder
+    val df_order_part_2 = df_train_order
       .filter(
         col(Dic.colResourceType).===(0)
           && col(Dic.colOrderStatus).>(1)
@@ -90,7 +91,7 @@ object UserProfileGenerateOrderPartForUserpay {
     /**
      * 已购买的所有订单金额
      */
-    val order_part_3 = df_trainUserOrder
+    val df_order_part_3 = df_train_order
       .filter(
         col(Dic.colOrderStatus).>(1)
       )
@@ -101,7 +102,7 @@ object UserProfileGenerateOrderPartForUserpay {
     /**
      * 未购买套餐
      */
-    val order_part_4 = df_trainUserOrder
+    val df_order_part_4 = df_train_order
       .filter(
         col(Dic.colResourceType).>(0)
           && col(Dic.colOrderStatus).<=(1)
@@ -114,7 +115,7 @@ object UserProfileGenerateOrderPartForUserpay {
     /**
      * 未购买单点
      */
-    val order_part_5 = df_trainUserOrder
+    val df_order_part_5 = df_train_order
       .filter(
         col(Dic.colResourceType).===(0)
           && col(Dic.colOrderStatus).<=(1)
@@ -129,7 +130,7 @@ object UserProfileGenerateOrderPartForUserpay {
      * 距离上次购买最大天数
      */
 
-    val order_part_6 = df_trainUserOrder
+    val df_order_part_6 = df_train_order
       .filter(
         col(Dic.colResourceType).>(0)
           && col(Dic.colOrderStatus).>(1)
@@ -141,7 +142,7 @@ object UserProfileGenerateOrderPartForUserpay {
     /**
      * 距离上次点击套餐最大天数
      */
-    val order_part_7 = df_trainUserOrder
+    val df_order_part_7 = df_train_order
       .filter(
         col(Dic.colResourceType).>(0)
       )
@@ -152,7 +153,7 @@ object UserProfileGenerateOrderPartForUserpay {
     /**
      * 30天前产生的订单总数
      */
-    val order_part_8 = df_trainUserOrder
+    val df_order_part_8 = df_train_order
       .filter(
         col(Dic.colCreationTime).>=(pre_30)
       )
@@ -163,7 +164,7 @@ object UserProfileGenerateOrderPartForUserpay {
     /**
      * 30天前支付的订单数
      */
-    val order_part_9 = df_trainUserOrder
+    val df_order_part_9 = df_train_order
       .filter(
         col(Dic.colCreationTime).>=(pre_30)
           && col(Dic.colOrderStatus).>(1)
@@ -172,7 +173,7 @@ object UserProfileGenerateOrderPartForUserpay {
       .agg(
         count(col(Dic.colUserId)).as(Dic.colNumberPaidOrdersLast30Days)
       )
-    val order_part_10 = df_trainUserOrder
+    val df_order_part_10 = df_train_order
       .filter(
         col(Dic.colCreationTime).>=(pre_30)
           && col(Dic.colOrderStatus).>(1)
@@ -182,7 +183,7 @@ object UserProfileGenerateOrderPartForUserpay {
       .agg(
         count(col(Dic.colUserId)).as(Dic.colNumberPaidPackageLast30Days)
       )
-    val order_part_11 = df_trainUserOrder
+    val df_order_part_11 = df_train_order
       .filter(
         col(Dic.colCreationTime).>=(pre_30)
           && col(Dic.colOrderStatus).>(1)
@@ -195,7 +196,7 @@ object UserProfileGenerateOrderPartForUserpay {
     /**
      * 仍然有效的套餐
      */
-    val order_part_12 = df_trainUserOrder
+    val df_order_part_12 = df_train_order
       .filter(
         col(Dic.colOrderEndTime).>(now)
           && col(Dic.colResourceType).>(0)
@@ -207,24 +208,26 @@ object UserProfileGenerateOrderPartForUserpay {
       )
 
 
-    var df_trainUserProfileOrder = df_trainId.join(order_part_1, joinKeysUserId, "left")
-      .join(order_part_2, joinKeysUserId, "left")
-      .join(order_part_3, joinKeysUserId, "left")
-      .join(order_part_4, joinKeysUserId, "left")
-      .join(order_part_5, joinKeysUserId, "left")
-      .join(order_part_6, joinKeysUserId, "left")
-      .join(order_part_7, joinKeysUserId, "left")
-      .join(order_part_8, joinKeysUserId, "left")
-      .join(order_part_9, joinKeysUserId, "left")
-      .join(order_part_10, joinKeysUserId, "left")
-      .join(order_part_11, joinKeysUserId, "left")
-      .join(order_part_12, joinKeysUserId, "left")
+    val df_trainUserProfileOrder = df_train_id.join(df_order_part_1, joinKeysUserId, "left")
+      .join(df_order_part_2, joinKeysUserId, "left")
+      .join(df_order_part_3, joinKeysUserId, "left")
+      .join(df_order_part_4, joinKeysUserId, "left")
+      .join(df_order_part_5, joinKeysUserId, "left")
+      .join(df_order_part_6, joinKeysUserId, "left")
+      .join(df_order_part_7, joinKeysUserId, "left")
+      .join(df_order_part_8, joinKeysUserId, "left")
+      .join(df_order_part_9, joinKeysUserId, "left")
+      .join(df_order_part_10, joinKeysUserId, "left")
+      .join(df_order_part_11, joinKeysUserId, "left")
+      .join(df_order_part_12, joinKeysUserId, "left")
 
 
     printDf("输出  userprofileOrderPart", df_trainUserProfileOrder)
 
     //大约有85万用户
     saveProcessedData(df_trainUserProfileOrder, userProfileOrderPartSavePath)
+
+    println("用户画像订单部分生成完毕。")
 
   }
 
