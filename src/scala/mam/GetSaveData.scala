@@ -2,7 +2,7 @@ package mam
 
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
 object GetSaveData {
 
@@ -2264,9 +2264,6 @@ object GetSaveData {
 
   /**
     * Save play data.
-    *
-    * @param spark
-    * @param df_order
     */
   def saveProcessedPlay(spark: SparkSession, df_play: DataFrame, partitiondate: String, license: String) = {
 
@@ -2348,12 +2345,17 @@ object GetSaveData {
     println("over over........... \n" * 4)
   }
 
+  def saveProcessedPlay(df_play_processed: DataFrame) = {
+
+    val hdfsPath = "hdfs:///pay_predict/"
+
+    val playProcessedPath = hdfsPath + "data/train/common/processed/plays"
+
+    df_play_processed.write.mode(SaveMode.Overwrite).format("parquet").save(playProcessedPath)
+  }
 
   /**
     * Save order data.
-    *
-    * @param spark
-    * @param df_order
     */
   def saveProcessedOrder(spark: SparkSession, df_order: DataFrame, partitiondate: String, license: String) = {
 
@@ -2453,6 +2455,65 @@ object GetSaveData {
     println("over over........... \n" * 4)
   }
 
+  def saveProcessedOrder(df_order_processed: DataFrame) = {
+
+    val hdfsPath = ""
+
+    val orderProcessedPath = hdfsPath + "data/train/common/processed/orders3"
+
+    saveProcessedData(df_order_processed, orderProcessedPath)
+  }
+
+  def getRawOrders(spark: SparkSession) = {
+
+    val hdfsPath = ""
+
+    val orderRawPath = hdfsPath + "data/train/common/raw/orders/*"
+
+    val schema = StructType(
+      List(
+        StructField(Dic.colUserId, StringType),
+        StructField(Dic.colMoney, StringType),
+        StructField(Dic.colResourceType, StringType),
+        StructField(Dic.colResourceId, StringType),
+        StructField(Dic.colResourceTitle, StringType),
+        StructField(Dic.colCreationTime, StringType),
+        StructField(Dic.colDiscountDescription, StringType),
+        StructField(Dic.colOrderStatus, StringType),
+        StructField(Dic.colOrderStartTime, StringType),
+        StructField(Dic.colOrderEndTime, StringType)))
+
+    val df = spark.read
+      .option("delimiter", "\t")
+      .option("header", false)
+      .schema(schema)
+      .csv(orderRawPath)
+
+    df
+  }
+
+  def getRawPlays(spark: SparkSession) = {
+
+    val hdfsPath = "hdfs:///pay_predict/"
+    //val hdfsPath=""
+    val playRawPath = hdfsPath + "data/train/common/raw/plays/behavior_*.txt"
+
+    val schema = StructType(
+      List(
+        StructField(Dic.colUserId, StringType),
+        StructField(Dic.colPlayEndTime, StringType),
+        StructField(Dic.colVideoId, StringType),
+        StructField(Dic.colBroadcastTime, FloatType)))
+
+    val df = spark.read
+      .option("delimiter", "\t")
+      .option("header", false)
+      .schema(schema)
+      .csv(playRawPath)
+
+    df
+  }
+
   /**
     * Save processed media data to hive
     *
@@ -2522,6 +2583,22 @@ object GetSaveData {
 
     spark.sql(insert_sql)
     println("over over........... \n" * 4)
+  }
+
+  def saveProcessedData(df: DataFrame, path: String) = {
+
+    df.write.mode(SaveMode.Overwrite).format("parquet").save(path)
+
+  }
+
+  def saveProcessedMedia(df_processed_media: DataFrame) = {
+
+    val hdfsPath = "hdfs:///pay_predict/"
+    //val hdfsPath = ""
+
+    val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
+
+    saveProcessedData(df_processed_media, mediasProcessedPath)
   }
 
   /**

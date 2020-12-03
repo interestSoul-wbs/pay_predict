@@ -1,72 +1,52 @@
 package train.common
 
 import mam.Dic
-import mam.Utils.{printDf, udfAddSuffix}
-import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql
-import org.apache.spark.sql.functions.udf
-import org.apache.spark.sql.types.{FloatType, StringType, StructField, StructType}
-import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
+import mam.Utils._
+import mam.GetSaveData._
+import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
 
 object PlaysProcess {
+
+  var timeMaxLimit = 43200
+  var timeMinLimit = 30
+
   def main(args: Array[String]): Unit = {
-    System.setProperty("hadoop.home.dir","c:\\winutils")
-    Logger.getLogger("org").setLevel(Level.ERROR)
-    val spark: SparkSession = new sql.SparkSession.Builder()
-      //.master("local[4]")
-      .appName("PlaysProcess")
+
+    sysParamSetting()
+
+    val spark = SparkSession
+      .builder()
+      //.master("local[6]") // Konverse - 上传 master 时，删除
+      .enableHiveSupport() // Konverse - 这个如果不影响本地运行，就不用注释；
       .getOrCreate()
 
+    val df_play_raw = getRawPlays(spark)
 
-    val hdfsPath="hdfs:///pay_predict/"
-    //val hdfsPath=""
-    val playRawPath=hdfsPath+"data/train/common/raw/plays/behavior_*.txt"
-    val playProcessedPath=hdfsPath+"data/train/common/processed/plays"
-    val playRaw=getRawPlays(playRawPath,spark)
+    printDf("df_play_raw", df_play_raw)
 
-    printDf("输入 playRaw",playRaw)
+    val df_play_processed = playsProcess(df_play_raw, timeMaxLimit, timeMinLimit)
 
+    printDf("df_play_processed", df_play_processed)
 
-    val playsProcessed=playsProcess(playRaw)
+    saveProcessedPlay(df_play_processed)
 
-
-    printDf("输出 playProcessed",playsProcessed)
-    playsProcessed.write.mode(SaveMode.Overwrite).format("parquet").save(playProcessedPath)
-     println("播放数据处理完成！")
-  }
-  def getRawPlays(playRawPath:String,spark:SparkSession)={
-    val schema = StructType(
-      List(
-        StructField(Dic.colUserId, StringType),
-        StructField(Dic.colPlayEndTime, StringType),
-        StructField(Dic.colVideoId, StringType),
-        StructField(Dic.colBroadcastTime, FloatType)
-      )
-    )
-    val df = spark.read
-      .option("delimiter", "\t")
-      .option("header", false)
-      .schema(schema)
-      .csv(playRawPath)
-    df
-
-  }
-  def playsProcess(playRaw:DataFrame)={
-    var playProcessed=playRaw
-      .withColumn(Dic.colPlayEndTime,substring(col(Dic.colPlayEndTime),0,10))
-      .groupBy(col(Dic.colUserId),col(Dic.colVideoId),col(Dic.colPlayEndTime))
-      .agg(sum(col(Dic.colBroadcastTime)) as Dic.colBroadcastTime)
-    val time_max_limit=43200
-    val time_min_limit=30
-    playProcessed=playProcessed
-      .filter(col(Dic.colBroadcastTime)<time_max_limit && col(Dic.colBroadcastTime)>time_min_limit )
-      .orderBy(col(Dic.colUserId),col(Dic.colPlayEndTime))
-      .withColumn(Dic.colPlayEndTime,udfAddSuffix(col(Dic.colPlayEndTime)))
-    playProcessed
-
+    println("播放数据处理完成！")
   }
 
+  def playsProcess(df_play_raw: DataFrame, timeMaxLimit: Int, timeMinLimit: Int) = {
+
+    val df_play_processed = df_play_raw
+      .withColumn(Dic.colPlayEndTime, substring(col(Dic.colPlayEndTime), 0, 10))
+      .groupBy(col(Dic.colUserId), col(Dic.colVideoId), col(Dic.colPlayEndTime))
+      .agg(
+        sum(col(Dic.colBroadcastTime)) as Dic.colBroadcastTime)
+      .filter(col(Dic.colBroadcastTime) < timeMaxLimit && col(Dic.colBroadcastTime) > timeMinLimit)
+      .orderBy(col(Dic.colUserId), col(Dic.colPlayEndTime))
+      .withColumn(Dic.colPlayEndTime, udfAddSuffix(col(Dic.colPlayEndTime)))
+
+    df_play_processed
+  }
 }
 
 

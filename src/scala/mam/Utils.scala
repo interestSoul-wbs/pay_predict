@@ -4,26 +4,28 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 
 import breeze.linalg.DenseVector
+import org.apache.log4j.{Level, Logger}
 import org.apache.spark.mllib.linalg.Vectors
 
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
 import org.apache.spark.sql.functions.{col, split, udf}
-
+import org.apache.spark.sql.functions._
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
 
 object Utils {
 
+  def sysParamSetting() = {
+
+    System.setProperty("hadoop.home.dir", "c:\\winutils")
+
+    Logger.getLogger("org").setLevel(Level.ERROR)
+  }
+
 
   def printDf(df_name: String, df: DataFrame) = {
-    /**
-     * @description dataframe信息输出
-     * @author wx
-     * @param [df_name]
-     * @param [df]
-     * @return {@link void }
-     * */
+
     println("_____________________\n" * 2)
     println(df_name)
     println("dataframe count ", df.count())
@@ -46,20 +48,18 @@ object Utils {
 
   }
 
+  /**
+    * @author wj
+    * @param [spark, orderProcessedPath]
+    * @return org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
+    * @description 读取数据
+    */
   def getData(spark: SparkSession, path: String) = {
-    /**
-     * @author wj
-     * @param [spark, orderProcessedPath]
-     * @return org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
-     * @description 读取数据
-     */
+
     spark.read.format("parquet").load(path)
   }
 
 
-  def saveProcessedData(df: DataFrame, path: String) = {
-    df.write.mode(SaveMode.Overwrite).format("parquet").save(path)
-  }
 
 
   //orderProcess
