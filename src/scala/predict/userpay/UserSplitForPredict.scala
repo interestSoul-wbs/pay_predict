@@ -10,6 +10,8 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 
 object UserSplitForPredict {
 
+  val timeLength = 14
+  val predictResourceId = Array(100201, 100202) //要预测的套餐id
 
   def main(args: Array[String]): Unit = {
     sysParamSetting()
@@ -17,38 +19,45 @@ object UserSplitForPredict {
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("UserSplitForPredict")
       //.master("local[6]")
-//      .enableHiveSupport()
+      //      .enableHiveSupport()
       .getOrCreate()
 
     val predictTime = args(0) + " " + args(1)
-    val timeLength = 14
 
-    val hdfsPath="hdfs:///pay_predict/"
+    /**
+     * Data Path
+     */
+    val hdfsPath = "hdfs:///pay_predict/"
     //val hdfsPath = ""
     val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders3"
     val predictUsersSavePath = hdfsPath + "data/predict/userpay/predictUsers" + args(0)
-
     //所有用户id的dataframe
     val allUserPath = hdfsPath + "data/train/userpay/allUsers/user_id.txt"
-    val df_allUsers = spark.read.format("csv").load(allUserPath).toDF(Dic.colUserId)
-    printDf("全部用户: ", df_allUsers)
+
+    /**
+     * Get Data
+     */
+    val df_all_users = spark.read.format("csv").load(allUserPath).toDF(Dic.colUserId)
+    printDf("全部用户: ", df_all_users)
 
     val df_orders = getData(spark, ordersProcessedPath)
+    printDf("df_orders", df_orders)
 
-    val df_allPredictUsers = getPredictSetUsers(df_allUsers, df_orders, predictTime, timeLength)
-    saveProcessedData(df_allPredictUsers, predictUsersSavePath)
+    val df_predict_users = getPredictSetUsers(df_all_users, df_orders, predictTime, timeLength)
+    printDf("df_predict_users", df_predict_users)
+
+    saveProcessedData(df_predict_users, predictUsersSavePath)
 
 
   }
 
 
-  def getPredictSetUsers(df_allUsers: DataFrame, df_orders: DataFrame, predictTime: String, timeLength: Int): DataFrame = {
+  def getPredictSetUsers(df_all_users: DataFrame, df_orders: DataFrame, predictTime: String, timeLength: Int): DataFrame = {
 
     val df_order = df_orders.withColumn(Dic.colIsMoneyError, udfGetErrorMoneySign(col(Dic.colResourceType), col(Dic.colMoney)))
-    val predictResourceId = Array(100201, 100202) //要预测的套餐id
 
     //金额异常用户
-    val df_illegalUsers = df_order.filter(
+    val df_illegal_users = df_order.filter(
       col(Dic.colCreationTime) >= predictTime and col(Dic.colCreationTime) < calDate(predictTime, timeLength)
         && (col(Dic.colResourceType) > 0 and col(Dic.colResourceType) < 4)
         && (col(Dic.colResourceId) === predictResourceId(0) or col(Dic.colResourceId) === predictResourceId(1))
@@ -57,28 +66,27 @@ object UserSplitForPredict {
 
 
     //  正样本
-    var df_predictPosUsers = df_order.filter(
+    val df_predict_pos_users = df_order.filter(
       col(Dic.colCreationTime) >= predictTime and col(Dic.colCreationTime) < calDate(predictTime, timeLength)
         && col(Dic.colResourceType).>(0) and col(Dic.colResourceType).<(4)
         && (col(Dic.colResourceId) === predictResourceId(0) or col(Dic.colResourceId) === predictResourceId(1))
         && col(Dic.colOrderStatus).>(1)
     ).select(Dic.colUserId).distinct()
-
-    df_predictPosUsers = df_predictPosUsers.except(df_illegalUsers)
+    .except(df_illegal_users)
       .withColumn(Dic.colOrderStatus, lit(1))
 
-    printDf("predictPosUsers", df_predictPosUsers)
+    printDf("predictPosUsers", df_predict_pos_users)
 
     //负样本
-    val df_allNegUsers = df_allUsers.except(df_predictPosUsers.select(Dic.colUserId))
-      .except(df_illegalUsers)
+    val df_all_neg_users = df_all_users.except(df_predict_pos_users.select(Dic.colUserId))
+      .except(df_illegal_users)
 
-    val df_predictNegUsers = df_allNegUsers.sample(1).limit(10 * df_predictPosUsers.count().toInt)
+    val df_predict_neg_users = df_all_neg_users.sample(1).limit(10 * df_predict_pos_users.count().toInt)
       .withColumn(Dic.colOrderStatus, lit(0))
 
-    printDf("df_PredictNegUsers", df_predictNegUsers)
+    printDf("df_PredictNegUsers", df_predict_neg_users)
 
-    df_predictPosUsers.union(df_predictNegUsers).sample(1)
+    df_predict_pos_users.union(df_predict_neg_users).sample(1)
 
   }
 

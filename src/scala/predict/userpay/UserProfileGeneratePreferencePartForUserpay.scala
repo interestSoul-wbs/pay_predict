@@ -15,14 +15,13 @@ object UserProfileGeneratePreferencePartForUserpay {
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("UserProfileGeneratePreferencePartForUserpayPredict")
       //.master("local[6]")
-//      .enableHiveSupport()
+      //      .enableHiveSupport()
       .getOrCreate()
 
     val now = args(0) + " " + args(1)
     userProfileGeneratePreferencePart(spark, now)
 
   }
-
 
 
   def userProfileGeneratePreferencePart(spark: SparkSession, now: String): Unit = {
@@ -36,12 +35,19 @@ object UserProfileGeneratePreferencePartForUserpay {
     val userProfilePreferencePartSavePath = hdfsPath + "data/predict/common/processed/userpay/userprofilepreferencepart" + now.split(" ")(0)
 
 
-
+    /**
+     * Get Data
+     */
     val df_medias = getData(spark, mediasProcessedPath)
-    val df_plays = getData(spark, playsProcessedPath)
-    val df_predictUsers = getData(spark, predictUserPath)
+    printDf("df_medias", df_medias)
 
-    val df_predictId = df_predictUsers.select(Dic.colUserId)
+    val df_plays = getData(spark, playsProcessedPath)
+    printDf("df_plays", df_plays)
+
+    val df_predict_users = getData(spark, predictUserPath)
+    printDf("df_predict_users", df_predict_users)
+
+    val df_predict_id = df_predict_users.select(Dic.colUserId)
 
     val pre_30 = calDate(now, -30)
     val pre_14 = calDate(now, days = -14)
@@ -51,11 +57,11 @@ object UserProfileGeneratePreferencePartForUserpay {
 
     val joinKeysUserId = Seq(Dic.colUserId)
     val joinKeyVideoId = Seq(Dic.colVideoId)
-    val df_predictUserPlaysMedias = df_plays.join(df_predictId, joinKeysUserId, "inner")
+    val df_predict_plays_medias = df_plays.join(df_predict_id, joinKeysUserId, "inner")
       .join(df_medias, joinKeyVideoId, "inner")
 
 
-    val play_medias_part_41 = df_predictUserPlaysMedias
+    val df_play_medias_part_41 = df_predict_plays_medias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_30)
@@ -65,7 +71,7 @@ object UserProfileGeneratePreferencePartForUserpay {
         sum(col(Dic.colTimeSum)).as(Dic.colTotalTimeMoviesLast30Days)
       ).withColumn(Dic.colTotalTimeMoviesLast30Days, round(col(Dic.colTotalTimeMoviesLast30Days) / 60, 0))
 
-    val play_medias_part_42 = df_predictUserPlaysMedias
+    val df_play_medias_part_42 = df_predict_plays_medias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_14)
@@ -77,7 +83,7 @@ object UserProfileGeneratePreferencePartForUserpay {
       .withColumn(Dic.colTotalTimeMoviesLast14Days, round(col(Dic.colTotalTimeMoviesLast14Days) / 60, 0))
 
 
-    val play_medias_part_43 = df_predictUserPlaysMedias
+    val df_play_medias_part_43 = df_predict_plays_medias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_7)
@@ -88,7 +94,7 @@ object UserProfileGeneratePreferencePartForUserpay {
       )
       .withColumn(Dic.colTotalTimeMoviesLast7Days, round(col(Dic.colTotalTimeMoviesLast7Days) / 60, 0))
 
-    val play_medias_part_44 = df_predictUserPlaysMedias
+    val df_play_medias_part_44 = df_predict_plays_medias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_3)
@@ -99,7 +105,7 @@ object UserProfileGeneratePreferencePartForUserpay {
       ).withColumn(Dic.colTotalTimeMoviesLast3Days, round(col(Dic.colTotalTimeMoviesLast3Days) / 60, 0))
 
 
-    val play_medias_part_45 = df_predictUserPlaysMedias
+    val df_play_medias_part_45 = df_predict_plays_medias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_1)
@@ -110,14 +116,14 @@ object UserProfileGeneratePreferencePartForUserpay {
       )
       .withColumn(Dic.colTotalTimeMoviesLast1Days, round(col(Dic.colTotalTimeMoviesLast1Days) / 60, 0))
 
-    var df_predictUserProfilePref = df_predictId.join(play_medias_part_41, joinKeysUserId, "left")
-      .join(play_medias_part_42, joinKeysUserId, "left")
-      .join(play_medias_part_43, joinKeysUserId, "left")
-      .join(play_medias_part_44, joinKeysUserId, "left")
-      .join(play_medias_part_45, joinKeysUserId, "left")
+    var df_user_profile_pref1 = df_predict_id.join(df_play_medias_part_41, joinKeysUserId, "left")
+      .join(df_play_medias_part_42, joinKeysUserId, "left")
+      .join(df_play_medias_part_43, joinKeysUserId, "left")
+      .join(df_play_medias_part_44, joinKeysUserId, "left")
+      .join(df_play_medias_part_45, joinKeysUserId, "left")
 
 
-    val play_medias_part_51 = df_predictUserPlaysMedias
+    val df_play_medias_part_51 = df_predict_plays_medias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_30)
@@ -129,7 +135,7 @@ object UserProfileGeneratePreferencePartForUserpay {
       )
       .withColumn(Dic.colTotalTimePaidMoviesLast30Days, round(col(Dic.colTotalTimePaidMoviesLast30Days) / 60, 0))
 
-    val play_medias_part_52 = df_predictUserPlaysMedias
+    val df_play_medias_part_52 = df_predict_plays_medias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_14)
@@ -142,7 +148,7 @@ object UserProfileGeneratePreferencePartForUserpay {
       .withColumn(Dic.colTotalTimePaidMoviesLast14Days, round(col(Dic.colTotalTimePaidMoviesLast14Days) / 60, 0))
 
 
-    val play_medias_part_53 = df_predictUserPlaysMedias
+    val df_play_medias_part_53 = df_predict_plays_medias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_7)
@@ -154,7 +160,7 @@ object UserProfileGeneratePreferencePartForUserpay {
       )
       .withColumn(Dic.colTotalTimePaidMoviesLast7Days, round(col(Dic.colTotalTimePaidMoviesLast7Days) / 60, 0))
 
-    val play_medias_part_54 = df_predictUserPlaysMedias
+    val df_play_medias_part_54 = df_predict_plays_medias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_3)
@@ -166,7 +172,7 @@ object UserProfileGeneratePreferencePartForUserpay {
       )
       .withColumn(Dic.colTotalTimePaidMoviesLast3Days, round(col(Dic.colTotalTimePaidMoviesLast3Days) / 60, 0))
 
-    val play_medias_part_55 = df_predictUserPlaysMedias
+    val df_play_medias_part_55 = df_predict_plays_medias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_1)
@@ -179,14 +185,14 @@ object UserProfileGeneratePreferencePartForUserpay {
       .withColumn(Dic.colTotalTimePaidMoviesLast1Days, round(col(Dic.colTotalTimePaidMoviesLast1Days) / 60, 0))
 
 
-    df_predictUserProfilePref = df_predictUserProfilePref.join(play_medias_part_51, joinKeysUserId, "left")
-      .join(play_medias_part_52, joinKeysUserId, "left")
-      .join(play_medias_part_53, joinKeysUserId, "left")
-      .join(play_medias_part_54, joinKeysUserId, "left")
-      .join(play_medias_part_55, joinKeysUserId, "left")
+    val df_user_profile_pref2 = df_user_profile_pref1.join(df_play_medias_part_51, joinKeysUserId, "left")
+      .join(df_play_medias_part_52, joinKeysUserId, "left")
+      .join(df_play_medias_part_53, joinKeysUserId, "left")
+      .join(df_play_medias_part_54, joinKeysUserId, "left")
+      .join(df_play_medias_part_55, joinKeysUserId, "left")
 
 
-    val play_medias_part_61 = df_predictUserPlaysMedias
+    val df_play_medias_part_61 = df_predict_plays_medias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_30)
@@ -199,7 +205,7 @@ object UserProfileGeneratePreferencePartForUserpay {
       )
 
 
-    val play_medias_part_62 = df_predictUserPlaysMedias
+    val df_play_medias_part_62 = df_predict_plays_medias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_30)
@@ -211,7 +217,7 @@ object UserProfileGeneratePreferencePartForUserpay {
         avg(col(Dic.colTimeSum)).as(Dic.colAvgRestdailyTimeVideosLast30Days)
       )
 
-    val play_medias_part_63 = df_predictUserPlaysMedias
+    val df_play_medias_part_63 = df_predict_plays_medias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_30)
@@ -223,7 +229,7 @@ object UserProfileGeneratePreferencePartForUserpay {
         avg(col(Dic.colTimeSum)).as(Dic.colAvgWorkdailyTimePaidVideosLast30Days)
       )
 
-    val play_medias_part_64 = df_predictUserPlaysMedias
+    val df_play_medias_part_64 = df_predict_plays_medias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_30)
@@ -235,13 +241,13 @@ object UserProfileGeneratePreferencePartForUserpay {
         avg(col(Dic.colTimeSum)).as(Dic.colAvgRestdailyTimePaidVideosLast30Days)
       )
 
-    df_predictUserProfilePref = df_predictUserProfilePref.join(play_medias_part_61, joinKeysUserId, "left")
-      .join(play_medias_part_62, joinKeysUserId, "left")
-      .join(play_medias_part_63, joinKeysUserId, "left")
-      .join(play_medias_part_64, joinKeysUserId, "left")
+    val df_user_profile_pref3 = df_user_profile_pref2.join(df_play_medias_part_61, joinKeysUserId, "left")
+      .join(df_play_medias_part_62, joinKeysUserId, "left")
+      .join(df_play_medias_part_63, joinKeysUserId, "left")
+      .join(df_play_medias_part_64, joinKeysUserId, "left")
 
 
-    val play_medias_part_71_temp = df_predictUserPlaysMedias
+    val df_play_medias_part_71_temp = df_predict_plays_medias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_30)
@@ -252,13 +258,13 @@ object UserProfileGeneratePreferencePartForUserpay {
         collect_list(col(Dic.colVideoTwoLevelClassificationList)).as(Dic.colVideoTwoLevelPreference),
         collect_list(col(Dic.colVideoTagList)).as(Dic.colTagPreference)
       )
-    val play_medias_part_71 = play_medias_part_71_temp
+    val df_play_medias_part_71 = df_play_medias_part_71_temp
       .withColumn(Dic.colVideoOneLevelPreference, udfGetLabelAndCount(col(Dic.colVideoOneLevelPreference)))
       .withColumn(Dic.colVideoTwoLevelPreference, udfGetLabelAndCount2(col(Dic.colVideoTwoLevelPreference)))
       .withColumn(Dic.colTagPreference, udfGetLabelAndCount2(col(Dic.colTagPreference)))
 
 
-    val play_medias_part_72_temp = df_predictUserPlaysMedias
+    val df_play_medias_part_72_temp = df_predict_plays_medias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_30)
@@ -269,12 +275,12 @@ object UserProfileGeneratePreferencePartForUserpay {
         collect_list(col(Dic.colVideoTwoLevelClassificationList)).as(Dic.colMovieTwoLevelPreference),
         collect_list(col(Dic.colVideoTagList)).as(Dic.colMovieTagPreference)
       )
-    val play_medias_part_72 = play_medias_part_72_temp
+    val df_play_medias_part_72 = df_play_medias_part_72_temp
       .withColumn(Dic.colMovieTwoLevelPreference, udfGetLabelAndCount2(col(Dic.colMovieTwoLevelPreference)))
       .withColumn(Dic.colMovieTagPreference, udfGetLabelAndCount2(col(Dic.colMovieTagPreference)))
 
 
-    val play_medias_part_73_temp = df_predictUserPlaysMedias
+    val df_play_medias_part_73_temp = df_predict_plays_medias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_30)
@@ -285,11 +291,11 @@ object UserProfileGeneratePreferencePartForUserpay {
         collect_list(col(Dic.colVideoTwoLevelClassificationList)).as(Dic.colSingleTwoLevelPreference),
         collect_list(col(Dic.colVideoTagList)).as(Dic.colSingleTagPreference)
       )
-    val play_medias_part_73 = play_medias_part_73_temp
+    val df_play_medias_part_73 = df_play_medias_part_73_temp
       .withColumn(Dic.colSingleTwoLevelPreference, udfGetLabelAndCount2(col(Dic.colSingleTwoLevelPreference)))
       .withColumn(Dic.colSingleTagPreference, udfGetLabelAndCount2(col(Dic.colSingleTagPreference)))
 
-    val play_medias_part_74_temp = df_predictUserPlaysMedias
+    val df_play_medias_part_74_temp = df_predict_plays_medias
       .filter(
         col(Dic.colPlayStartTime).<(now)
           && col(Dic.colPlayStartTime).>=(pre_30)
@@ -300,20 +306,20 @@ object UserProfileGeneratePreferencePartForUserpay {
         collect_list(col(Dic.colVideoTwoLevelClassificationList)).as(Dic.colInPackageVideoTwoLevelPreference),
         collect_list(col(Dic.colVideoTagList)).as(Dic.colInPackageTagPreference)
       )
-    val play_medias_part_74 = play_medias_part_74_temp
+    val df_play_medias_part_74 = df_play_medias_part_74_temp
       .withColumn(Dic.colInPackageVideoTwoLevelPreference, udfGetLabelAndCount2(col(Dic.colInPackageVideoTwoLevelPreference)))
       .withColumn(Dic.colInPackageTagPreference, udfGetLabelAndCount2(col(Dic.colInPackageTagPreference)))
 
 
-    df_predictUserProfilePref = df_predictUserProfilePref.join(play_medias_part_71, joinKeysUserId, "left")
-      .join(play_medias_part_72, joinKeysUserId, "left")
-      .join(play_medias_part_73, joinKeysUserId, "left")
-      .join(play_medias_part_74, joinKeysUserId, "left")
+    val df_user_profile_pref = df_user_profile_pref3.join(df_play_medias_part_71, joinKeysUserId, "left")
+      .join(df_play_medias_part_72, joinKeysUserId, "left")
+      .join(df_play_medias_part_73, joinKeysUserId, "left")
+      .join(df_play_medias_part_74, joinKeysUserId, "left")
 
 
     //大约有85万用户
-    saveProcessedData(df_predictUserProfilePref, userProfilePreferencePartSavePath)
-
+    saveProcessedData(df_user_profile_pref, userProfilePreferencePartSavePath)
+    println("User Profile Pref Part Save Done!")
   }
 
 

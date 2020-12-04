@@ -20,7 +20,7 @@ object UserSplitForTrain {
 
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("UserSplitForTrain")
-      //.master("local[6]")
+      .master("local[6]")
       //.enableHiveSupport()
       .getOrCreate()
 
@@ -28,8 +28,8 @@ object UserSplitForTrain {
     println("trainTime", trainTime)
 
 
-    val hdfsPath = "hdfs:///pay_predict/"
-    //val hdfsPath = ""
+    //val hdfsPath = "hdfs:///pay_predict/"
+    val hdfsPath = ""
     val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders3"
     val trainSetUsersPath = hdfsPath + "data/train/userpay/trainUsers" + args(0)
     val allUserPath = hdfsPath + "data/train/userpay/allUsers/user_id.txt"
@@ -76,15 +76,13 @@ object UserSplitForTrain {
 
 
     //  正样本
-    val df_train_pos = df_order.filter(
+    val df_train_pos_users = df_order.filter(
       col(Dic.colCreationTime) >= trainTime and col(Dic.colCreationTime) < calDate(trainTime, timeLength)
         && col(Dic.colResourceType).>(0) and col(Dic.colResourceType).<(4)
         && (col(Dic.colResourceId) === predictResourceId(0) or col(Dic.colResourceId) === predictResourceId(1))
         && col(Dic.colOrderStatus).>(1)
     ).select(Dic.colUserId).distinct()
-
-    //去掉金额异常用户
-    val df_train_pos_users = df_train_pos.except(df_illegal_users)
+      .except(df_illegal_users)
       .withColumn(Dic.colOrderStatus, lit(1))
 
     printDf("trainPosUsers", df_train_pos_users)

@@ -2,7 +2,7 @@ package train.common
 
 import mam.Dic
 import mam.GetSaveData.saveProcessedData
-import mam.Utils.{getData, printDf, udfBreak}
+import mam.Utils.{getData, printDf, sysParamSetting, udfBreak}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.ml.feature.Word2Vec
 import org.apache.spark.sql
@@ -20,11 +20,11 @@ object MediasVideoVectorProcess {
   val vectorDimension = 32
 
   def main(args: Array[String]): Unit = {
-    System.setProperty("hadoop.home.dir", "c:\\winutils")
-    Logger.getLogger("org").setLevel(Level.ERROR)
+    sysParamSetting()
     val spark: SparkSession = new sql.SparkSession.Builder()
       .master("local[4]")
       .appName("MediasVideoLabelsVectorProcess")
+      //      .enableHiveSupport()
       .getOrCreate()
 
     //val hdfsPath = "hdfs:///pay_predict/"
@@ -46,7 +46,7 @@ object MediasVideoVectorProcess {
     /**
      * Process Medias Vector
      */
-    val df_medias_vector_v1 = mediasVectorProces(df_medias, df_plays)
+    val df_medias_vector_v1 = mediasVectorProcess(df_medias, df_plays)
     saveProcessedData(df_medias_vector_v1, mediasVectorSavePath)
     printDf("df_medias_vector_v1", df_medias_vector_v1)
     println("Media's video vector saved !!! ")
@@ -54,7 +54,7 @@ object MediasVideoVectorProcess {
   }
 
 
-  def mediasVectorProces(df_medias: DataFrame, df_plays: DataFrame) = {
+  def mediasVectorProcess(df_medias: DataFrame, df_plays: DataFrame) = {
     /**
      * @description: Get vector of Medias video which played by users
      * @param: df_medias :  medias dataframe
@@ -80,13 +80,15 @@ object MediasVideoVectorProcess {
         when(col(Dic.colVideoTagList).isNotNull, col(Dic.colVideoTagList))
           .otherwise(Array("其他")))
       .withColumn(Dic.colVideoHour, col(Dic.colVideoTime) / 3600)
-      .withColumn(Dic.colInPackage, when(col(Dic.colPackageId).>(0), 1).otherwise(0))
-      .withColumn(Dic.colScore, col(Dic.colScore) / 10)
       .na.fill(
       Map((Dic.colIsPaid, 0),
         (Dic.colInPackage, 0),
         (Dic.colVideoOneLevelClassification, "其他"))
     )
+      .withColumn(Dic.colInPackage, when(col(Dic.colPackageId).>(0), 1).otherwise(0))
+      .withColumn(Dic.colScore, col(Dic.colScore) / 10)
+
+
 
     val df_medias_played_labels = df_medias_played_process.select(Dic.colVideoId, Dic.colVideoOneLevelClassification, Dic.colVideoTwoLevelClassificationList, Dic.colVideoTagList)
 
@@ -108,7 +110,6 @@ object MediasVideoVectorProcess {
 
     val df_labels_vector = getMeanVectorOfLabels(vectorDimension, df_one_vector, df_two_mean_vector, df_tags_mean_vector, df_medias_played_labels)
     printDf("df_labelsVector", df_labels_vector)
-
 
 
     // colVideoOneLevelClassification will be used in TrainSetProcess

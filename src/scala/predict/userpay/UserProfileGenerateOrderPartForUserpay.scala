@@ -3,7 +3,7 @@ package predict.userpay
 import mam.Dic
 import mam.GetSaveData.saveProcessedData
 import mam.Utils.{calDate, getData, printDf, sysParamSetting, udfGetDays}
-import org.apache.log4j.{Level, Logger}
+import org.apache.spark.sql.functions._
 import org.apache.spark.sql
 import org.apache.spark.sql.SparkSession
 
@@ -29,8 +29,6 @@ object UserProfileGenerateOrderPartForUserpay {
 
   def userProfileGenerateOrderPart(spark: SparkSession, now: String): Unit = {
 
-    import org.apache.spark.sql.functions._
-
 
     val hdfsPath = "hdfs:///pay_predict/"
     //val hdfsPath = ""
@@ -39,20 +37,24 @@ object UserProfileGenerateOrderPartForUserpay {
     val userProfileOrderPartSavePath = hdfsPath + "data/predict/common/processed/userpay/userprofileorderpart" + now.split(" ")(0)
 
 
-
-
+    /**
+     * Get Data
+     */
     val df_orders = getData(spark, ordersProcessedPath)
-    val df_predictUsers = getData(spark, predictUserPath)
-    val df_predictId = df_predictUsers.select(Dic.colUserId)
+    printDf("df_orders", df_orders)
+
+    val df_predict_users = getData(spark, predictUserPath)
+    printDf("df_predict", df_predict_users)
+
+    val df_predict_id = df_predict_users.select(Dic.colUserId)
 
 
     val pre_30 = calDate(now, -30)
-
     val joinKeysUserId = Seq(Dic.colUserId)
-    val df_predictUserOrder = df_orders.join(df_predictId, Seq(Dic.colUserId), "inner")
-      .filter(col(Dic.colCreationTime).<(now) and (col(Dic.colCreationTime)) < calDate(now, -timeWindow * 3))
+    val df_predict_order = df_orders.filter(col(Dic.colCreationTime).<(now) and (col(Dic.colCreationTime) < calDate(now, -timeWindow * 3)))
+      .join(df_predict_id, Seq(Dic.colUserId), "inner")
 
-    val order_part_1 = df_predictUserOrder
+    val df_order_part_1 = df_predict_order
       .filter(
         col(Dic.colResourceType).>(0)
           && col(Dic.colOrderStatus).>(1)
@@ -66,7 +68,8 @@ object UserProfileGenerateOrderPartForUserpay {
         avg(col(Dic.colMoney)).as(Dic.colAvgMoneyPackagePurchased),
         stddev(col(Dic.colMoney)).as(Dic.colVarMoneyPackagePurchased)
       )
-    val order_part_2 = df_predictUserOrder
+
+    val df_order_part_2 = df_predict_order
       .filter(
         col(Dic.colResourceType).===(0)
           && col(Dic.colOrderStatus).>(1)
@@ -76,7 +79,8 @@ object UserProfileGenerateOrderPartForUserpay {
         count(col(Dic.colUserId)).as(Dic.colNumberSinglesPurchased),
         sum(col(Dic.colMoney)).as(Dic.colTotalMoneySinglesPurchased)
       )
-    val order_part_3 = df_predictUserOrder
+
+    val df_order_part_3 = df_predict_order
       .filter(
         col(Dic.colOrderStatus).>(1)
       )
@@ -84,7 +88,8 @@ object UserProfileGenerateOrderPartForUserpay {
       .agg(
         sum(col(Dic.colMoney)).as(Dic.colTotalMoneyConsumption)
       )
-    val order_part_4 = df_predictUserOrder
+
+    val df_order_part_4 = df_predict_order
       .filter(
         col(Dic.colResourceType).>(0)
           && col(Dic.colOrderStatus).<=(1)
@@ -95,7 +100,7 @@ object UserProfileGenerateOrderPartForUserpay {
         sum(col(Dic.colMoney)).as(Dic.colMoneyPackagesUnpurchased)
       )
 
-    val order_part_5 = df_predictUserOrder
+    val df_order_part_5 = df_predict_order
       .filter(
         col(Dic.colResourceType).===(0)
           && col(Dic.colOrderStatus).<=(1)
@@ -105,7 +110,7 @@ object UserProfileGenerateOrderPartForUserpay {
         count(col(Dic.colUserId)).as(Dic.colNumberSinglesUnpurchased),
         sum(col(Dic.colMoney)).as(Dic.colMoneySinglesUnpurchased)
       )
-    val order_part_6 = df_predictUserOrder
+    val df_order_part_6 = df_predict_order
       .filter(
         col(Dic.colResourceType).>(0)
           && col(Dic.colOrderStatus).>(1)
@@ -115,7 +120,7 @@ object UserProfileGenerateOrderPartForUserpay {
         udfGetDays(max(col(Dic.colCreationTime)), lit(now)).as(Dic.colDaysSinceLastPurchasePackage)
       )
 
-    val order_part_7 = df_predictUserOrder
+    val df_order_part_7 = df_predict_order
       .filter(
         col(Dic.colResourceType).>(0)
       )
@@ -124,7 +129,7 @@ object UserProfileGenerateOrderPartForUserpay {
         udfGetDays(max(col(Dic.colCreationTime)), lit(now)).as(Dic.colDaysSinceLastClickPackage)
       )
 
-    val order_part_8 = df_predictUserOrder
+    val df_order_part_8 = df_predict_order
       .filter(
         col(Dic.colCreationTime).>=(pre_30)
       )
@@ -133,7 +138,7 @@ object UserProfileGenerateOrderPartForUserpay {
         count(col(Dic.colUserId)).as(Dic.colNumbersOrdersLast30Days)
       )
 
-    val order_part_9 = df_predictUserOrder
+    val df_order_part_9 = df_predict_order
       .filter(
         col(Dic.colCreationTime).>=(pre_30)
           && col(Dic.colOrderStatus).>(1)
@@ -142,7 +147,7 @@ object UserProfileGenerateOrderPartForUserpay {
       .agg(
         count(col(Dic.colUserId)).as(Dic.colNumberPaidOrdersLast30Days)
       )
-    val order_part_10 = df_predictUserOrder
+    val df_order_part_10 = df_predict_order
       .filter(
         col(Dic.colCreationTime).>=(pre_30)
           && col(Dic.colOrderStatus).>(1)
@@ -152,7 +157,7 @@ object UserProfileGenerateOrderPartForUserpay {
       .agg(
         count(col(Dic.colUserId)).as(Dic.colNumberPaidPackageLast30Days)
       )
-    val order_part_11 = df_predictUserOrder
+    val df_order_part_11 = df_predict_order
       .filter(
         col(Dic.colCreationTime).>=(pre_30)
           && col(Dic.colOrderStatus).>(1)
@@ -163,7 +168,7 @@ object UserProfileGenerateOrderPartForUserpay {
         count(col(Dic.colUserId)).as(Dic.colNumberPaidSingleLast30Days)
       )
 
-    val order_part_12 = df_predictUserOrder
+    val df_order_part_12 = df_predict_order
       .filter(
         col(Dic.colOrderEndTime).>(now)
           && col(Dic.colResourceType).>(0)
@@ -177,27 +182,26 @@ object UserProfileGenerateOrderPartForUserpay {
 
     //当前是否是连续包月
 
-    val df_predictUserProfileOrder = df_predictId.join(order_part_1, joinKeysUserId, "left")
-      .join(order_part_2, joinKeysUserId, "left")
-      .join(order_part_3, joinKeysUserId, "left")
-      .join(order_part_4, joinKeysUserId, "left")
-      .join(order_part_5, joinKeysUserId, "left")
-      .join(order_part_6, joinKeysUserId, "left")
-      .join(order_part_7, joinKeysUserId, "left")
-      .join(order_part_8, joinKeysUserId, "left")
-      .join(order_part_9, joinKeysUserId, "left")
-      .join(order_part_10, joinKeysUserId, "left")
-      .join(order_part_11, joinKeysUserId, "left")
-      .join(order_part_12, joinKeysUserId, "left")
+    val df_user_profile_order = df_predict_id.join(df_order_part_1, joinKeysUserId, "left")
+      .join(df_order_part_2, joinKeysUserId, "left")
+      .join(df_order_part_3, joinKeysUserId, "left")
+      .join(df_order_part_4, joinKeysUserId, "left")
+      .join(df_order_part_5, joinKeysUserId, "left")
+      .join(df_order_part_6, joinKeysUserId, "left")
+      .join(df_order_part_7, joinKeysUserId, "left")
+      .join(df_order_part_8, joinKeysUserId, "left")
+      .join(df_order_part_9, joinKeysUserId, "left")
+      .join(df_order_part_10, joinKeysUserId, "left")
+      .join(df_order_part_11, joinKeysUserId, "left")
+      .join(df_order_part_12, joinKeysUserId, "left")
 
-    printDf("用户画像 order part", df_predictUserProfileOrder)
+    printDf("用户画像 order part", df_user_profile_order)
 
 
-    saveProcessedData(df_predictUserProfileOrder, userProfileOrderPartSavePath)
+    saveProcessedData(df_user_profile_order, userProfileOrderPartSavePath)
 
 
   }
-
 
 
 }
