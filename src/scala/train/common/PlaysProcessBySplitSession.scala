@@ -1,7 +1,7 @@
 package train.common
 
 import mam.Dic
-import mam.GetSaveData.{getProcessedMedias, getRawPlays, saveProcessedData}
+import mam.GetSaveData.{getRawPlays, saveProcessedData}
 import mam.Utils.{getData, printDf, sysParamSetting, udfLongToDateTime}
 import org.apache.spark.sql
 import org.apache.spark.sql.expressions.Window
@@ -17,21 +17,22 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 
 object PlaysProcessBySplitSession {
 
-  var timeMaxLimit = 43200
-  var timeMinLimit = 30
+  val timeMaxLimit = 43200
+  val timeMinLimit = 30
+  val timeGapMergeForSameVideo = 1800 //相同视频播放间隔半小时内合并
 
   def main(args: Array[String]): Unit = {
-   sysParamSetting()
+    sysParamSetting()
 
     val spark: SparkSession = new sql.SparkSession.Builder()
-      .master("local[4]")
+      //.master("local[4]")
       .appName("PlaysProcessBySplitSession")
-//      .enableHiveSupport()
+      //      .enableHiveSupport()
       .getOrCreate()
 
 
-    //val hdfsPath = "hdfs:///pay_predict/"
-    val hdfsPath = ""
+    val hdfsPath = "hdfs:///pay_predict/"
+//    val hdfsPath = ""
 
     val df_play_raw = getRawPlays(spark)
     printDf("输入 df_play_raw", df_play_raw)
@@ -40,9 +41,11 @@ object PlaysProcessBySplitSession {
     val playProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3"
 
     val df_medias_processed = getData(spark, mediasProcessedPath)
-    val df_plays_processed = playsProcessBySpiltSession(df_play_raw, df_medias_processed)
+    printDf("输入 df_medias_processed", df_medias_processed)
 
-    saveProcessedData(df_plays_processed, playProcessedPath)
+    val df_plays_processed = playsProcessBySpiltSession(df_play_raw, df_medias_processed)
+//    saveProcessedData(df_plays_processed, playProcessedPath)
+
     printDf("输出 playProcessed", df_plays_processed)
 
     println("播放数据处理完成！")
@@ -85,42 +88,74 @@ object PlaysProcessBySplitSession {
      * 并 选取start_time_Lead_play和start_time_Lead_same_play 在 end_time之后的数据
      */
 
-
     //获得同一用户下一条 same video play数据的start_time
     val win1 = Window.partitionBy(Dic.colUserId, Dic.colVideoId).orderBy(Dic.colPlayStartTime)
-    //同一个用户下一个相同视频的开始时间
-    val df_play_gap = df_play_start_time.withColumn(Dic.colStartTimeLeadSameVideo, lead(Dic.colPlayStartTime, 1).over(win1)) //下一个start_time
-      .withColumn(Dic.colTimeGapLeadSameVideo, ((unix_timestamp(col(Dic.colStartTimeLeadSameVideo))) - unix_timestamp(col(Dic.colPlayEndTime))))
+
+    val df_play_gap = df_play_start_time
+      //同一个用户下一个相同视频的开始时间
+      .withColumn(Dic.colStartTimeLeadSameVideo, lead(Dic.colPlayStartTime, 1).over(win1)) //下一个start_time
+      .withColumn(Dic.colTimeGapLeadSameVideo,
+        ((unix_timestamp(col(Dic.colStartTimeLeadSameVideo))) - unix_timestamp(col(Dic.colPlayEndTime))))
       .withColumn(Dic.colTimeGap30minSign,
-        when(col(Dic.colTimeGapLeadSameVideo) < 1800, 0)
+        when(col(Dic.colTimeGapLeadSameVideo) < timeGapMergeForSameVideo, 0) //相同视频播放时间差30min之内
           .otherwise(1)) //0和1不能反
       .withColumn(Dic.colTimeGap30minSignLag, lag(Dic.colTimeGap30minSign, 1).over(win1))
       //划分session
       .withColumn(Dic.colSessionSign, sum(Dic.colTimeGap30minSignLag).over(win1))
       //填充null 并选取 StartTimeLeadSameVideo 在 end_time之后的
-      .na.fill(Map((Dic.colTimeGapLeadSameVideo, 0), (Dic.colSessionSign, 0))) //填充空值
+      .na.fill(Map((Dic.colTimeGapLeadSameVideo, 0), (Dic.colSessionSign, 0))) //填充移动后产生的空值
       .filter(col(Dic.colTimeGapLeadSameVideo) >= 0) //筛选正确时间间隔的数据
+
+    printDf("df_play_gap", df_play_gap)
 
     /**
      * 合并session内相同video时间间隔在30min之内的播放时长
      */
 
-    val df_play_sum_time = df_play_gap.groupBy(Dic.colUserId, Dic.colVideoId, Dic.colSessionSign).agg(sum(col(Dic.colBroadcastTime)))
+    val df_play_sum_time = df_play_gap
+      .groupBy(
+        Dic.colUserId,
+        Dic.colVideoId,
+        Dic.colSessionSign
+      ).agg(
+      sum(col(Dic.colBroadcastTime))
+    )
       .withColumnRenamed("sum(broadcast_time)", Dic.colTimeSum)
 
-    val df_play_session = df_play_gap.join(df_play_sum_time, Seq(Dic.colUserId, Dic.colVideoId, Dic.colSessionSign), "inner")
-      .select(Dic.colUserId, Dic.colVideoId, Dic.colPlayStartTime, Dic.colTimeSum, Dic.colTimeGapLeadSameVideo, Dic.colSessionSign)
+    printDf("df_play_sum_time", df_play_sum_time)
 
+    val df_play_session = df_play_gap
+      .join(df_play_sum_time, Seq(Dic.colUserId, Dic.colVideoId, Dic.colSessionSign), "inner")
+      .select(
+        Dic.colUserId,
+        Dic.colVideoId,
+        Dic.colPlayStartTime,
+        Dic.colTimeSum,
+        Dic.colTimeGapLeadSameVideo,
+        Dic.colSessionSign
+      )
+
+    printDf("df_play_session", df_play_session)
     /**
      * 同一个session内相同video只保留第一条数据
      */
 
-    val win2 = Window.partitionBy(Dic.colUserId, Dic.colVideoId, Dic.colSessionSign, Dic.colTimeSum).orderBy(Dic.colPlayStartTime)
-    val df_play_processed = df_play_session.withColumn(Dic.colKeepSign, count(Dic.colSessionSign).over(win2)) //keep_sign为1的保留 其他全部去重
-      .filter(col(Dic.colKeepSign) === 1)
-      .drop(col(Dic.colKeepSign))
-      .drop(col(Dic.colTimeGapLeadSameVideo))
-      .drop(col(Dic.colSessionSign))
+    val win2 = Window.partitionBy(
+      Dic.colUserId,
+      Dic.colVideoId,
+      Dic.colSessionSign,
+      Dic.colTimeSum
+    ).orderBy(Dic.colPlayStartTime)
+
+    val df_play_processed = df_play_session
+      .withColumn(Dic.colKeepSign, count(Dic.colSessionSign).over(win2))
+      .filter(col(Dic.colKeepSign) === 1) //keep_sign为1的保留 其他全部去掉
+      .drop(
+        Dic.colKeepSign,
+        Dic.colTimeGapLeadSameVideo,
+        Dic.colSessionSign
+      )
+    printDf("df_play_processed", df_play_processed)
 
     df_play_processed
   }

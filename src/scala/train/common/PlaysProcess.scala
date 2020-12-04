@@ -18,15 +18,13 @@ object PlaysProcess {
     val spark = SparkSession
       .builder()
       //.master("local[6]") // Konverse - 上传 master 时，删除
-      .enableHiveSupport() // Konverse - 这个如果不影响本地运行，就不用注释；
+//      .enableHiveSupport() // Konverse - 这个如果不影响本地运行，就不用注释；
       .getOrCreate()
 
     val df_play_raw = getRawPlays(spark)
-
     printDf("df_play_raw", df_play_raw)
 
     val df_play_processed = playsProcess(df_play_raw, timeMaxLimit, timeMinLimit)
-
     printDf("df_play_processed", df_play_processed)
 
     saveProcessedPlay(df_play_processed)

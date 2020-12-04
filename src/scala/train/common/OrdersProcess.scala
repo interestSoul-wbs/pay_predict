@@ -24,7 +24,8 @@ object OrdersProcess {
 
     val df_order_processed = orderProcess(df_order_raw)
     printDf("输出 df_order_processed", df_order_processed)
-    saveProcessedOrder(df_order_processed)
+
+//    saveProcessedOrder(df_order_processed)
 
     println("订单数据处理完成！")
   }
@@ -67,7 +68,13 @@ object OrdersProcess {
     //选取同时产生的两个订单中支付成功的(父子订单)
 
     val df_order_processed_tmp_2 = df_order_processed_tmp_1
-      .groupBy(Dic.colUserId, Dic.colResourceId, Dic.colCreationTime, Dic.colOrderStartTime).max(Dic.colOrderStatus)
+      .groupBy(
+        Dic.colUserId,
+        Dic.colResourceId,
+        Dic.colCreationTime,
+        Dic.colOrderStartTime
+      )
+      .max(Dic.colOrderStatus)
       .withColumnRenamed("max(order_status)", Dic.colOrderStatus)
 
     val df_order_processed = df_order_processed_tmp_2

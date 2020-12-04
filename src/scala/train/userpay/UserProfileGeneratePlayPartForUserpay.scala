@@ -41,11 +41,14 @@ object UserProfileGeneratePlayPartForUserpay {
      * Get Data
      */
     val df_medias = getData(spark, mediasProcessedPath)
-    printDf("df_medias", df_medias)
+    printDf("输入 df_medias", df_medias)
+
     val df_plays = getData(spark, playsProcessedPath)
-    printDf("df_plays", df_plays)
+    printDf("输入 df_plays", df_plays)
+
     val df_train_users = getData(spark, trainUsersPath)
-    printDf("df_train_users", df_train_users)
+
+    printDf("输入 df_train_users", df_train_users)
 
     val df_train_id = df_train_users.select(Dic.colUserId)
     val df_train_plays = df_plays.join(df_train_id, Seq(Dic.colUserId), "inner")
@@ -321,9 +324,10 @@ object UserProfileGeneratePlayPartForUserpay {
       .join(df_play_medias_part_35, joinKeysUserId, "left")
 
 
+    printDf("输出 df_user_profile_play", df_user_profile_play)
     //大约有85万用户
-    saveProcessedData(df_user_profile_play, userProfilePlayPartSavePath)
-    println("用户画像播放部分生成完毕。")
+//    saveProcessedData(df_user_profile_play, userProfilePlayPartSavePath)
+    println("用户画像play部分生成完毕。")
 
   }
 

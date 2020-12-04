@@ -10,7 +10,7 @@ import org.apache.spark.sql.functions._
 import mam.GetSaveData._
 import scala.collection.mutable
 
-object MediasProcess {
+object MediasProcessFilledByLevelOne {
 
   def main(args: Array[String]): Unit = {
 
@@ -19,7 +19,7 @@ object MediasProcess {
     val spark = SparkSession
       .builder()
       //.master("local[6]") // Konverse - 上传 master 时，删除
-      //      .enableHiveSupport() // Konverse - 这个如果不影响本地运行，就不用注释；
+//      .enableHiveSupport() // Konverse - 这个如果不影响本地运行，就不用注释；
       .getOrCreate()
 
     // 2 - 所有这些 文件 的读取和存储路径，全部包含到函数里，不再当参数传入，见例子 - getRawMediaData
@@ -40,21 +40,21 @@ object MediasProcess {
 
     // 对数据进行处理
     val df_medias_processed = mediasProcess(df_raw_medias)
-    //    saveProcessedMedia(df_medias_processed)
-    printDf("输出 df_medias_processed", df_medias_processed)
+//    saveProcessedMedia(df_medias_processed)
+    printDf("df_medias_processed", df_medias_processed)
 
     // 保存标签
     val df_label_one = getSingleStrColLabel(df_medias_processed, Dic.colVideoOneLevelClassification)
-    //    saveLabel(df_label_one, videoFirstCategoryTempPath)
-    printDf("输出 df_label_one", df_label_one)
+//    saveLabel(df_label_one, videoFirstCategoryTempPath)
+    printDf("df_label_one", df_label_one)
 
     val df_label_two = getArrayStrColLabel(df_medias_processed, Dic.colVideoTwoLevelClassificationList )
-    //    saveLabel(df_label_two, videoSecondCategoryTempPath)
-    printDf("输出 df_label_two", df_label_two)
+//    saveLabel(df_label_two, videoSecondCategoryTempPath)
+    printDf("df_label_two", df_label_two)
 
     val df_label_tags = getArrayStrColLabel(df_medias_processed, Dic.colVideoTagList)
-    //    saveLabel(df_label_tags, labelTempPath)
-    printDf("输出 df_label_tags", df_label_tags)
+//    saveLabel(df_label_tags, labelTempPath)
+    printDf("df_label_tags", df_label_tags)
 
 
     // 导演 演员尚未处理 目前还未使用到
@@ -96,8 +96,7 @@ object MediasProcess {
         (Dic.colIsSingle, 0),
         (Dic.colIsPaid, 0),
         (Dic.colIsTrailers, 0),
-        (Dic.colVideoOneLevelClassification, "其他")
-      ))
+        (Dic.colVideoOneLevelClassification, "其他")))
       .withColumn(Dic.colVideoTwoLevelClassificationList,
         when(col(Dic.colVideoTwoLevelClassificationList).isNotNull, col(Dic.colVideoTwoLevelClassificationList))
           .otherwise(Array("其他")))
@@ -105,27 +104,80 @@ object MediasProcess {
         when(col(Dic.colVideoTagList).isNotNull, col(Dic.colVideoTagList))
           .otherwise(Array("其他")))
 
-    val df_medias_mean = meanFill(df_modified_format, Array(Dic.colVideoTime, Dic.colScore))
+    printDf("基本处理后的med", df_modified_format)
 
-    df_medias_mean
+    // 根据一级分类填充空值
+    val df_mean_score_fill = meanFillAccordLevelOne(df_modified_format, Dic.colScore)
+    val df_mean_video_time_fill = meanFillAccordLevelOne(df_mean_score_fill, Dic.colVideoTime)
+
+    printDf("填充空值之后", df_mean_video_time_fill)
+
+    df_mean_video_time_fill
   }
 
-
+  /**
+   * @author wj
+   * @param [dfModifiedFormat ]
+   * @return org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
+   * @description 将指定的列使用均值进行填充
+   */
   def meanFill(dfModifiedFormat: DataFrame, cols: Array[String]) = {
-    /**
-     * @author wj
-     * @param [dfModifiedFormat ]
-     * @return org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
-     * @description 将指定的列使用均值进行填充
-     */
+
 
     val imputer = new Imputer()
       .setInputCols(cols)
       .setOutputCols(cols)
       .setStrategy("mean")
 
-    imputer.fit(dfModifiedFormat).transform(dfModifiedFormat)
+    val dfMeanFill = imputer.fit(dfModifiedFormat).transform(dfModifiedFormat)
 
+    dfMeanFill
+  }
+
+  /**
+   * @describe 根据video的视频一级分类进行相关列空值的填充
+   * @author wx
+   * */
+  def meanFillAccordLevelOne(df_medias: DataFrame, colName: String) = {
+
+    /**
+     * !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+     * 还是有一级分类中二级分类乱入的情况
+     * !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+     */
+    val df_mean = df_medias
+      .groupBy(Dic.colVideoOneLevelClassification)
+      .agg(mean(col(colName)).as("mean_" + colName + "_accord_level_one"))
+
+    printDf("df_mean", df_mean)
+
+    val meanValue = df_medias
+      .agg(mean(colName))
+      .collectAsList()
+      .get(0)
+      .get(0)
+
+    println("Mean " + colName + " of All Videos", meanValue)
+
+    val df_mean_not_null = df_mean
+      .na.fill(Map(("mean_" + colName + "_accord_level_one", meanValue)))
+
+    printDf("df_mean_not_null", df_mean_not_null)
+
+    val meanMap = df_mean_not_null.rdd //Dataframe转化为RDD
+      .map(row =>
+        row.getAs(Dic.colVideoOneLevelClassification).toString -> row.getAs("mean_" + colName + "_accord_level_one").toString)
+      .collectAsMap() //将key-value对类型的RDD转化成Map
+      .asInstanceOf[mutable.HashMap[String, Double]]
+
+    println(meanMap)
+
+    val df_mean_filled = df_medias.na.fill(Map((colName, -1)))
+      .withColumn(colName, fillUseMap(meanMap)(col(colName), col(Dic.colVideoOneLevelClassification)))
+
+    printDf("df_mean_filled", df_mean_filled)
+
+    df_mean_filled
   }
 
 
@@ -140,6 +192,8 @@ object MediasProcess {
       .select(
         concat_ws("\t", col(Dic.colRank), col(colName)).cast(StringType).as(Dic.colContent))
 
+    printDf("输出  df_label", df_label)
+
     df_label
   }
 
@@ -153,7 +207,21 @@ object MediasProcess {
       .select(
         concat_ws("\t", col(Dic.colRank), col(colName)).as(Dic.colContent))
 
+    printDf("输出  df_label", df_label)
+
     df_label
   }
+
+
+  def fillUseMap(fillMap: mutable.HashMap[String, Double]) = udf((value: Double, levelOneType: String) =>
+
+    if (value > 0)
+      value
+    else {
+      println(value, levelOneType)
+      fillMap(levelOneType)
+    }
+  )
+
 
 }

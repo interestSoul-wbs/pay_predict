@@ -26,7 +26,7 @@ object UserProfileGeneratePreferencePartForUserpay {
 
   }
 
-  def userProfileGeneratePreferencePart(spark:SparkSession, now: String) = {
+  def userProfileGeneratePreferencePart(spark: SparkSession, now: String) = {
 
     val hdfsPath = "hdfs:///pay_predict/"
     //val hdfsPath=""
@@ -39,11 +39,13 @@ object UserProfileGeneratePreferencePartForUserpay {
      * Get Data
      */
     val df_medias = getData(spark, mediasProcessedPath)
-    printDf("df_medias", df_medias)
+    printDf("输入 df_medias", df_medias)
+
     val df_plays = getData(spark, playsProcessedPath)
-    printDf("df_plays", df_plays)
+    printDf("输入 df_plays", df_plays)
+
     val df_train_users = getData(spark, trainUsersPath)
-    printDf("df_train_users", df_train_users)
+    printDf("输入 df_train_users", df_train_users)
 
     val df_train_id = df_train_users.select(Dic.colUserId)
     val df_train_plays = df_plays.join(df_train_id, Seq(Dic.colUserId), "inner")
@@ -316,9 +318,8 @@ object UserProfileGeneratePreferencePartForUserpay {
       .join(df_play_medias_part_73, joinKeysUserId, "left")
       .join(df_play_medias_part_74, joinKeysUserId, "left")
 
-
-    //大约有85万用户
-    saveProcessedData(df_user_profile_pref, userProfilePreferencePartSavePath)
+    printDf("输出 df_user_profile_pref", df_user_profile_pref)
+    //    saveProcessedData(df_user_profile_pref, userProfilePreferencePartSavePath)
     println("df_trainUserProfilePref Save Done!")
 
   }

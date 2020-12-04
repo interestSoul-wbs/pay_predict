@@ -38,15 +38,15 @@ object UserSplitForPredict {
      * Get Data
      */
     val df_all_users = spark.read.format("csv").load(allUserPath).toDF(Dic.colUserId)
-    printDf("全部用户: ", df_all_users)
+    printDf("输入 全部用户: ", df_all_users)
 
     val df_orders = getData(spark, ordersProcessedPath)
-    printDf("df_orders", df_orders)
+    printDf("输入 df_orders", df_orders)
 
     val df_predict_users = getPredictSetUsers(df_all_users, df_orders, predictTime, timeLength)
-    printDf("df_predict_users", df_predict_users)
+    printDf("输出 df_predict_users", df_predict_users)
 
-    saveProcessedData(df_predict_users, predictUsersSavePath)
+    //    saveProcessedData(df_predict_users, predictUsersSavePath)
 
 
   }
@@ -58,33 +58,39 @@ object UserSplitForPredict {
 
     //金额异常用户
     val df_illegal_users = df_order.filter(
-      col(Dic.colCreationTime) >= predictTime and col(Dic.colCreationTime) < calDate(predictTime, timeLength)
-        && (col(Dic.colResourceType) > 0 and col(Dic.colResourceType) < 4)
-        && (col(Dic.colResourceId) === predictResourceId(0) or col(Dic.colResourceId) === predictResourceId(1))
+      col(Dic.colCreationTime) >= predictTime
+        && col(Dic.colCreationTime) < calDate(predictTime, timeLength)
+        && (col(Dic.colResourceType) > 0
+        && col(Dic.colResourceType) < 4)
+        && (col(Dic.colResourceId) === predictResourceId(0)
+        or col(Dic.colResourceId) === predictResourceId(1))
         && (col(Dic.colIsMoneyError) === 1)
     ).select(Dic.colUserId).distinct()
 
 
     //  正样本
     val df_predict_pos_users = df_order.filter(
-      col(Dic.colCreationTime) >= predictTime and col(Dic.colCreationTime) < calDate(predictTime, timeLength)
-        && col(Dic.colResourceType).>(0) and col(Dic.colResourceType).<(4)
-        && (col(Dic.colResourceId) === predictResourceId(0) or col(Dic.colResourceId) === predictResourceId(1))
+      col(Dic.colCreationTime) >= predictTime
+        && col(Dic.colCreationTime) < calDate(predictTime, timeLength)
+        && col(Dic.colResourceType).>(0)
+        && col(Dic.colResourceType).<(4)
+        && (col(Dic.colResourceId) === predictResourceId(0)
+        or col(Dic.colResourceId) === predictResourceId(1))
         && col(Dic.colOrderStatus).>(1)
     ).select(Dic.colUserId).distinct()
-    .except(df_illegal_users)
+      .except(df_illegal_users)
       .withColumn(Dic.colOrderStatus, lit(1))
 
-    printDf("predictPosUsers", df_predict_pos_users)
 
     //负样本
-    val df_all_neg_users = df_all_users.except(df_predict_pos_users.select(Dic.colUserId))
+    val df_all_neg_users = df_all_users
+      .except(df_predict_pos_users.select(Dic.colUserId))
       .except(df_illegal_users)
 
-    val df_predict_neg_users = df_all_neg_users.sample(1).limit(10 * df_predict_pos_users.count().toInt)
+    val df_predict_neg_users = df_all_neg_users
+      .sample(1).limit(10 * df_predict_pos_users.count().toInt)
       .withColumn(Dic.colOrderStatus, lit(0))
 
-    printDf("df_PredictNegUsers", df_predict_neg_users)
 
     df_predict_pos_users.union(df_predict_neg_users).sample(1)
 

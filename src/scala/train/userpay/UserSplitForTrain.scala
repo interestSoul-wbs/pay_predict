@@ -20,7 +20,7 @@ object UserSplitForTrain {
 
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("UserSplitForTrain")
-      .master("local[6]")
+      //.master("local[6]")
       //.enableHiveSupport()
       .getOrCreate()
 
@@ -35,19 +35,19 @@ object UserSplitForTrain {
     val allUserPath = hdfsPath + "data/train/userpay/allUsers/user_id.txt"
 
     val df_orders = getData(spark, ordersProcessedPath)
-    printDf("df_orders", df_orders)
+    printDf("输出 df_orders", df_orders)
 
     //所有用户id的dataframe  Hisense data
     val df_all_Users = spark.read.format("csv").load(allUserPath).toDF(Dic.colUserId)
-    printDf("全部用户: ", df_all_Users)
+    printDf("输入 df_all_Users", df_all_Users)
 
 
     /**
      * 训练集正负样本选取
      */
     val df_all_train_users = getTrainSetUsers(df_all_Users, df_orders, trainTime, timeLength, predictResourceId)
-    printDf("df_all_train_users", df_all_train_users)
-    saveProcessedData(df_all_train_users, trainSetUsersPath)
+    printDf("输出 df_all_train_users", df_all_train_users)
+    //    saveProcessedData(df_all_train_users, trainSetUsersPath)
 
   }
 
@@ -62,38 +62,43 @@ object UserSplitForTrain {
     /**
      * 标记金额信息异常用户 money is 0 or 1 RMB
      */
-    val df_order = df_orders.withColumn(Dic.colIsMoneyError, udfGetErrorMoneySign(col(Dic.colResourceType), col(Dic.colMoney)))
+    val df_order = df_orders
+      .withColumn(Dic.colIsMoneyError, udfGetErrorMoneySign(col(Dic.colResourceType), col(Dic.colMoney)))
 
     //金额异常用户
-    val df_illegal_users = df_order.filter(
-      col(Dic.colCreationTime) >= trainTime and col(Dic.colCreationTime) < calDate(trainTime, timeLength)
-        && col(Dic.colResourceType).>(0) and col(Dic.colResourceType).<(4)
-        && (col(Dic.colResourceId) === predictResourceId(0) or col(Dic.colResourceId) === predictResourceId(1))
-        && (col(Dic.colIsMoneyError) === 1)
-    ).select(Dic.colUserId).distinct()
-
-    printDf("df_illegal_users", df_illegal_users)
-
+    val df_illegal_users = df_order
+      .filter(
+        col(Dic.colCreationTime) >= trainTime
+          && col(Dic.colCreationTime) < calDate(trainTime, timeLength)
+          && col(Dic.colResourceType).>(0)
+          && col(Dic.colResourceType).<(4)
+          && (col(Dic.colResourceId) === predictResourceId(0)
+          || col(Dic.colResourceId) === predictResourceId(1))
+          && (col(Dic.colIsMoneyError) === 1)
+      ).select(Dic.colUserId).distinct()
 
     //  正样本
-    val df_train_pos_users = df_order.filter(
-      col(Dic.colCreationTime) >= trainTime and col(Dic.colCreationTime) < calDate(trainTime, timeLength)
-        && col(Dic.colResourceType).>(0) and col(Dic.colResourceType).<(4)
-        && (col(Dic.colResourceId) === predictResourceId(0) or col(Dic.colResourceId) === predictResourceId(1))
-        && col(Dic.colOrderStatus).>(1)
-    ).select(Dic.colUserId).distinct()
+    val df_train_pos_users = df_order
+      .filter(
+        col(Dic.colCreationTime) >= trainTime
+          && col(Dic.colCreationTime) < calDate(trainTime, timeLength)
+          && col(Dic.colResourceType).>(0)
+          && col(Dic.colResourceType).<(4)
+          && (col(Dic.colResourceId) === predictResourceId(0)
+          || col(Dic.colResourceId) === predictResourceId(1))
+          && col(Dic.colOrderStatus).>(1)
+      ).select(Dic.colUserId).distinct()
       .except(df_illegal_users)
       .withColumn(Dic.colOrderStatus, lit(1))
 
-    printDf("trainPosUsers", df_train_pos_users)
-
     //负样本
-    val df_all_neg_users = df_allUsers.except(df_train_pos_users.select(Dic.colUserId))
+    val df_all_neg_users = df_allUsers
+      .except(df_train_pos_users.select(Dic.colUserId))
       .except(df_illegal_users) //except 保证column一致
 
-    val df_train_neg_users = df_all_neg_users.sample(1).limit(10 * df_train_pos_users.count().toInt)
+    val df_train_neg_users = df_all_neg_users
+      .sample(1).limit(10 * df_train_pos_users.count().toInt)
       .withColumn(Dic.colOrderStatus, lit(0))
-    printDf("df_trainNegUsers", df_train_neg_users)
 
     df_train_pos_users.union(df_train_neg_users).distinct().sample(1)
 

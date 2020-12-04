@@ -15,8 +15,8 @@ object TrainSetProcess {
     sysParamSetting()
 
     val spark: SparkSession = new sql.SparkSession.Builder()
-      //.master("local[6]")
       .appName("TrainSetProcess")
+      //.master("local[6]")
       //      .enableHiveSupport()
       .getOrCreate()
 
@@ -69,31 +69,31 @@ object TrainSetProcess {
      * Get Data
      */
     val df_user_profile_play = getData(spark, userProfilePlayPartPath)
-    printDf("df_user_profile_play", df_user_profile_play)
+    printDf("输入 df_user_profile_play", df_user_profile_play)
 
     val df_user_profile_pref = getData(spark, userProfilePreferencePartPath)
-    printDf("df_user_profile_pref", df_user_profile_pref)
+    printDf("输入 df_user_profile_pref", df_user_profile_pref)
 
     val df_user_profile_order = getData(spark, userProfileOrderPartPath)
-    printDf("df_user_profile_order", df_user_profile_order)
+    printDf("输入 df_user_profile_order", df_user_profile_order)
 
     val df_video_first_category = spark.read.format("csv").load(videoFirstCategoryTempPath)
-    printDf("df_video_first_category", df_video_first_category)
+    printDf("输入 df_video_first_category", df_video_first_category)
 
     val df_video_second_category = spark.read.format("csv").load(videoSecondCategoryTempPath)
-    printDf("df_video_second_category", df_video_second_category)
+    printDf("输入 df_video_second_category", df_video_second_category)
 
     val df_label = spark.read.format("csv").load(labelTempPath)
-    printDf("df_label", df_label)
+    printDf("输入 df_label", df_label)
 
-//    val df_play_vector = getData(spark, userPlayVectorPath)
-//    printDf("df_play_vector", df_play_vector)
+    //    val df_play_vector = getData(spark, userPlayVectorPath)
+    //    printDf("输入 df_play_vector", df_play_vector)
 
     val df_order_history = getData(spark, orderHistoryPath)
-    printDf("df_order_history", df_order_history)
+    printDf("输入 df_order_history", df_order_history)
 
     val df_train_users = getData(spark, trainUsersPath)
-    printDf("df_train_users", df_train_users)
+    printDf("输入 df_train_users", df_train_users)
 
 
     /**
@@ -192,7 +192,7 @@ object TrainSetProcess {
       }
     }
 
-var df_userProfile_split_pref2 = df_userProfile_split_pref1
+    var df_userProfile_split_pref2 = df_userProfile_split_pref1
     for (elem <- prefColumns) {
       if (elem.contains(Dic.colVideoOneLevelPreference)) {
         df_userProfile_split_pref2 = df_userProfile_split_pref2.withColumn(elem + "_1", udfFillPreferenceIndex(col(elem + "_1"), lit(videoFirstCategoryMap.mkString(","))))
@@ -224,20 +224,23 @@ var df_userProfile_split_pref2 = df_userProfile_split_pref1
       }
     }
 
-    val df_train_userProfile = df_userProfile_split_pref3.select(columnList.map(df_userProfile_split_pref3.col(_)): _*)
+    val df_train_user_profile = df_userProfile_split_pref3.select(columnList.map(df_userProfile_split_pref3.col(_)): _*)
 
     // Save Train User Profile
     //    saveProcessedData(df_trainUserProfile, trainUserProfileSavePath)
 
     /**
-     * Train User Profile Merge with Order History And Play History to be Train Set
+     * Train User Profile Merge with Order History And Play History
      */
-    val df_userProfile_Order_history = df_train_userProfile.join(df_order_history, joinKeysUserId, "left")
-    val df_trainSet = df_train_users.join(df_userProfile_Order_history, Seq(Dic.colUserId), "left")
-    //    val df_trainSet = df_userProfile_Order_history.join(df_play_vector, joinKeysUserId, "left")
 
-    saveProcessedData(df_trainSet, trainSetSavePath)
-    println("Done！")
+    val df_train_set = df_train_users.join(df_train_user_profile, joinKeysUserId, "left")
+      .join(df_order_history, joinKeysUserId, "left")
+//      .join(df_play_vector, joinKeysUserId, "left")
+
+    printDf("输出 df_train_set", df_train_set)
+    //    saveProcessedData(df_train_set, trainSetSavePath)
+
+    println("Train Set Process Done！")
 
 
   }

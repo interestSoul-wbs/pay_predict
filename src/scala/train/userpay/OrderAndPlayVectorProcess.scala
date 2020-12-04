@@ -22,6 +22,7 @@ object OrderAndPlayVectorProcess {
   val pastDaysPlaysForPackage = 7
   val topNPlay = 50
 
+
   def main(args: Array[String]): Unit = {
     sysParamSetting()
 
@@ -51,13 +52,17 @@ object OrderAndPlayVectorProcess {
      * Get Files
      */
     val df_orders = getData(spark, orderProcessedPath)
-    printDf("df_orders", df_orders)
+    printDf("输入 df_orders", df_orders)
+
     val df_plays = getData(spark, playsProcessedPath)
-    printDf("df_plays", df_plays)
+    printDf("输入 df_plays", df_plays)
+
     val df_medias = getData(spark, mediasProcessedPath)
-    printDf("df_medias", df_medias)
+    printDf("输入 df_medias", df_medias)
+
     val df_train_user = getData(spark, trainUsersPath)
-    printDf("df_train_user", df_train_user)
+    printDf("输入 df_train_user", df_train_user)
+
     val df_train_Id = df_train_user.select(Dic.colUserId)
 
 
@@ -67,9 +72,9 @@ object OrderAndPlayVectorProcess {
      */
 
     val df_order_history = getOrderHistoryList(df_train_Id, df_orders, trainTime, pastDaysForOrderHistory)
-    printDf("df_order_history", df_order_history)
+    printDf("输出 df_order_history", df_order_history)
 
-    saveProcessedData(df_order_history, historyPath + "orderHistory" + args(0))
+    //    saveProcessedData(df_order_history, historyPath + "orderHistory" + args(0))
     println("Order history process done! ")
 
 
@@ -78,8 +83,8 @@ object OrderAndPlayVectorProcess {
      * 对于每个用户生成播放历史，14天内的播放历史，最多取n条
      */
 
-    val df_play_history = getPlaySeqList(df_train_Id, df_plays, Dic.colVideoId, trainTime, pastDaysForPlayHistory, topNPlay)
-    printDf("df_play_history", df_play_history)
+    val df_play_history = getPlayVideoIdList(df_train_Id, df_plays, Dic.colVideoId, trainTime, pastDaysForPlayHistory, topNPlay)
+    printDf("输出 df_play_history", df_play_history)
 
     // 因为映射后向量存不下，因此把这个数据存储到HDFS上，然后用python运行的，所以如果后面的映射向量可以存储就不要存了
     //    saveProcessedData(df_play_history, historyPath + "playHistory" + args(0))
@@ -91,37 +96,29 @@ object OrderAndPlayVectorProcess {
     // Get vector of medias' video
     val df_medias_Part = getData(spark, mediasVideoVectorPath)
     val df_video_vector = mediasVectorProcess(df_medias_Part, trainTime)
-    printDf("df_video_vector", df_video_vector)
+    printDf("输出 df_video_vector", df_video_vector)
 
     // 因为映射后向量存不下，因此把这个数据存储到HDFS上，然后用python运行的，所以如果后面的映射向量可以存储就不要存了
-    saveProcessedData(df_video_vector, videoVectorSavePath)
+    //    saveProcessedData(df_video_vector, videoVectorSavePath)
 
     val df_user_play_vector = mapVideoVector(df_play_history, df_video_vector)
 
-    printDf("df_user_play_vector", df_user_play_vector)
+    printDf("输出 df_user_play_vector", df_user_play_vector)
 
-    saveProcessedData(df_user_play_vector, playHistoryVectorSavePath)
+    //    saveProcessedData(df_user_play_vector, playHistoryVectorSavePath)
     println("Play history vector process done!!")
 
 
     /**
-     * Get all User;s play history play history during train time to express package as package vector
+     * Get all User's play history play history during train time to express package as package vector
      */
     val df_video_played_times = getVideoPlaysTimes(df_plays, trainTime, pastDaysPlaysForPackage, df_medias)
-    printDf("df_video_played_times", df_video_played_times)
+    val df_video_times_vector = getPackageVector(df_video_vector, df_video_played_times)
 
-    /**
-     * Use videos' vector in package to express package
-     */
-    val df_video_times_vector = df_video_vector.join(df_video_played_times, Seq(Dic.colVideoId), "inner") //video vector is played video
-      .withColumn("log_count", when(col(Dic.colPlayTimes) > 0, udfLog(col(Dic.colPlayTimes))).otherwise(0))
-      .select(Dic.colVideoId, "vector", "log_count")
-
-
-    printDf("df_video_times_vector", df_video_times_vector)
+    printDf("输出 df_video_times_vector", df_video_times_vector)
 
     //    Use python to select "weighted_vector" to be a Matrix then merge with every user
-    saveProcessedData(df_video_times_vector, historyPath + "packageExpByPlayedVideo" + args(0))
+    //    saveProcessedData(df_video_times_vector, historyPath + "packageExpByPlayedVideo" + args(0))
 
     println("packageExpByVideo dataframe save done!")
 
@@ -135,13 +132,22 @@ object OrderAndPlayVectorProcess {
      * Select order history during now and now-timeLength
      * Create a new column called CreationTimeGap
      */
-    val df_order_part = df_orders.join(df_train_id, Seq(Dic.colUserId), "inner")
+    val df_order_part = df_orders
+      .join(df_train_id, Seq(Dic.colUserId), "inner")
       .filter(col(Dic.colCreationTime) < now and col(Dic.colCreationTime) >= calDate(now, -timeLength))
       .withColumn("now", lit(now))
       .withColumn(Dic.colCreationTimeGap, udfGetDays(col(Dic.colCreationTime), col("now")))
       //.withColumn(Dic.colIsMoneyError, udfGetErrorMoneySign(col(Dic.colResourceType), col(Dic.colMoney)))
       .withColumn(Dic.colTimeValidity, udfUniformTimeValidity(col(Dic.colTimeValidity), col(Dic.colResourceType)))
-      .select(Dic.colUserId, Dic.colMoney, Dic.colResourceType, Dic.colCreationTimeGap, Dic.colTimeValidity, Dic.colOrderStatus, Dic.colCreationTime)
+      .select(
+        Dic.colUserId,
+        Dic.colMoney,
+        Dic.colResourceType,
+        Dic.colCreationTimeGap,
+        Dic.colTimeValidity,
+        Dic.colOrderStatus,
+        Dic.colCreationTime
+      )
 
 
     printDf("df_orderPart", df_order_part)
@@ -153,19 +159,32 @@ object OrderAndPlayVectorProcess {
     val win = Window.partitionBy(Dic.colUserId).orderBy(desc(Dic.colCreationTime))
 
     val rowCount = df_order_part.count().toString.length
-    val df_order_concat_columns = df_order_part.withColumn("index", row_number().over(win))
+    val df_order_concat_columns = df_order_part
+      .withColumn("index", row_number().over(win))
       .withColumn("0", lit("0")) //要pad的字符
       .withColumn("tmp_rank", udfLpad(col("index"), lit(rowCount), col("0"))) //拼接列
       .drop("0")
       .withColumn("tmp_column", concat_ws(":", col("tmp_rank"),
-        concat_ws(",", col(Dic.colMoney), col(Dic.colResourceType), col(Dic.colCreationTimeGap), col(Dic.colTimeValidity), col(Dic.colOrderStatus)).as(Dic.colOrderHistory)))
+        concat_ws(",",
+          col(Dic.colMoney),
+          col(Dic.colResourceType),
+          col(Dic.colCreationTimeGap),
+          col(Dic.colTimeValidity),
+          col(Dic.colOrderStatus)
+        ).as(Dic.colOrderHistory)))
 
 
-    val df_order_history = df_order_concat_columns.groupBy(col(Dic.colUserId))
-      .agg(collect_list(col("tmp_column")).as("tmp_column")) //collect_set 会去重
+    val df_order_history = df_order_concat_columns
+      .groupBy(col(Dic.colUserId))
+      .agg(
+        collect_list(col("tmp_column")
+        ).as("tmp_column")) //collect_set 会去重
       .withColumn("tmp_column_1", sort_array(col("tmp_column")))
       .withColumn("tmp_column_list", udfGetAllHistory(col("tmp_column_1")))
-      .select(Dic.colUserId, "tmp_column_list")
+      .select(
+        Dic.colUserId,
+        "tmp_column_list"
+      )
       .withColumnRenamed("tmp_column_list", Dic.colOrderHistory)
 
 
@@ -187,11 +206,15 @@ object OrderAndPlayVectorProcess {
 
 
     // Get video played times by users
-    df_play_history.groupBy(Dic.colVideoId).agg(count(Dic.colPlayStartTime).as(Dic.colPlayTimes))
+    df_play_history
+      .groupBy(Dic.colVideoId)
+      .agg(
+        count(Dic.colPlayStartTime).as(Dic.colPlayTimes)
+      )
   }
 
 
-  def getPlaySeqList(df_train_id: DataFrame, df_play: DataFrame, colName: String, now: String, timeWindowPlay: Int, topNPlay: Int) = {
+  def getPlayVideoIdList(df_train_id: DataFrame, df_play: DataFrame, colName: String, now: String, timeWindowPlay: Int, topNPlay: Int) = {
     /**
      * @describe 按照userid和播放起始时间逆向排序 选取 now - timewindow 到 now的播放历史和播放时长
      * @author wx
@@ -200,8 +223,12 @@ object OrderAndPlayVectorProcess {
      * @return {@link org.apache.spark.sql.Dataset< org.apache.spark.sql.Row > }
      * */
 
-    var df_train_play = df_play.join(df_train_id, Seq(Dic.colUserId), "inner")
-      .filter(col(Dic.colPlayStartTime).<(now) && col(Dic.colPlayStartTime) >= calDate(now, days = -timeWindowPlay))
+    val df_train_play = df_play
+      .join(df_train_id, Seq(Dic.colUserId), "inner")
+      .filter(
+        col(Dic.colPlayStartTime).<(now)
+          && col(Dic.colPlayStartTime) >= calDate(now, days = -timeWindowPlay)
+      )
 
     //获取数字位数
     val rowCount = df_train_play.count().toString.length
@@ -282,15 +309,19 @@ object OrderAndPlayVectorProcess {
     println("mean " + Dic.colStorageTimeGap, meanValue)
 
 
-    val df_meanFilled = df_medias.join(df_mean, Seq(Dic.colVideoOneLevelClassification), "inner")
+    val df_medias_mean = df_medias
+      .join(df_mean, Seq(Dic.colVideoOneLevelClassification), "inner")
       .withColumn(Dic.colStorageTimeGap, when(col(Dic.colStorageTimeGap).>=(0.0), col(Dic.colStorageTimeGap))
         .otherwise(col("mean_" + Dic.colStorageTimeGap)))
-      .na.fill(Map((Dic.colStorageTimeGap, meanValue)))
+      .na.fill(
+      Map(
+        (Dic.colStorageTimeGap, meanValue)
+      ))
       .drop("mean_" + Dic.colStorageTimeGap)
       .withColumn(Dic.colStorageTimeGap, udfLog(col(Dic.colStorageTimeGap)))
       .drop(Dic.colVideoOneLevelClassification)
 
-    df_meanFilled
+    df_medias_mean
   }
 
   def mapVideoVector(df_play_history: DataFrame, df_video_vector: DataFrame) = {
@@ -315,11 +346,34 @@ object OrderAndPlayVectorProcess {
     println("Medias Map size", mediasMap.size)
 
 
-    val df_playVector = df_play_history.withColumn("play_vector", mapIdToMediasVector(mediasMap)(col(Dic.colVideoId + "_list")))
+    val df_play_vector = df_play_history
+      .withColumn("play_vector", mapIdToMediasVector(mediasMap)(col(Dic.colVideoId + "_list")))
       .drop(Dic.colVideoId + "_list")
 
-    df_playVector
+    df_play_vector
 
   }
+
+  def getPackageVector(df_video_vector: DataFrame, df_video_played_times: DataFrame): DataFrame = {
+    /**
+     * @description: Use videos in package 100201 and 100202 to express package info
+     * @param: df_video_vector
+     * @param: df_video_played_times
+     * @return: org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
+     * @author: wx
+     * @Date: 2020/12/4
+     */
+
+    df_video_vector
+      .join(df_video_played_times, Seq(Dic.colVideoId), "inner") //video vector is played video
+      .withColumn("log_count",
+        when(col(Dic.colPlayTimes) > 0, udfLog(col(Dic.colPlayTimes)))
+        .otherwise(0)
+      )
+      .select(Dic.colVideoId, "vector", "log_count")
+
+
+  }
+
 
 }

@@ -14,8 +14,8 @@ object UserProfileGenerateOrderPartForUserpay {
   def main(args: Array[String]): Unit = {
     sysParamSetting()
     val spark: SparkSession = new sql.SparkSession.Builder()
-      .master("local[4]")
       .appName("userProfileGenerateOrderPartUserpayForPredict")
+//      .master("local[4]")
       //      .enableHiveSupport()
       .getOrCreate()
 
@@ -41,10 +41,10 @@ object UserProfileGenerateOrderPartForUserpay {
      * Get Data
      */
     val df_orders = getData(spark, ordersProcessedPath)
-    printDf("df_orders", df_orders)
+    printDf("输入 df_orders", df_orders)
 
     val df_predict_users = getData(spark, predictUserPath)
-    printDf("df_predict", df_predict_users)
+    printDf("输入 df_predict", df_predict_users)
 
     val df_predict_id = df_predict_users.select(Dic.colUserId)
 
@@ -195,10 +195,10 @@ object UserProfileGenerateOrderPartForUserpay {
       .join(df_order_part_11, joinKeysUserId, "left")
       .join(df_order_part_12, joinKeysUserId, "left")
 
-    printDf("用户画像 order part", df_user_profile_order)
+    printDf("输出 df_user_profile_order", df_user_profile_order)
 
 
-    saveProcessedData(df_user_profile_order, userProfileOrderPartSavePath)
+//    saveProcessedData(df_user_profile_order, userProfileOrderPartSavePath)
 
 
   }

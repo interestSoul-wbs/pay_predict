@@ -12,7 +12,6 @@ object UserProfileGenerateOrderPartForUserpay {
   val timeWindow = 30
 
   def main(args: Array[String]): Unit = {
-
     sysParamSetting()
 
     val spark: SparkSession = new sql.SparkSession.Builder()
@@ -23,9 +22,7 @@ object UserProfileGenerateOrderPartForUserpay {
 
 
     val now = args(0) + " " + args(1)
-
     userProfileGenerateOrderPart(spark, now)
-
 
   }
 
@@ -43,9 +40,10 @@ object UserProfileGenerateOrderPartForUserpay {
      * Get Data
      */
     val df_orders = getData(spark, ordersProcessedPath)
-    printDf("df_orders", df_orders)
+    printDf("输入 df_orders", df_orders)
+
     val df_train_users = getData(spark, trainUsersPath)
-    printDf("df_trainUsers", df_train_users)
+    printDf("输入 df_train_users", df_train_users)
 
 
     val df_train_id = df_train_users.select(Dic.colUserId)
@@ -208,7 +206,7 @@ object UserProfileGenerateOrderPartForUserpay {
       )
 
 
-    val df_trainUserProfileOrder = df_train_id.join(df_order_part_1, joinKeysUserId, "left")
+    val df_user_profile_order = df_train_id.join(df_order_part_1, joinKeysUserId, "left")
       .join(df_order_part_2, joinKeysUserId, "left")
       .join(df_order_part_3, joinKeysUserId, "left")
       .join(df_order_part_4, joinKeysUserId, "left")
@@ -222,10 +220,9 @@ object UserProfileGenerateOrderPartForUserpay {
       .join(df_order_part_12, joinKeysUserId, "left")
 
 
-    printDf("输出  userprofileOrderPart", df_trainUserProfileOrder)
+    printDf("输出  df_user_profile_order", df_user_profile_order)
 
-    //大约有85万用户
-    saveProcessedData(df_trainUserProfileOrder, userProfileOrderPartSavePath)
+//    saveProcessedData(df_user_profile_order, userProfileOrderPartSavePath)
 
     println("用户画像订单部分生成完毕。")
 

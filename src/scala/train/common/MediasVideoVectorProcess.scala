@@ -22,7 +22,7 @@ object MediasVideoVectorProcess {
   def main(args: Array[String]): Unit = {
     sysParamSetting()
     val spark: SparkSession = new sql.SparkSession.Builder()
-      .master("local[4]")
+      //.master("local[4]")
       .appName("MediasVideoLabelsVectorProcess")
       //      .enableHiveSupport()
       .getOrCreate()
@@ -37,10 +37,10 @@ object MediasVideoVectorProcess {
      * Get Data
      */
     val df_medias = getData(spark, mediasProcessedPath)
-    printDf("df_medias", df_medias)
+    printDf("输入 df_medias", df_medias)
 
     val df_plays = getData(spark, playsProcessedPath)
-    printDf("df_plays", df_plays)
+    printDf("输入 df_plays", df_plays)
 
 
     /**
@@ -48,8 +48,8 @@ object MediasVideoVectorProcess {
      */
     val df_medias_vector_v1 = mediasVectorProcess(df_medias, df_plays)
     saveProcessedData(df_medias_vector_v1, mediasVectorSavePath)
-    printDf("df_medias_vector_v1", df_medias_vector_v1)
-    println("Media's video vector saved !!! ")
+    printDf("输出 df_medias_vector_v1", df_medias_vector_v1)
+    println("Media's video vector saved !")
 
   }
 
@@ -71,6 +71,7 @@ object MediasVideoVectorProcess {
 
     // Medias further process about Labels
     val df_medias_played_process = df_medias_played
+      ////////////////////////////
       .na.drop("all")
       .dropDuplicates(Dic.colVideoId)
       .withColumn(Dic.colVideoTwoLevelClassificationList,
@@ -79,15 +80,15 @@ object MediasVideoVectorProcess {
       .withColumn(Dic.colVideoTagList,
         when(col(Dic.colVideoTagList).isNotNull, col(Dic.colVideoTagList))
           .otherwise(Array("其他")))
-      .withColumn(Dic.colVideoHour, col(Dic.colVideoTime) / 3600)
       .na.fill(
       Map((Dic.colIsPaid, 0),
-        (Dic.colInPackage, 0),
         (Dic.colVideoOneLevelClassification, "其他"))
-    )
+    ) ////////////////////////////
+      // 统一处理方式之后 以上部分写在MediasProcess中
+      .withColumn(Dic.colVideoHour, col(Dic.colVideoTime) / 3600)
       .withColumn(Dic.colInPackage, when(col(Dic.colPackageId).>(0), 1).otherwise(0))
       .withColumn(Dic.colScore, col(Dic.colScore) / 10)
-
+      .na.fill(Map((Dic.colInPackage, 0)))
 
 
     val df_medias_played_labels = df_medias_played_process.select(Dic.colVideoId, Dic.colVideoOneLevelClassification, Dic.colVideoTwoLevelClassificationList, Dic.colVideoTagList)
@@ -115,12 +116,7 @@ object MediasVideoVectorProcess {
     // colVideoOneLevelClassification will be used in TrainSetProcess
     val df_medias_part = df_medias_played_process.select(Dic.colVideoId, Dic.colScore, Dic.colIsPaid, Dic.colInPackage, Dic.colVideoHour, Dic.colStorageTime, Dic.colVideoOneLevelClassification)
 
-    val df_medias_vector_v1 = df_labels_vector.join(df_medias_part, Seq(Dic.colVideoId), "left")
-
-    printDf("Medias' Vector Multiple Columns", df_medias_vector_v1)
-
-
-    df_medias_vector_v1
+    df_labels_vector.join(df_medias_part, Seq(Dic.colVideoId), "left")
 
 
   }

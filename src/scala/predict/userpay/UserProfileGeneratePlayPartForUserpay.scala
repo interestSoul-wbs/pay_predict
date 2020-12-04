@@ -44,13 +44,13 @@ object UserProfileGeneratePlayPartForUserpay {
      * Gat Data
      */
     val df_medias = getData(spark, mediasProcessedPath)
-    printDf("df_medias", df_medias)
+    printDf("输入 df_medias", df_medias)
 
     val df_plays = getData(spark, playsProcessedPath)
-    printDf("df_plays", df_plays)
+    printDf("输入 df_plays", df_plays)
 
     val df_predict_users = getData(spark, predictUserPath)
-    printDf("df_predict_users", df_predict_users)
+    printDf("输入 df_predict_users", df_predict_users)
 
 
     val df_predict_id = df_predict_users.select(Dic.colUserId)
@@ -325,9 +325,8 @@ object UserProfileGeneratePlayPartForUserpay {
 
     //Save data
     saveProcessedData(df_user_profile_play, userProfilePlayPartSavePath)
-    printDf("df_user_profile_play", df_user_profile_play)
+    printDf("输出 df_user_profile_play", df_user_profile_play)
 
-    println("userprofileplaypart done!")
   }
 
 

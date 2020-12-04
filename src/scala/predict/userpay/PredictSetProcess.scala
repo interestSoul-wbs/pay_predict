@@ -53,24 +53,32 @@ object PredictSetProcess {
      */
     // User Profile
     val df_user_profile_play = getData(spark, userProfilePlayPartPath)
-    printDf("df_user_profile_play", df_user_profile_play)
+    printDf("输入 df_user_profile_play", df_user_profile_play)
 
     val df_user_profile_pref = getData(spark, userProfilePreferencePartPath)
-    printDf("df_user_profile_pref", df_user_profile_pref)
+    printDf("输入 df_user_profile_pref", df_user_profile_pref)
 
     val df_user_profile_order = getData(spark, userProfileOrderPartPath)
-    printDf("df_user_profile_order", df_user_profile_order)
+    printDf("输入 df_user_profile_order", df_user_profile_order)
     // Predict Users
     val df_predict_users = getData(spark, predictUserPath)
-    printDf("df_predict_users", df_predict_users)
+    printDf("输入 df_predict_users", df_predict_users)
     // Labels
-    var df_video_first_category = spark.read.format("csv").load(videoFirstCategoryTempPath)
-    var df_video_second_category = spark.read.format("csv").load(videoSecondCategoryTempPath)
-    var df_label = spark.read.format("csv").load(labelTempPath)
+    val df_video_first_category = spark.read.format("csv").load(videoFirstCategoryTempPath)
+    printDf("输入 df_video_first_category", df_video_first_category)
+
+    val df_video_second_category = spark.read.format("csv").load(videoSecondCategoryTempPath)
+    printDf("输入 df_video_second_category", df_video_second_category)
+
+    val df_label = spark.read.format("csv").load(labelTempPath)
+    printDf("输入 df_label", df_label)
 
     // History Data
     val df_order_history = getData(spark, orderHistoryPath)
+    printDf("输入 df_order_history", df_order_history)
+
     //    val df_play_vector = getData(spark, playVectorPath)
+    //    printDf("输入 df_play_vector", df_play_vector)
 
 
     // Get All User Profile Data
@@ -166,6 +174,7 @@ object PredictSetProcess {
         tempMap.get(prefer)
       }
     }
+
     var df_temp_df2 = df_temp_df1
 
     for (elem <- prefColumns) {
@@ -207,10 +216,11 @@ object PredictSetProcess {
      */
 
 
-    val df_order_profile_order = df_predict_user_profile.join(df_order_history, joinKeysUserId, "left")
-    saveProcessedData(df_order_profile_order, predictSetSavePath)
+    val df_predict_set = df_predict_user_profile
+      .join(df_order_history, joinKeysUserId, "left")
+    //    .join(df_play_vector, joinKeysUserId, "left")
 
-    //    val df_predict_set = df_order_profile_order.join(df_play_vector, joinKeysUserId, "left")
+    printDf("输出 df_predict_set", df_predict_set)
     //    saveProcessedData(df_predict_set, predictSetSavePath)
 
     println("Predict Set Save Done！")
