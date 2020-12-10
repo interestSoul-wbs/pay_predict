@@ -46,7 +46,7 @@ object UserSplitForPredict {
     val df_predict_users = getPredictSetUsers(df_all_users, df_orders, predictTime, timeLength)
     printDf("输出 df_predict_users", df_predict_users)
 
-    //    saveProcessedData(df_predict_users, predictUsersSavePath)
+    saveProcessedData(df_predict_users, predictUsersSavePath)
 
 
   }

@@ -326,7 +326,7 @@ object UserProfileGeneratePlayPartForUserpay {
 
     printDf("输出 df_user_profile_play", df_user_profile_play)
     //大约有85万用户
-//    saveProcessedData(df_user_profile_play, userProfilePlayPartSavePath)
+    saveProcessedData(df_user_profile_play, userProfilePlayPartSavePath)
     println("用户画像play部分生成完毕。")
 
   }

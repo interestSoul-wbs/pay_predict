@@ -28,8 +28,8 @@ object UserSplitForTrain {
     println("trainTime", trainTime)
 
 
-    //val hdfsPath = "hdfs:///pay_predict/"
-    val hdfsPath = ""
+    val hdfsPath = "hdfs:///pay_predict/"
+    //val hdfsPath = ""
     val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders3"
     val trainSetUsersPath = hdfsPath + "data/train/userpay/trainUsers" + args(0)
     val allUserPath = hdfsPath + "data/train/userpay/allUsers/user_id.txt"
@@ -47,7 +47,7 @@ object UserSplitForTrain {
      */
     val df_all_train_users = getTrainSetUsers(df_all_Users, df_orders, trainTime, timeLength, predictResourceId)
     printDf("输出 df_all_train_users", df_all_train_users)
-    //    saveProcessedData(df_all_train_users, trainSetUsersPath)
+    saveProcessedData(df_all_train_users, trainSetUsersPath)
 
   }
 

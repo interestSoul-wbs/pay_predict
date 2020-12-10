@@ -319,8 +319,8 @@ object UserProfileGeneratePreferencePartForUserpay {
     printDf("输出 df_user_profile_pref", df_user_profile_pref)
 
 
-    //大约有85万用户
-//    saveProcessedData(df_user_profile_pref, userProfilePreferencePartSavePath)
+
+    saveProcessedData(df_user_profile_pref, userProfilePreferencePartSavePath)
     println("User Profile Pref Part Save Done!")
   }
 

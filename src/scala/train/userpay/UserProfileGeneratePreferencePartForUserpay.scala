@@ -319,7 +319,7 @@ object UserProfileGeneratePreferencePartForUserpay {
       .join(df_play_medias_part_74, joinKeysUserId, "left")
 
     printDf("输出 df_user_profile_pref", df_user_profile_pref)
-    //    saveProcessedData(df_user_profile_pref, userProfilePreferencePartSavePath)
+    saveProcessedData(df_user_profile_pref, userProfilePreferencePartSavePath)
     println("df_trainUserProfilePref Save Done!")
 
   }

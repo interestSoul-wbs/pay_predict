@@ -5,38 +5,40 @@ package train.userpay
  * @describe Train users' order history,  play history, and map video in play history to vector
  */
 
-
 import mam.Dic
 import mam.GetSaveData.saveProcessedData
-import mam.Utils.{calDate, getData, mapIdToMediasVector, printDf, sysParamSetting, udfGetAllHistory, udfGetDays, udfGetErrorMoneySign, udfGetTopNHistory, udfLog, udfLpad, udfUniformTimeValidity}
+import mam.Utils.{calDate, getData, mapIdToMediasVector, printDf, sysParamSetting, udfGetAllOrderHistory, udfGetDays, udfGetErrorMoneySign, udfGetTopNHistory, udfLog, udfLpad, udfUniformTimeValidity}
 import org.apache.spark.ml.feature.VectorAssembler
 import org.apache.spark.sql
 import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.functions.{col, collect_list, concat_ws, count, desc, lit, mean, row_number, sort_array, when}
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.functions.{col, collect_list, concat_ws, count, desc, lit, mean, row_number, sort_array, struct, udf, when}
+import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
+import org.apache.spark.mllib.linalg.{Matrices, Vector, Vectors}
+
+import scala.collection.mutable.ArrayBuffer
 
 object OrderAndPlayVectorProcess {
 
   val pastDaysForPlayHistory = 14
   val pastDaysForOrderHistory = 90
   val pastDaysPlaysForPackage = 7
-  val topNPlay = 50
-
+  val topNPlay = 1
+  val videoVectorDimension = 21
 
   def main(args: Array[String]): Unit = {
     sysParamSetting()
 
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("OrderAndPlayVectorProcessTrain")
-      //.master("local[6]")
+      .master("local[6]")
       //      .enableHiveSupport()
       .getOrCreate()
 
     val trainTime = args(0) + " " + args(1)
     println(trainTime)
 
-    //val hdfsPath = ""
-    val hdfsPath = "hdfs:///pay_predict/"
+    val hdfsPath = ""
+    //val hdfsPath = "hdfs:///pay_predict/"
     val orderProcessedPath = hdfsPath + "data/train/common/processed/orders3"
     val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3"
     val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
@@ -103,9 +105,12 @@ object OrderAndPlayVectorProcess {
 
     val df_user_play_vector = mapVideoVector(df_play_history, df_video_vector)
 
-    printDf("输出 df_user_play_vector", df_user_play_vector)
+        printDf("输出 df_user_play_vector", df_user_play_vector)
+    //val test_vector = df_user_play_vector.withColumn(Dic.colPlayVector, udfGetMatrix(struct(col(Dic.colPlayVector))))
+//    printDf("test_vector", test_vector)
 
-    //    saveProcessedData(df_user_play_vector, playHistoryVectorSavePath)
+    // 映射结果能存下只存这一个，后面的TrainSetProcess里面记得把注释的playVector部分打开
+    saveProcessedData(df_user_play_vector, playHistoryVectorSavePath)
     println("Play history vector process done!!")
 
 
@@ -123,6 +128,25 @@ object OrderAndPlayVectorProcess {
     println("packageExpByVideo dataframe save done!")
 
 
+  }
+
+  def udfGetMatrix = udf(getMatrix _)
+
+  def getMatrix(row: Row) = {
+    val history = row.getAs[scala.collection.mutable.WrappedArray[String]](Dic.colPlayVector)
+    val rows = history.length
+    val historyArray = new ArrayBuffer[Double]()
+    for (item <- history) {
+      val temp: Array[Double] = item
+        .substring(1, item.length - 1)
+        .split(",")
+        .map(item => item.toDouble)
+
+      temp.foreach(i =>
+        historyArray.append(i)
+      )}
+
+    Matrices.dense(rows, videoVectorDimension, historyArray.toArray )
   }
 
 
@@ -150,7 +174,7 @@ object OrderAndPlayVectorProcess {
       )
 
 
-    printDf("df_orderPart", df_order_part)
+    printDf("df_order_part", df_order_part)
 
     /**
      * This is to make sure the order history is in order after calculate in cluster
@@ -180,7 +204,7 @@ object OrderAndPlayVectorProcess {
         collect_list(col("tmp_column")
         ).as("tmp_column")) //collect_set 会去重
       .withColumn("tmp_column_1", sort_array(col("tmp_column")))
-      .withColumn("tmp_column_list", udfGetAllHistory(col("tmp_column_1")))
+      .withColumn("tmp_column_list", udfGetAllOrderHistory(col("tmp_column_1")))
       .select(
         Dic.colUserId,
         "tmp_column_list"
@@ -272,16 +296,16 @@ object OrderAndPlayVectorProcess {
     // fill na colStorageTime with colLevelOne mean storage time
     val df_filled_gap = fillStorageGap(df_medias_vector)
 
-    printDf("df_mediasVector", df_filled_gap)
+    printDf("df_filled_gap", df_filled_gap)
 
     // Concat columns to be vector of the videos
     val mergeColumns = df_filled_gap.columns.filter(!_.contains(Dic.colVideoId)) //remove column videoId
     val assembler = new VectorAssembler()
       .setInputCols(mergeColumns)
       .setHandleInvalid("keep")
-      .setOutputCol("vector")
+      .setOutputCol(Dic.colVector)
 
-    assembler.transform(df_filled_gap).select(Dic.colVideoId, "vector")
+    assembler.transform(df_filled_gap).select(Dic.colVideoId, Dic.colVector)
 
   }
 
@@ -314,8 +338,7 @@ object OrderAndPlayVectorProcess {
       .withColumn(Dic.colStorageTimeGap, when(col(Dic.colStorageTimeGap).>=(0.0), col(Dic.colStorageTimeGap))
         .otherwise(col("mean_" + Dic.colStorageTimeGap)))
       .na.fill(
-      Map(
-        (Dic.colStorageTimeGap, meanValue)
+      Map((Dic.colStorageTimeGap, meanValue)
       ))
       .drop("mean_" + Dic.colStorageTimeGap)
       .withColumn(Dic.colStorageTimeGap, udfLog(col(Dic.colStorageTimeGap)))
@@ -323,6 +346,7 @@ object OrderAndPlayVectorProcess {
 
     df_medias_mean
   }
+
 
   def mapVideoVector(df_play_history: DataFrame, df_video_vector: DataFrame) = {
     /**
@@ -334,23 +358,32 @@ object OrderAndPlayVectorProcess {
      * @Date: 2020/11/26
      */
 
-    import scala.collection.mutable
+
     /**
      * Medias to Map( video_id -> vector)
      */
-    val mediasMap = df_video_vector.rdd //Dataframe转化为RDD
-      .map(row => row.getAs(Dic.colVideoId).toString -> row.getAs("vector").toString)
-      .collectAsMap() //将key-value对类型的RDD转化成Map
-      .asInstanceOf[mutable.HashMap[String, String]]
 
-    println("Medias Map size", mediasMap.size)
+//    import scala.collection.mutable
+//    val mediasMap = df_video_vector.rdd //Dataframe转化为RDD
+//      .map(row => row.getAs(Dic.colVideoId).toString -> row.getAs(Dic.colVector).toString)
+//      .collectAsMap() //将key-value对类型的RDD转化成Map
+//      .asInstanceOf[mutable.HashMap[String, String]]
+//
+//    println("Video Vector Map Processed, Map(Video_id -> Vector)")
+//    println("Medias Map size", mediasMap.size)
+//
+//    val df_play_vector = df_play_history
+//      .withColumn(Dic.colPlayVector, mapIdToMediasVector(mediasMap)(col(Dic.colVideoId + "_list"), lit(videoVectorDimension)))
+//      .drop(Dic.colVideoId + "_list")
+
+//    df_play_vector
 
 
-    val df_play_vector = df_play_history
-      .withColumn("play_vector", mapIdToMediasVector(mediasMap)(col(Dic.colVideoId + "_list")))
-      .drop(Dic.colVideoId + "_list")
+    df_play_history.withColumnRenamed(Dic.colVideoId + "_list", Dic.colVideoId)
+      .join(df_video_vector, Seq(Dic.colVideoId), "left")
 
-    df_play_vector
+
+
 
   }
 
@@ -364,15 +397,16 @@ object OrderAndPlayVectorProcess {
      * @Date: 2020/12/4
      */
 
-    df_video_vector
+    val df_package_vector = df_video_vector
       .join(df_video_played_times, Seq(Dic.colVideoId), "inner") //video vector is played video
       .withColumn("log_count",
         when(col(Dic.colPlayTimes) > 0, udfLog(col(Dic.colPlayTimes)))
-        .otherwise(0)
+          .otherwise(0)
       )
-      .select(Dic.colVideoId, "vector", "log_count")
+      .select(Dic.colVideoId, Dic.colVector, "log_count")
 
 
+    df_package_vector
   }
 
 

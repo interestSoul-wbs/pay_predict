@@ -5,9 +5,10 @@ package predict.userpay
  * @describe order中的订单历史，生成过去一个月的消费历史：包含支付成功和未支付成功
  */
 
+import breeze.linalg.DenseVector
 import mam.Dic
 import mam.GetSaveData.saveProcessedData
-import mam.Utils.{calDate, getData, mapIdToMediasVector, printDf, sysParamSetting, udfGetAllHistory, udfGetDays, udfGetTopNHistory, udfLog, udfLpad, udfUniformTimeValidity}
+import mam.Utils.{calDate, getData, mapIdToMediasVector, printDf, sysParamSetting, udfGetAllOrderHistory, udfGetDays, udfGetTopNHistory, udfLog, udfLpad, udfUniformTimeValidity}
 import org.apache.spark.ml.feature.VectorAssembler
 import org.apache.spark.sql
 import org.apache.spark.sql.expressions.Window
@@ -20,14 +21,14 @@ object OrderAndPlayVectorProcess {
   val pastDaysForOrderHistory = 90
   val pastDaysPlaysForPackage = 7
   val topNPlay = 50
-
+  val videoVectorDimension = 37
 
   def main(args: Array[String]): Unit = {
     sysParamSetting()
 
     val spark: SparkSession = new sql.SparkSession.Builder()
       .appName("OrderAndPlayVectorProcessPredict")
-      //.master("local[6]")
+      .master("local[6]")
       //      .enableHiveSupport()
       .getOrCreate()
 
@@ -37,8 +38,8 @@ object OrderAndPlayVectorProcess {
     /**
      * Data Path
      */
-    //val hdfsPath = ""
-    val hdfsPath = "hdfs:///pay_predict/"
+    val hdfsPath = ""
+    //val hdfsPath = "hdfs:///pay_predict/"
     val orderProcessedPath = hdfsPath + "data/train/common/processed/orders3"
     val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3"
     val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
@@ -186,7 +187,7 @@ object OrderAndPlayVectorProcess {
         collect_list(col("tmp_column")).as("tmp_column")
       ) //collect_set 会去重
       .withColumn("tmp_column_1", sort_array(col("tmp_column")))
-      .withColumn("tmp_column_list", udfGetAllHistory(col("tmp_column_1")))
+      .withColumn("tmp_column_list", udfGetAllOrderHistory(col("tmp_column_1")))
       .select(Dic.colUserId, "tmp_column_list")
       .withColumnRenamed("tmp_column_list", Dic.colOrderHistory)
 
@@ -361,8 +362,9 @@ object OrderAndPlayVectorProcess {
 
     printDf("df_predict_playHistory", df_predict_play_history)
 
+    val filledList = List.fill(videoVectorDimension)(0)
     val df_play_vector = df_predict_play_history
-      .withColumn("play_vector", mapIdToMediasVector(mediasMap)(col(Dic.colVideoId + "_list")))
+      .withColumn("play_vector", mapIdToMediasVector(mediasMap)(col(Dic.colVideoId + "_list"), lit(filledList)))
       .drop(Dic.colVideoId + "_list")
 
     df_play_vector
