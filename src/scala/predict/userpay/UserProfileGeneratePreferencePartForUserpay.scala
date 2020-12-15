@@ -58,6 +58,7 @@ object UserProfileGeneratePreferencePartForUserpay {
     val joinKeysUserId = Seq(Dic.colUserId)
     val joinKeyVideoId = Seq(Dic.colVideoId)
     val df_predict_plays_medias = df_plays.join(df_predict_id, joinKeysUserId, "inner")
+      .withColumn(Dic.colPlayDate, col(Dic.colPlayStartTime).substr(1, 10))
       .join(df_medias, joinKeyVideoId, "inner")
 
 
@@ -200,7 +201,7 @@ object UserProfileGeneratePreferencePartForUserpay {
           && dayofweek(col(Dic.colPlayStartTime)).=!=(1))
       .groupBy(col(Dic.colUserId))
       .agg(
-        countDistinct(col(Dic.colPlayStartTime)).as(Dic.colActiveWorkdaysLast30Days),
+        countDistinct(col(Dic.colPlayDate)).as(Dic.colActiveWorkdaysLast30Days),
         avg(col(Dic.colTimeSum)).as(Dic.colAvgWorkdailyTimeVideosLast30Days)
       )
 
@@ -213,7 +214,7 @@ object UserProfileGeneratePreferencePartForUserpay {
           && dayofweek(col(Dic.colPlayStartTime)).===(1))
       .groupBy(col(Dic.colUserId))
       .agg(
-        countDistinct(col(Dic.colPlayStartTime)).as(Dic.colActiveRestdaysLast30Days),
+        countDistinct(col(Dic.colPlayDate)).as(Dic.colActiveRestdaysLast30Days),
         avg(col(Dic.colTimeSum)).as(Dic.colAvgRestdailyTimeVideosLast30Days)
       )
 
