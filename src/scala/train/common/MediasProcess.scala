@@ -57,7 +57,6 @@ object MediasProcess {
     printDf("输出 df_label_tags", df_label_tags)
 
 
-    // 导演 演员尚未处理 目前还未使用到
     println("媒资数据处理完成！")
   }
 

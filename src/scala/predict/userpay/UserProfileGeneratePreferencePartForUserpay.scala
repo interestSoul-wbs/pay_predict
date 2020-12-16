@@ -247,7 +247,9 @@ object UserProfileGeneratePreferencePartForUserpay {
       .join(df_play_medias_part_63, joinKeysUserId, "left")
       .join(df_play_medias_part_64, joinKeysUserId, "left")
 
-
+    /**
+     * 标签类信息
+     */
     val df_play_medias_part_71_temp = df_predict_plays_medias
       .filter(
         col(Dic.colPlayStartTime).<(now)
@@ -318,8 +320,6 @@ object UserProfileGeneratePreferencePartForUserpay {
       .join(df_play_medias_part_74, joinKeysUserId, "left")
 
     printDf("输出 df_user_profile_pref", df_user_profile_pref)
-
-
 
     saveProcessedData(df_user_profile_pref, userProfilePreferencePartSavePath)
     println("User Profile Pref Part Save Done!")

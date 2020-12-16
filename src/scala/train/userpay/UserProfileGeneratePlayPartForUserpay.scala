@@ -65,6 +65,7 @@ object UserProfileGeneratePlayPartForUserpay {
 
 
     /**
+     * 用户画像play part 时间类相关信息
      * 时长类转换成分钟
      */
     val df_play_part_1 = df_train_plays
@@ -114,11 +115,14 @@ object UserProfileGeneratePlayPartForUserpay {
       .withColumn(Dic.colTotalTimeLast3Days, round(col(Dic.colTotalTimeLast3Days) / 60, 0))
 
     val joinKeysUserId = Seq(Dic.colUserId)
-    var df_play_time = df_train_id.join(df_play_part_1, joinKeysUserId, "left")
+    val df_play_time = df_train_id.join(df_play_part_1, joinKeysUserId, "left")
       .join(df_play_part_2, joinKeysUserId, "left")
       .join(df_play_part_3, joinKeysUserId, "left")
       .join(df_play_part_4, joinKeysUserId, "left")
 
+    /**
+     * 付费类视频的播放相关信息
+     */
     val joinKeyVideoId = Seq(Dic.colVideoId)
     val df_train_medias = df_train_plays.join(df_medias, joinKeyVideoId, "inner")
 
@@ -183,7 +187,9 @@ object UserProfileGeneratePlayPartForUserpay {
       .join(df_play_medias_part_14, joinKeysUserId, "left")
       .join(df_play_medias_part_15, joinKeysUserId, "left")
 
-
+    /**
+     * 套餐内
+     */
     val df_play_medias_part_21 = df_train_medias
       .filter(
         col(Dic.colPlayStartTime).<(now)
@@ -325,8 +331,8 @@ object UserProfileGeneratePlayPartForUserpay {
 
 
     printDf("输出 df_user_profile_play", df_user_profile_play)
-    //大约有85万用户
-    saveProcessedData(df_user_profile_play, userProfilePlayPartSavePath)
+
+//    saveProcessedData(df_user_profile_play, userProfilePlayPartSavePath)
     println("用户画像play部分生成完毕。")
 
   }

@@ -1,17 +1,15 @@
 package predict.userpay
 
-
 import mam.Dic
 import mam.GetSaveData.saveProcessedData
 import mam.Utils.{getData, printDf, sysParamSetting}
 import org.apache.spark.sql
-import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{SaveMode, SparkSession}
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions.{col, lit, udf}
 
 import scala.collection.mutable.ArrayBuffer
 
 object PredictSetProcess {
-
 
   def main(args: Array[String]): Unit = {
     sysParamSetting()
@@ -23,31 +21,31 @@ object PredictSetProcess {
       .getOrCreate()
 
 
-    /**
-     * Data path
-     */
+
     //val hdfsPath=""
     val hdfsPath = "hdfs:///pay_predict/"
 
-    // Predict users path
+    /**
+     * Data Save Path
+     */
+    val predictUserprofileSavePath = hdfsPath + "data/predict/userpay/predictUserProfile" + args(0)
+
+    /**
+     * User And Profile Data Path
+     */
     val predictUserPath = hdfsPath + "data/predict/userpay/predictUsers" + args(0)
-    // User profile path
     val userProfilePlayPartPath = hdfsPath + "data/predict/common/processed/userpay/userprofileplaypart" + args(0)
     val userProfilePreferencePartPath = hdfsPath + "data/predict/common/processed/userpay/userprofilepreferencepart" + args(0)
     val userProfileOrderPartPath = hdfsPath + "data/predict/common/processed/userpay/userprofileorderpart" + args(0)
-    // Labels path
+
+    /**
+     * Medias Label Info Path
+     */
     val videoFirstCategoryTempPath = hdfsPath + "data/train/common/processed/videofirstcategorytemp.txt"
     val videoSecondCategoryTempPath = hdfsPath + "data/train/common/processed/videosecondcategorytemp.txt"
     val labelTempPath = hdfsPath + "data/train/common/processed/labeltemp.txt"
-    // History Path
-    val orderHistoryPath = hdfsPath + "data/predict/common/processed/userpay/history/orderHistory" + args(0)
-    //    val playVectorPath = hdfsPath + "data/predict/common/processed/userpay/history/playHistory" + args(0)
 
-    /**
-     * Train set save path
-     */
-    val predictSetSavePath = hdfsPath + "/data/predict/userpay/OrderHistoryUserProfile" + args(0)
-    //     val predictSetSavePath = hdfsPath + "/data/predict/userpay/PredictSet" + args(0)
+
     /**
      * Get Data
      */
@@ -72,13 +70,6 @@ object PredictSetProcess {
 
     val df_label = spark.read.format("csv").load(labelTempPath)
     printDf("输入 df_label", df_label)
-
-    // History Data
-    val df_order_history = getData(spark, orderHistoryPath)
-    printDf("输入 df_order_history", df_order_history)
-
-    //    val df_play_vector = getData(spark, playVectorPath)
-    //    printDf("输入 df_play_vector", df_play_vector)
 
 
     // Get All User Profile Data
@@ -211,21 +202,12 @@ object PredictSetProcess {
     val df_predict_user_profile = df_temp_df3.select(columnList.map(df_temp_df3.col(_)): _*)
 
 
-    /**
-     * Predict User Profile Merge with Order History And Play History to be Train Set
-     */
+    saveProcessedData(df_predict_user_profile, predictUserprofileSavePath)
 
-
-    val df_predict_set = df_predict_user_profile
-      .join(df_order_history, joinKeysUserId, "left")
-    //    .join(df_play_vector, joinKeysUserId, "left")
-
-    printDf("输出 df_predict_set", df_predict_set)
-    //    saveProcessedData(df_predict_set, predictSetSavePath)
+    printDf("输出 df_predict_user_profile", df_predict_user_profile)
 
     println("Predict Set Save Done！")
 
 
   }
-
 }

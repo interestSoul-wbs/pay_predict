@@ -4,12 +4,13 @@ import mam.Dic
 import mam.GetSaveData.saveProcessedData
 import mam.Utils.{getData, printDf, sysParamSetting}
 import org.apache.spark.sql
-import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions.{col, lit, udf}
 
 import scala.collection.mutable.ArrayBuffer
 
 object TrainSetProcess {
+
 
   def main(args: Array[String]): Unit = {
     sysParamSetting()
@@ -39,8 +40,6 @@ object TrainSetProcess {
      * Data Save Path
      */
     val trainUserProfileSavePath = hdfsPath + "data/train/userpay/trainUserProfile" + now.split(" ")(0)
-    //    val trainSetSavePath = hdfsPath + "data/train/userpay/trainSet" + now.split(" ")(0)
-    val trainSetSavePath = hdfsPath + "data/train/userpay/OrderAndUserProfile" + now.split(" ")(0)
 
     /**
      * User And Profile Data Path
@@ -58,13 +57,6 @@ object TrainSetProcess {
     val labelTempPath = hdfsPath + "data/train/common/processed/labeltemp.txt"
 
 
-    /**
-     * User History Data Path
-     */
-    val userPlayVectorPath = hdfsPath + "data/train/common/processed/userpay/history/playHistoryVector" + now.split(" ")(0)
-    val orderHistoryPath = hdfsPath + "data/train/common/processed/userpay/history/orderHistory" + now.split(" ")(0)
-
-    val packageInfoPath = ""
 
     /**
      * Get Data
@@ -87,14 +79,8 @@ object TrainSetProcess {
     val df_label = spark.read.format("csv").load(labelTempPath)
     printDf("输入 df_label", df_label)
 
-    //    val df_play_vector = getData(spark, userPlayVectorPath)
-    //    printDf("输入 df_play_vector", df_play_vector)
-
-    val df_order_history = getData(spark, orderHistoryPath)
-    printDf("输入 df_order_history", df_order_history)
-
-    val df_train_users = getData(spark, trainUsersPath)
-    printDf("输入 df_train_users", df_train_users)
+    val df_train_user = getData(spark, trainUsersPath)
+    printDf("df_train_user", df_train_user)
 
 
     /**
@@ -105,6 +91,9 @@ object TrainSetProcess {
     val df_user_profile = df_profile_play_pref.join(df_user_profile_order, joinKeysUserId, "left")
 
 
+    /**
+     * 空值填充
+     */
     val colList = df_user_profile.columns.toList
     val colTypeList = df_user_profile.dtypes.toList
     val mapColList = ArrayBuffer[String]()
@@ -123,7 +112,9 @@ object TrainSetProcess {
       Dic.colDaysFromLastActive, Dic.colDaysSinceFirstActiveInTimewindow))
       .na.fill(0, numColList)
 
-
+    /**
+     * 偏好部分标签处理
+     */
     var videoFirstCategoryMap: Map[String, Int] = Map()
     var videoSecondCategoryMap: Map[String, Int] = Map()
     var labelMap: Map[String, Int] = Map()
@@ -225,21 +216,16 @@ object TrainSetProcess {
       }
     }
 
+    /**
+     * 将添加用户的标签信息
+     */
     val df_train_user_profile = df_userProfile_split_pref3.select(columnList.map(df_userProfile_split_pref3.col(_)): _*)
+    val df_train_set = df_train_user.join(df_train_user_profile, joinKeysUserId, "left")
 
     // Save Train User Profile
-    //    saveProcessedData(df_trainUserProfile, trainUserProfileSavePath)
+//    saveProcessedData(df_train_set, trainUserProfileSavePath)
 
-    /**
-     * Train User Profile Merge with Order History And Play History
-     */
-
-    val df_train_set = df_train_users.join(df_train_user_profile, joinKeysUserId, "left")
-      .join(df_order_history, joinKeysUserId, "left")
-//      .join(df_play_vector, joinKeysUserId, "left")
-
-    printDf("输出 df_train_set", df_train_set)
-    //    saveProcessedData(df_train_set, trainSetSavePath)
+    printDf("输出 df_train_set", df_train_user_profile)
 
     println("Train Set Process Done！")
 
