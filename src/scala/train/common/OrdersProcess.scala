@@ -15,7 +15,7 @@ object OrdersProcess {
 
     val spark = SparkSession
       .builder()
-      //.master("local[6]") // Konverse - 上传 master 时，删除
+      .master("local[6]") // Konverse - 上传 master 时，删除
 //      .enableHiveSupport() // Konverse - 这个如果不影响本地运行，就不用注释；
       .getOrCreate()
 
@@ -53,8 +53,6 @@ object OrdersProcess {
       .withColumn(Dic.colTimeValidity, udfGetDays(col(Dic.colOrderEndTime), col(Dic.colOrderStartTime)))
       //选取有效时间大于0的
       .filter(col(Dic.colTimeValidity).>=(0))
-      // 根据 time_validity 和 resource_type 填充order中 discount_description 为 null的数值
-      //.withColumn(Dic.colDiscountDescription, udfFillDiscountDescription(col(Dic.colResourceType),col(Dic.colTimeValidity)))
       //统一有效时长
       .withColumn(Dic.colTimeValidity, udfUniformTimeValidity(col(Dic.colTimeValidity), col(Dic.colResourceType)))
       // 选取生效时间晚于 creation_time 的数据 ，由于存在1/4的创建)数据晚于生效时间，但时间差距基本为几秒，因此比较时间部分加上1min
@@ -68,16 +66,13 @@ object OrdersProcess {
     //选取同时产生的两个订单中支付成功的(父子订单)
 
     val df_order_processed_tmp_2 = df_order_processed_tmp_1
-      .groupBy(
-        Dic.colUserId,
-        Dic.colResourceId,
-        Dic.colCreationTime,
-        Dic.colOrderStartTime
-      )
+      .groupBy(Dic.colUserId, Dic.colResourceId, Dic.colCreationTime, Dic.colOrderStartTime)
       .max(Dic.colOrderStatus)
       .withColumnRenamed("max(order_status)", Dic.colOrderStatus)
 
-    val df_order_processed = df_order_processed_tmp_2
+    printDf("df_order_processed_tmp_2", df_order_processed_tmp_2)
+
+    val df_order_processed = df_order_processed_tmp_1
       .join(df_order_processed_tmp_2, Seq(Dic.colUserId, Dic.colResourceId, Dic.colCreationTime, Dic.colOrderStartTime, Dic.colOrderStatus), "inner")
 
     df_order_processed
