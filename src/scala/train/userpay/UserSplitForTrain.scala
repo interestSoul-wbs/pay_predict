@@ -35,7 +35,7 @@ object UserSplitForTrain {
     val allUserPath = hdfsPath + "data/train/userpay/allUsers/user_id.txt"
 
     val df_orders = getData(spark, ordersProcessedPath)
-    printDf("输出 df_orders", df_orders)
+    printDf("输入 df_orders", df_orders)
 
     //所有用户id的dataframe  Hisense data
     val df_all_Users = spark.read.format("csv").load(allUserPath).toDF(Dic.colUserId)
@@ -47,7 +47,7 @@ object UserSplitForTrain {
      */
     val df_all_train_users = getTrainSetUsers(df_all_Users, df_orders, trainTime, timeLength, predictResourceId)
     printDf("输出 df_all_train_users", df_all_train_users)
-    saveProcessedData(df_all_train_users, trainSetUsersPath)
+//    saveProcessedData(df_all_train_users, trainSetUsersPath)
 
   }
 
