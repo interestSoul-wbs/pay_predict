@@ -15,7 +15,7 @@ object OrdersProcess {
 
     val spark = SparkSession
       .builder()
-      //.master("local[6]") // Konverse - 上传 master 时，删除
+      .master("local[6]") // Konverse - 上传 master 时，删除
 //      .enableHiveSupport() // Konverse - 这个如果不影响本地运行，就不用注释；
       .getOrCreate()
 
@@ -77,7 +77,7 @@ object OrdersProcess {
       .max(Dic.colOrderStatus)
       .withColumnRenamed("max(order_status)", Dic.colOrderStatus)
 
-    val df_order_processed = df_order_processed_tmp_2
+    val df_order_processed = df_order_processed_tmp_1
       .join(df_order_processed_tmp_2, Seq(Dic.colUserId, Dic.colResourceId, Dic.colCreationTime, Dic.colOrderStartTime, Dic.colOrderStatus), "inner")
 
     df_order_processed
