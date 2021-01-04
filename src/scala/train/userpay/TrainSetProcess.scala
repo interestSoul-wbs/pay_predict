@@ -1,10 +1,10 @@
 package train.userpay
 
-import mam.Dic
-import mam.GetSaveData.saveProcessedData
+import mam.{Dic, SparkSessionInit}
+import mam.GetSaveData.{getTrainUser, getUserProfileOrderPart, getUserProfilePlayPart, getUserProfilePreferencePart, getVideoFirstCategory, getVideoLabel, getVideoSecondCategory,saveTrainSet}
+import mam.SparkSessionInit.spark
 import mam.Utils.{getData, printDf, sysParamSetting}
-import org.apache.spark.sql
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions.{col, lit, udf}
 
 import scala.collection.mutable.ArrayBuffer
@@ -13,74 +13,54 @@ object TrainSetProcess {
 
 
   def main(args: Array[String]): Unit = {
-    sysParamSetting()
-
-    val spark: SparkSession = new sql.SparkSession.Builder()
-      .appName("TrainSetProcess")
-      //.master("local[6]")
-      //      .enableHiveSupport()
-      .getOrCreate()
 
 
-    val now = args(0) + " " + args(1)
-    println(now)
+    // 1 SparkSession init
+    sysParamSetting
+    SparkSessionInit.init()
 
-    trainSetProcess(spark, now)
+    val trainTime = args(0) + " " + args(1)
+    println("trainTime", trainTime)
+
+    // 2 Get Data
+
+    val df_user_profile_play = getUserProfilePlayPart(spark, trainTime)
+    printDf("输入 df_user_profile_play", df_user_profile_play)
+
+    val df_user_profile_pref = getUserProfilePreferencePart(spark, trainTime)
+    printDf("输入 df_user_profile_pref", df_user_profile_pref)
+
+    val df_user_profile_order = getUserProfileOrderPart(spark, trainTime)
+    printDf("输入 df_user_profile_order", df_user_profile_order)
+
+    val df_video_first_category = getVideoFirstCategory()
+    printDf("输入 df_video_first_category", df_video_first_category)
+
+    val df_video_second_category = getVideoSecondCategory()
+    printDf("输入 df_video_second_category", df_video_second_category)
+
+    val df_label = getVideoLabel()
+    printDf("输入 df_label", df_label)
+
+    val df_train_user = getTrainUser(spark, trainTime)
+    printDf("df_train_user", df_train_user)
+
+
+    // 3 Train Set Process
+    val df_train_set = trainSetProcess(df_user_profile_play, df_user_profile_pref, df_user_profile_order,
+      df_video_first_category, df_video_second_category, df_label, df_train_user)
+
+    // 4 Save Train Users
+    saveTrainSet(trainTime, df_train_set)
+    printDf("输出 df_train_set", df_train_set)
+    println("Train Set Process Done！")
 
 
   }
 
 
-  def trainSetProcess(spark: SparkSession, now: String) = {
-
-    val hdfsPath = "hdfs:///pay_predict/"
-    //val hdfsPath = ""
-
-    /**
-     * Data Save Path
-     */
-    val trainUserProfileSavePath = hdfsPath + "data/train/userpay/trainUserProfile" + now.split(" ")(0)
-
-    /**
-     * User And Profile Data Path
-     */
-    val trainUsersPath = "hdfs:///pay_predict/data/train/userpay/trainUsers" + now.split(" ")(0)
-    val userProfilePlayPartPath = hdfsPath + "data/train/common/processed/userpay/userprofileplaypart" + now.split(" ")(0)
-    val userProfilePreferencePartPath = hdfsPath + "data/train/common/processed/userpay/userprofilepreferencepart" + now.split(" ")(0)
-    val userProfileOrderPartPath = hdfsPath + "data/train/common/processed/userpay/userprofileorderpart" + now.split(" ")(0)
-
-    /**
-     * Medias Label Info Path
-     */
-    val videoFirstCategoryTempPath = hdfsPath + "data/train/common/processed/videofirstcategorytemp.txt"
-    val videoSecondCategoryTempPath = hdfsPath + "data/train/common/processed/videosecondcategorytemp.txt"
-    val labelTempPath = hdfsPath + "data/train/common/processed/labeltemp.txt"
-
-
-
-    /**
-     * Get Data
-     */
-    val df_user_profile_play = getData(spark, userProfilePlayPartPath)
-    printDf("输入 df_user_profile_play", df_user_profile_play)
-
-    val df_user_profile_pref = getData(spark, userProfilePreferencePartPath)
-    printDf("输入 df_user_profile_pref", df_user_profile_pref)
-
-    val df_user_profile_order = getData(spark, userProfileOrderPartPath)
-    printDf("输入 df_user_profile_order", df_user_profile_order)
-
-    val df_video_first_category = spark.read.format("csv").load(videoFirstCategoryTempPath)
-    printDf("输入 df_video_first_category", df_video_first_category)
-
-    val df_video_second_category = spark.read.format("csv").load(videoSecondCategoryTempPath)
-    printDf("输入 df_video_second_category", df_video_second_category)
-
-    val df_label = spark.read.format("csv").load(labelTempPath)
-    printDf("输入 df_label", df_label)
-
-    val df_train_user = getData(spark, trainUsersPath)
-    printDf("df_train_user", df_train_user)
+  def trainSetProcess(df_user_profile_play: DataFrame, df_user_profile_pref: DataFrame, df_user_profile_order: DataFrame,
+                      df_video_first_category: DataFrame, df_video_second_category: DataFrame, df_label: DataFrame, df_train_user: DataFrame): DataFrame = {
 
 
     /**
@@ -222,12 +202,7 @@ object TrainSetProcess {
     val df_train_user_profile = df_userProfile_split_pref3.select(columnList.map(df_userProfile_split_pref3.col(_)): _*)
     val df_train_set = df_train_user.join(df_train_user_profile, joinKeysUserId, "left")
 
-    // Save Train User Profile
-//    saveProcessedData(df_train_set, trainUserProfileSavePath)
-
-    printDf("输出 df_train_set", df_train_user_profile)
-
-    println("Train Set Process Done！")
+    df_train_set
 
 
   }

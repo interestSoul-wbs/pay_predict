@@ -61,7 +61,7 @@ object Dic {
   val colContent = "content"
   val colStorageTimeGap = "storage_time_gap"
   val colPlayTimes = "play_times"  // video played times by users
-
+  val colPlayVector = "play_vector"
 
   /**
    * order中的属性

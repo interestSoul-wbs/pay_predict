@@ -1,10 +1,11 @@
 package train.userpay
 
-import mam.Dic
-import mam.GetSaveData.saveProcessedData
+import mam.{Dic, SparkSessionInit}
+import mam.GetSaveData.{getProcessedMedias, getProcessedPlay, getTrainUser, saveProcessedData, saveUserProfilePlayPart}
+import mam.SparkSessionInit.spark
 import mam.Utils.{calDate, getData, printDf, sysParamSetting, udfGetDays}
 import org.apache.spark.sql
-import org.apache.spark.sql.{SparkSession}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions._
 
 
@@ -12,43 +13,40 @@ object UserProfileGeneratePlayPartForUserpay {
 
   def main(args: Array[String]): Unit = {
 
+
+    // 1 SparkSession init
     sysParamSetting()
-
-    val spark: SparkSession = new sql.SparkSession.Builder()
-      .appName("UserProfileGeneratePlayPartForUserpayTrain")
-      //.master("local[6]")
-      //      .enableHiveSupport()
-      .getOrCreate()
+    SparkSessionInit.init()
 
 
+    // 2 Get Data
     val now = args(0) + " " + args(1)
-    userProfileGeneratePlayPart(spark, now)
+
+    val df_plays = getProcessedPlay(spark)
+    printDf("输入 df_plays", df_plays)
+
+    val df_medias = getProcessedMedias(spark)
+    printDf("输入 df_medias", df_medias)
+
+
+    val df_train_users = getTrainUser(spark, now)
+    printDf("输入 df_train_users", df_train_users)
+
+    // 3 Process Data
+    val df_user_profile_play = userProfileGeneratePlayPart(spark, now, df_plays, df_train_users, df_medias)
+
+    // 4 Save Data
+    saveUserProfilePlayPart(now, df_user_profile_play)
+    printDf("输出 df_user_profile_play", df_user_profile_play)
+
+    println("用户画像play部分生成完毕。")
+
 
 
   }
 
-  def userProfileGeneratePlayPart(spark: SparkSession, now: String) = {
+  def userProfileGeneratePlayPart(spark: SparkSession, now: String, df_plays:DataFrame, df_train_users:DataFrame, df_medias:DataFrame):DataFrame = {
 
-    //val hdfsPath = ""
-    val hdfsPath = "hdfs:///pay_predict/"
-    val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
-    val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3"
-    val trainUsersPath = hdfsPath + "data/train/userpay/trainUsers" + now.split(" ")(0)
-    val userProfilePlayPartSavePath = hdfsPath + "data/train/common/processed/userpay/userprofileplaypart" + now.split(" ")(0)
-
-
-    /**
-     * Get Data
-     */
-    val df_medias = getData(spark, mediasProcessedPath)
-    printDf("输入 df_medias", df_medias)
-
-    val df_plays = getData(spark, playsProcessedPath)
-    printDf("输入 df_plays", df_plays)
-
-    val df_train_users = getData(spark, trainUsersPath)
-
-    printDf("输入 df_train_users", df_train_users)
 
     val df_train_id = df_train_users.select(Dic.colUserId)
     val df_train_plays = df_plays.join(df_train_id, Seq(Dic.colUserId), "inner")
@@ -330,10 +328,7 @@ object UserProfileGeneratePlayPartForUserpay {
       .join(df_play_medias_part_35, joinKeysUserId, "left")
 
 
-    printDf("输出 df_user_profile_play", df_user_profile_play)
-
-//    saveProcessedData(df_user_profile_play, userProfilePlayPartSavePath)
-    println("用户画像play部分生成完毕。")
+    df_user_profile_play
 
   }
 

@@ -1,7 +1,8 @@
 package train.userpay
 
-import mam.Dic
-import mam.GetSaveData.saveProcessedData
+import mam.{Dic, SparkSessionInit}
+import mam.GetSaveData.{getProcessedMedias, getProcessedPlay, getTrainUser, saveProcessedData, saveUserProfilePreferencePart}
+import mam.SparkSessionInit.spark
 import mam.Utils.{calDate, getData, printDf, sysParamSetting, udfGetLabelAndCount, udfGetLabelAndCount2}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
@@ -11,41 +12,38 @@ import org.apache.spark.sql.functions._
 object UserProfileGeneratePreferencePartForUserpay {
 
   def main(args: Array[String]): Unit = {
+
+    // 1 SparkSession init
     sysParamSetting()
-
-    val spark: SparkSession = new sql.SparkSession.Builder()
-      .appName("UserProfileGeneratePreferencePartForUserpayTrain")
-      //.master("local[6]")
-      //      .enableHiveSupport()
-      .getOrCreate()
+    SparkSessionInit.init()
 
 
+    // 2 Get Data
     val now = args(0) + " " + args(1)
-    userProfileGeneratePreferencePart(spark, now)
 
+    val df_plays = getProcessedPlay(spark)
+    printDf("输入 df_plays", df_plays)
+
+    val df_medias = getProcessedMedias(spark)
+    printDf("输入 df_medias", df_medias)
+
+
+    val df_train_users = getTrainUser(spark, now)
+    printDf("输入 df_train_users", df_train_users)
+
+    // 3 Process Data
+    val df_user_profile_pref = userProfileGeneratePreferencePart(now, df_plays, df_train_users, df_medias)
+
+    // 4 Save Data
+    saveUserProfilePreferencePart(now, df_user_profile_pref)
+    printDf("输出 df_user_profile_pf", df_user_profile_pref)
+
+    println("用户画像Preference部分生成完毕。")
 
   }
 
-  def userProfileGeneratePreferencePart(spark: SparkSession, now: String) = {
+  def userProfileGeneratePreferencePart(now:String, df_plays:DataFrame, df_train_users: DataFrame, df_medias : DataFrame) = {
 
-    val hdfsPath = "hdfs:///pay_predict/"
-    //val hdfsPath=""
-    val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
-    val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3" //userpay
-    val trainUsersPath = hdfsPath + "data/train/userpay/trainUsers" + now.split(" ")(0)
-    val userProfilePreferencePartSavePath = hdfsPath + "data/train/common/processed/userpay/userprofilepreferencepart" + now.split(" ")(0)
-
-    /**
-     * Get Data
-     */
-    val df_medias = getData(spark, mediasProcessedPath)
-    printDf("输入 df_medias", df_medias)
-
-    val df_plays = getData(spark, playsProcessedPath)
-    printDf("输入 df_plays", df_plays)
-
-    val df_train_users = getData(spark, trainUsersPath)
-    printDf("输入 df_train_users", df_train_users)
 
     val df_train_id = df_train_users.select(Dic.colUserId)
     val df_train_plays = df_plays.join(df_train_id, Seq(Dic.colUserId), "inner")
@@ -321,9 +319,7 @@ object UserProfileGeneratePreferencePartForUserpay {
       .join(df_play_medias_part_73, joinKeysUserId, "left")
       .join(df_play_medias_part_74, joinKeysUserId, "left")
 
-    printDf("输出 df_user_profile_pref", df_user_profile_pref)
-//    saveProcessedData(df_user_profile_pref, userProfilePreferencePartSavePath)
-    println("df_trainUserProfilePref Save Done!")
+    df_user_profile_pref
 
   }
 

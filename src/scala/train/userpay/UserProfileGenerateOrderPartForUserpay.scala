@@ -1,7 +1,8 @@
 package train.userpay
 
-import mam.Dic
-import mam.GetSaveData.saveProcessedData
+import mam.{Dic, SparkSessionInit}
+import mam.GetSaveData.{getProcessedOrder, getTrainUser, saveProcessedData, saveUserProfileOrderPart}
+import mam.SparkSessionInit.spark
 import mam.Utils.{calDate, getData, printDf, sysParamSetting, udfGetDays}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
@@ -12,38 +13,35 @@ object UserProfileGenerateOrderPartForUserpay {
   val timeWindow = 30
 
   def main(args: Array[String]): Unit = {
+
+    // 1 SparkSession init
     sysParamSetting()
-
-    val spark: SparkSession = new sql.SparkSession.Builder()
-      .appName("UserProfileGenerateOrderPartForUserpayTrain")
-      //.master("local[6]")
-      //      .enableHiveSupport()
-      .getOrCreate()
+    SparkSessionInit.init()
 
 
+    // 2 Get Data
     val now = args(0) + " " + args(1)
-    userProfileGenerateOrderPart(spark, now)
+
+    val df_orders = getProcessedOrder(spark)
+    printDf("输入 df_orders", df_orders)
+
+    val df_train_users = getTrainUser(spark, now)
+    printDf("输入 df_train_users", df_train_users)
+
+    // 3 Process Data
+    val df_user_profile_order = userProfileGenerateOrderPart(spark, now, df_orders, df_train_users)
+
+    // 4 Save Data
+    saveUserProfileOrderPart(now, df_user_profile_order)
+    printDf("输出  df_user_profile_order", df_user_profile_order)
+
+    println("用户画像订单部分生成完毕。")
+
+
 
   }
 
-  def userProfileGenerateOrderPart(spark: SparkSession, now: String): Unit = {
-
-    val hdfsPath = "hdfs:///pay_predict/"
-    //val hdfsPath = ""
-
-    val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders3"
-    val trainUsersPath = hdfsPath + "data/train/userpay/trainUsers" + now.split(" ")(0)
-
-    val userProfileOrderPartSavePath = hdfsPath + "data/train/common/processed/userpay/userprofileorderpart" + now.split(" ")(0)
-
-    /**
-     * Get Data
-     */
-    val df_orders = getData(spark, ordersProcessedPath)
-    printDf("输入 df_orders", df_orders)
-
-    val df_train_users = getData(spark, trainUsersPath)
-    printDf("输入 df_train_users", df_train_users)
+  def userProfileGenerateOrderPart(spark: SparkSession, now: String, df_orders: DataFrame, df_train_users: DataFrame): DataFrame = {
 
 
     val df_train_id = df_train_users.select(Dic.colUserId)
@@ -219,13 +217,7 @@ object UserProfileGenerateOrderPartForUserpay {
       .join(df_order_part_11, joinKeysUserId, "left")
       .join(df_order_part_12, joinKeysUserId, "left")
 
-
-    printDf("输出  df_user_profile_order", df_user_profile_order)
-
-//    saveProcessedData(df_user_profile_order, userProfileOrderPartSavePath)
-
-    println("用户画像订单部分生成完毕。")
-
+    df_user_profile_order
   }
 
 

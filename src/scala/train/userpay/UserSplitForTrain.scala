@@ -2,8 +2,9 @@ package train.userpay
 
 
 import org.apache.spark.sql.functions._
-import mam.Dic
-import mam.GetSaveData.saveProcessedData
+import mam.{Dic, SparkSessionInit}
+import mam.GetSaveData.{getAllUsers, getProcessedOrder, saveProcessedData, saveTrainUsers}
+import mam.SparkSessionInit.spark
 import mam.Utils.{calDate, getData, printDf, sysParamSetting, udfGetErrorMoneySign}
 import org.apache.spark.sql
 import org.apache.spark.sql.functions.col
@@ -16,39 +17,28 @@ object UserSplitForTrain {
 
 
   def main(args: Array[String]): Unit = {
-    sysParamSetting()
-
-    val spark: SparkSession = new sql.SparkSession.Builder()
-      .appName("UserSplitForTrain")
-      //.master("local[6]")
-      //.enableHiveSupport()
-      .getOrCreate()
+    // 1 SparkSession init
+    sysParamSetting
+    SparkSessionInit.init()
 
     val trainTime = args(0) + " " + args(1)
     println("trainTime", trainTime)
 
-
-    val hdfsPath = "hdfs:///pay_predict/"
-    //val hdfsPath = ""
-    val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders3"
-    val trainSetUsersPath = hdfsPath + "data/train/userpay/trainUsers" + args(0)
-    val allUserPath = hdfsPath + "data/train/userpay/allUsers/user_id.txt"
-
-    val df_orders = getData(spark, ordersProcessedPath)
+    // 2 Get Data
+    val df_orders = getProcessedOrder(spark)
     printDf("输入 df_orders", df_orders)
 
     //所有用户id的dataframe  Hisense data
-    val df_all_Users = spark.read.format("csv").load(allUserPath).toDF(Dic.colUserId)
-    printDf("输入 df_all_Users", df_all_Users)
+    val df_all_users = getAllUsers(spark)
+    printDf("输入 df_all_Users", df_all_users)
 
-
-    /**
-     * 训练集正负样本选取
-     */
-    val df_all_train_users = getTrainSetUsers(df_all_Users, df_orders, trainTime, timeLength, predictResourceId)
+    // 3 训练集正负样本选取
+    val df_all_train_users = getTrainSetUsers(df_all_users, df_orders, trainTime, timeLength, predictResourceId)
     printDf("输出 df_all_train_users", df_all_train_users)
-//    saveProcessedData(df_all_train_users, trainSetUsersPath)
 
+    // 4 Save Train Users
+    saveTrainUsers(trainTime, df_all_train_users)
+    println("Train Users Save Done!")
   }
 
   def getTrainSetUsers(df_allUsers: DataFrame, df_orders: DataFrame, trainTime: String, timeLength: Int, predictResourceId: Array[Int]): DataFrame = {

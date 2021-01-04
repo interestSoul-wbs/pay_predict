@@ -14,7 +14,8 @@ object SparkSessionInit {
 
     spark = SparkSession
       .builder()
-      .enableHiveSupport()
+//      .enableHiveSupport()
+      .master("local[6]")
       .config("spark.sql.crossJoin.enabled", "true")
       .config("hive.exec.dynamici.partition", true)
       .config("hive.exec.dynamic.partition.mode", "nonstrict")

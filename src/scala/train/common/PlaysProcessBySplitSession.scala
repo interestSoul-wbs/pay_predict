@@ -1,12 +1,14 @@
 package train.common
 
-import mam.Dic
-import mam.GetSaveData.{getRawPlays, saveProcessedData}
+import mam.{Dic, SparkSessionInit}
+import mam.GetSaveData.{getProcessedMedias, getRawOrders, getRawPlays, saveProcessedData, saveProcessedOrder, saveProcessedPlay}
+import mam.SparkSessionInit.spark
 import mam.Utils.{getData, printDf, sysParamSetting, udfLongToDateTime}
 import org.apache.spark.sql
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import train.common.OrdersProcess.orderProcess
 
 /**
  * @author wx
@@ -22,32 +24,24 @@ object PlaysProcessBySplitSession {
   val timeGapMergeForSameVideo = 1800 //相同视频播放间隔半小时内合并
 
   def main(args: Array[String]): Unit = {
-    sysParamSetting()
 
-    val spark: SparkSession = new sql.SparkSession.Builder()
-      //.master("local[4]")
-      .appName("PlaysProcessBySplitSession")
-      //      .enableHiveSupport()
-      .getOrCreate()
+    // 1 SparkSession init
+    SparkSessionInit.init()
 
-
-    val hdfsPath = "hdfs:///pay_predict/"
-//    val hdfsPath = ""
-
+    // 2 數據讀取
     val df_play_raw = getRawPlays(spark)
     printDf("输入 df_play_raw", df_play_raw)
 
-    val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
-    val playProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3"
-
-    val df_medias_processed = getData(spark, mediasProcessedPath)
+    val df_medias_processed = getProcessedMedias(spark)
     printDf("输入 df_medias_processed", df_medias_processed)
 
-    val df_plays_processed = playsProcessBySpiltSession(df_play_raw, df_medias_processed)
-//    saveProcessedData(df_plays_processed, playProcessedPath)
 
+    // 3 數據處理
+    val df_plays_processed = playsProcessBySpiltSession(df_play_raw, df_medias_processed)
     printDf("输出 playProcessed", df_plays_processed)
 
+    // 4 Save Processed Data
+    saveProcessedPlay(df_plays_processed)
     println("播放数据处理完成！")
   }
 
@@ -55,7 +49,7 @@ object PlaysProcessBySplitSession {
     /**
      * 转换数据类型
      */
-    var df_play = df_play_raw.select(
+    val df_play = df_play_raw.select(
       when(col(Dic.colUserId) === "NULL", null).otherwise(col(Dic.colUserId)).as(Dic.colUserId),
       when(col(Dic.colPlayEndTime) === "NULL", null).otherwise(col(Dic.colPlayEndTime)).as(Dic.colPlayEndTime),
       when(col(Dic.colVideoId) === "NULL", null).otherwise(col(Dic.colVideoId)).as(Dic.colVideoId),
@@ -63,6 +57,7 @@ object PlaysProcessBySplitSession {
     ).na.drop("any")
       .filter(col(Dic.colBroadcastTime) > timeMinLimit and col(Dic.colBroadcastTime) < timeMaxLimit)
 
+    
     /**
      * 删除不在medias中的播放数据
      */

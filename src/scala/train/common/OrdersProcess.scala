@@ -75,7 +75,9 @@ object OrdersProcess {
     printDf("df_order_processed_tmp_2", df_order_processed_tmp_2)
 
     val df_order_processed = df_order_processed_tmp_1
-      .join(df_order_processed_tmp_2, Seq(Dic.colUserId, Dic.colResourceId, Dic.colCreationTime, Dic.colOrderStartTime, Dic.colOrderStatus), "inner")
+      .join(df_order_processed_tmp_2,
+        Seq(Dic.colUserId, Dic.colResourceId, Dic.colCreationTime, Dic.colOrderStartTime, Dic.colOrderStatus),
+        "inner")
 
     df_order_processed
   }

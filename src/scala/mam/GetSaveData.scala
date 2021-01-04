@@ -1,5 +1,7 @@
 package mam
 
+import mam.SparkSessionInit.spark
+import mam.Utils.getData
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
@@ -7,6 +9,9 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 object GetSaveData {
 
   var tempTable = "temp_table"
+  val hdfsPath = ""
+  // val hdfsPath = "hdfs:///pay_predict/"
+
 
   def getOrignalSubId(spark: SparkSession, partitiondate: String, license: String, vod_version: String) = {
 
@@ -27,11 +32,11 @@ object GetSaveData {
   }
 
   /**
-    *
-    * @param spark
-    * @param partitiondate - 这个的选取要最新的
-    * @return
-    */
+   *
+   * @param spark
+   * @param partitiondate - 这个的选取要最新的
+   * @return
+   */
   def getOrignalAllUserInfo(spark: SparkSession, partitiondate: String) = {
 
     val get_result_sql =
@@ -53,8 +58,8 @@ object GetSaveData {
   }
 
   /**
-    * Save data to hive.
-    */
+   * Save data to hive.
+   */
   def saveSubIdAndShuntIdInfo(spark: SparkSession, df_result: DataFrame, partitiondate: String, license: String, vod_version: String) = {
 
     spark.sql(
@@ -174,9 +179,9 @@ object GetSaveData {
   }
 
   /**
-    * 从 t_media_sum 获取 物品的数据
-    * 2020-11-3 - 目前在测试阶段，在调用该函数时，使用数据分区 partitiondate='20201028' 的数据。
-    */
+   * 从 t_media_sum 获取 物品的数据
+   * 2020-11-3 - 目前在测试阶段，在调用该函数时，使用数据分区 partitiondate='20201028' 的数据。
+   */
   def getRawMediaData(spark: SparkSession, partitiondate: String, license: String) = {
 
     val get_result_sql =
@@ -213,15 +218,14 @@ object GetSaveData {
   }
 
   /**
-    * @author wj
-    * @param [spark , rawMediasPath]
-    * @return org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
-    * @description 读取原始文件
-    */
+   * @author wj
+   * @param [spark , rawMediasPath]
+   * @return org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
+   * @description 读取原始文件
+   */
   def getRawMediaData(spark: SparkSession) = {
 
-    //val hdfsPath = ""
-    val hdfsPath = "hdfs:///pay_predict/"
+    //
     val mediasRawPath = hdfsPath + "data/train/common/raw/medias/*"
 
     val schema = StructType(
@@ -281,53 +285,14 @@ object GetSaveData {
 
     df_raw_media
   }
-//
-//  def getRawMediaData(spark: SparkSession) = {
-//
-//    val hdfsPath = "hdfs:///pay_predict/"
-//    //val hdfsPath=""
-//    val mediasRawPath = hdfsPath + "data/train/common/raw/medias/medias.txt"
-//
-//    val schema = StructType(
-//      List(
-//        StructField(Dic.colVideoId, StringType),
-//        StructField(Dic.colVideoTitle, StringType),
-//        StructField(Dic.colVideoOneLevelClassification, StringType),
-//        StructField(Dic.colVideoTwoLevelClassificationList, StringType),
-//        StructField(Dic.colVideoTagList, StringType),
-//        StructField(Dic.colDirectorList, StringType),
-//        StructField(Dic.colActorList, StringType),
-//        StructField(Dic.colCountry, StringType),
-//        StructField(Dic.colLanguage, StringType),
-//        StructField(Dic.colReleaseDate, StringType),
-//        StructField(Dic.colStorageTime, StringType),
-//        //视频时长
-//        StructField(Dic.colVideoTime, StringType),
-//        StructField(Dic.colScore, StringType),
-//        StructField(Dic.colIsPaid, StringType),
-//        StructField(Dic.colPackageId, StringType),
-//        StructField(Dic.colIsSingle, StringType),
-//        //是否片花
-//        StructField(Dic.colIsTrailers, StringType),
-//        StructField(Dic.colSupplier, StringType),
-//        StructField(Dic.colIntroduction, StringType)
-//      )
-//    )
-//    val dfRawMedias = spark.read
-//      .option("delimiter", "\t")
-//      .option("header", false)
-//      .schema(schema)
-//      .csv(mediasRawPath)
-//
-//    dfRawMedias
-//  }
+
 
   /**
-    * Get user order data.
-    *
-    * @param spark
-    * @return
-    */
+   * Get user order data.
+   *
+   * @param spark
+   * @return
+   */
   def getProcessedOrder(spark: SparkSession, partitiondate: String, license: String) = {
 
     // 1 - 获取用户购买记录
@@ -405,11 +370,11 @@ object GetSaveData {
   }
 
   /**
-    * 这是已经抽样的用户在一定时间段内的 play 数据，是抽取给山大的数据。
-    * 这里的subscriberid 是 rank，要拿到实际的 subscriberid 需要 通过 vodrs.t_vod_user_sample_sdu_v1 join
-    *
-    * @return
-    */
+   * 这是已经抽样的用户在一定时间段内的 play 数据，是抽取给山大的数据。
+   * 这里的subscriberid 是 rank，要拿到实际的 subscriberid 需要 通过 vodrs.t_vod_user_sample_sdu_v1 join
+   *
+   * @return
+   */
   def getRawPlayByDateRangeSmpleUsers(spark: SparkSession, start_date: String, end_date: String, license: String) = {
 
     // 1 - 获取用户播放记录
@@ -437,11 +402,11 @@ object GetSaveData {
   }
 
   /**
-    * Get user play data.
-    *
-    * @param spark
-    * @return
-    */
+   * Get user play data.
+   *
+   * @param spark
+   * @return
+   */
   def getProcessedPlay(spark: SparkSession, partitiondate: String, license: String) = {
 
     // 1 - 获取用户播放记录
@@ -485,11 +450,11 @@ object GetSaveData {
   }
 
   /**
-    * Get processed user play data.
-    *
-    * @param spark
-    * @return
-    */
+   * Get processed user play data.
+   *
+   * @param spark
+   * @return
+   */
   def getUserProfilePlayPart(spark: SparkSession, partitiondate: String, license: String, category: String) = {
 
     val data_sql =
@@ -548,7 +513,7 @@ object GetSaveData {
   }
 
 
-  def getuserProfilePreferencePart(spark: SparkSession, partitiondate: String, license: String, category: String) = {
+  def getUserProfilePreferencePart(spark: SparkSession, partitiondate: String, license: String, category: String) = {
 
     val data_sql =
       s"""
@@ -665,11 +630,11 @@ object GetSaveData {
   }
 
   /**
-    * 这是已经抽样的用户在一定时间段内的订单，是抽取给山大的数据。
-    * 这里的subscriberid 是 rank，要拿到实际的 subscriberid 需要 通过 vodrs.t_vod_user_sample_sdu_v1 join
-    *
-    * @return
-    */
+   * 这是已经抽样的用户在一定时间段内的订单，是抽取给山大的数据。
+   * 这里的subscriberid 是 rank，要拿到实际的 subscriberid 需要 通过 vodrs.t_vod_user_sample_sdu_v1 join
+   *
+   * @return
+   */
   def getRawOrderByDateRangeSmpleUsers(spark: SparkSession, start_date: String, end_date: String, license: String) = {
 
     val sample_user_order_ori_sql =
@@ -708,11 +673,11 @@ object GetSaveData {
   }
 
   /**
-    * Get smaple users' order data within a period.
-    *
-    * @param spark
-    * @return
-    */
+   * Get smaple users' order data within a period.
+   *
+   * @param spark
+   * @return
+   */
   def getRawOrderByDateRange(spark: SparkSession, start_date: String, today: String, license: String) = {
 
     // 1 - 获取用户购买记录
@@ -757,11 +722,11 @@ object GetSaveData {
 
 
   /**
-    * Get processed media data.
-    *
-    * @param spark
-    * @return
-    */
+   * Get processed media data.
+   *
+   * @param spark
+   * @return
+   */
   def getProcessedMedias(spark: SparkSession, partitiondate: String, license: String) = {
 
     // 1 - get processed medias
@@ -1885,11 +1850,11 @@ object GetSaveData {
 
 
   /**
-    * Save data.
-    *
-    * @param spark
-    * @param df_result
-    */
+   * Save data.
+   *
+   * @param spark
+   * @param df_result
+   */
   def saveVideoProfileGenerate(spark: SparkSession, df_result: DataFrame, partitiondate: String, license: String, category: String) = {
 
     spark.sql(
@@ -1984,11 +1949,11 @@ object GetSaveData {
   }
 
   /**
-    * Save data.
-    *
-    * @param spark
-    * @param df_result
-    */
+   * Save data.
+   *
+   * @param spark
+   * @param df_result
+   */
   def saveUserProfileGeneratePreferencePart(spark: SparkSession, df_result: DataFrame, partitiondate: String, license: String, category: String) = {
 
     spark.sql(
@@ -2071,11 +2036,11 @@ object GetSaveData {
   }
 
   /**
-    * Save user profile play data.
-    *
-    * @param spark
-    * @param df_result
-    */
+   * Save user profile play data.
+   *
+   * @param spark
+   * @param df_result
+   */
   def saveUserProfilePlayData(spark: SparkSession, df_result: DataFrame, partitiondate: String, license: String, category: String) = {
 
     spark.sql(
@@ -2187,11 +2152,11 @@ object GetSaveData {
   }
 
   /**
-    * Save data to hive.
-    *
-    * @param spark
-    * @param df_result
-    */
+   * Save data to hive.
+   *
+   * @param spark
+   * @param df_result
+   */
   def saveUserProfileOrderPart(spark: SparkSession, df_result: DataFrame, partitiondate: String, license: String, category: String) = {
 
     spark.sql(
@@ -2264,11 +2229,11 @@ object GetSaveData {
 
 
   /**
-    * Save play data.
-    *
-    * @param spark
-    * @param
-    */
+   * Save play data.
+   *
+   * @param spark
+   * @param
+   */
   def saveProcessedPlay(spark: SparkSession, df_play: DataFrame, partitiondate: String, license: String) = {
 
     // 1 - If table not exist, creat.
@@ -2349,19 +2314,13 @@ object GetSaveData {
     println("over over........... \n" * 4)
   }
 
-  def saveProcessedPlay(df_play_processed: DataFrame) = {
-
-    val hdfsPath = "hdfs:///pay_predict/"
-    val playProcessedPath = hdfsPath + "data/train/common/processed/plays"
-    df_play_processed.write.mode(SaveMode.Overwrite).format("parquet").save(playProcessedPath)
-  }
 
   /**
-    * Save order data.
-    *
-    * @param spark
-    * @param df_order
-    */
+   * Save order data.
+   *
+   * @param spark
+   * @param df_order
+   */
   def saveProcessedOrder(spark: SparkSession, df_order: DataFrame, partitiondate: String, license: String) = {
 
     spark.sql(
@@ -2460,16 +2419,8 @@ object GetSaveData {
     println("over over........... \n" * 4)
   }
 
-  def saveProcessedOrder(df_order_processed: DataFrame) = {
-
-    val hdfsPath = ""
-    val orderProcessedPath = hdfsPath + "data/train/common/processed/orders3"
-    saveProcessedData(df_order_processed, orderProcessedPath)
-  }
 
   def getRawOrders(spark: SparkSession) = {
-
-    val hdfsPath = ""
 
     val orderRawPath = hdfsPath + "data/train/common/raw/orders/*"
 
@@ -2497,8 +2448,6 @@ object GetSaveData {
 
   def getRawPlays(spark: SparkSession) = {
 
-//    val hdfsPath = "hdfs:///pay_predict/"
-    val hdfsPath=""
     val playRawPath = hdfsPath + "data/train/common/raw/plays/*"
 
     val schema = StructType(
@@ -2518,10 +2467,10 @@ object GetSaveData {
   }
 
   /**
-    * Save processed media data to hive
-    *
-    * @param df_media
-    */
+   * Save processed media data to hive
+   *
+   * @param df_media
+   */
   def saveProcessedMedia(spark: SparkSession, df_media: DataFrame, partitiondate: String, license: String) = {
 
     spark.sql(
@@ -2593,28 +2542,19 @@ object GetSaveData {
     df.write.mode(SaveMode.Overwrite).format("parquet").save(path)
 
   }
+
   def saveLabel(df_label: DataFrame, labelSavedPath: String) = {
 
     df_label.coalesce(1).write.mode(SaveMode.Overwrite).option("header", "false").csv(labelSavedPath)
   }
 
-  def saveProcessedMedia(df_processed_media: DataFrame) = {
-
-    val hdfsPath = "hdfs:///pay_predict/"
-    //val hdfsPath = ""
-
-    val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
-
-    saveProcessedData(df_processed_media, mediasProcessedPath)
-  }
-
 
   /**
-    * Save the tag of video_one_level_classification, video_two_level_classification_list, video_tag_list
-    *
-    * @param df_label
-    * @param category
-    */
+   * Save the tag of video_one_level_classification, video_two_level_classification_list, video_tag_list
+   *
+   * @param df_label
+   * @param category
+   */
   def saveLabel(spark: SparkSession, df_label: DataFrame, partitiondate: String, license: String, category: String) = {
 
     spark.sql(
@@ -2642,6 +2582,209 @@ object GetSaveData {
       """.stripMargin
     spark.sql(insert_sql)
     println("over over........... \n" * 4)
+  }
+
+
+  /**
+   * @description: saveProcessedMedia to HDFS
+   * @param: df_processed_media
+   * @return: void
+   * @author: wx
+   * @Date: 2021/1/4
+   */
+  def saveProcessedMedia(df_processed_media: DataFrame) = {
+
+
+    val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
+
+    saveProcessedData(df_processed_media, mediasProcessedPath)
+  }
+
+  /**
+   * @description: saveProcessedOrder to HDFS
+   * @param: df_order_processed
+   * @return: void
+   * @author: wx
+   * @Date: 2021/1/4
+   */
+  def saveProcessedOrder(df_order_processed: DataFrame) = {
+
+
+    val orderProcessedPath = hdfsPath + "data/train/common/processed/orders3"
+    saveProcessedData(df_order_processed, orderProcessedPath)
+  }
+
+  /**
+   * @description: saveProcessedPlay to HDFS
+   * @param: spark
+   * @param: license
+   * @param: category
+   * @return: org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
+   * @author: wx
+   * @Date: 2021/1/4
+   */
+  def saveProcessedPlay(df_play_processed: DataFrame) = {
+
+    val playProcessedPath = hdfsPath + "data/train/common/processed/plays"
+    df_play_processed.write.mode(SaveMode.Overwrite).format("parquet").save(playProcessedPath)
+  }
+
+
+  /**
+   * @description: getProcessedMedias from HDFS
+   * @param: sparkSession
+   * @return: org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
+   * @author: wx
+   * @Date: 2021/1/4
+   */
+  def getProcessedMedias(sparkSession: SparkSession) = {
+
+    val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
+    sparkSession.read.format("parquet").load(mediasProcessedPath)
+
+  }
+
+  /**
+   * @description: getProcessedOrder from HDFS
+   * @param: spark
+   * @return: org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
+   * @author: wx
+   * @Date: 2021/1/4
+   */
+  def getProcessedOrder(spark: SparkSession) = {
+
+    val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders3"
+    spark.read.format("parquet").load(ordersProcessedPath)
+
+  }
+
+  def getProcessedPlay(sparkSession: SparkSession) = {
+
+    val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3"
+    sparkSession.read.format("parquet").load(playsProcessedPath)
+
+  }
+
+  /**
+   * @description: All Users' id get from Hisense
+   * @param: spark
+   * @return: org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
+   * @author: wx
+   * @Date: 2021/1/4
+   */
+  def getAllUsers(spark: SparkSession) = {
+
+    val allUsersPath = hdfsPath + "data/train/userpay/allUsers/user_id.txt"
+    spark.read.format("csv").load(allUsersPath).toDF(Dic.colUserId)
+
+  }
+
+  /**
+   * @description: save all Train Users to HDFS
+   * @param: trainTime
+   * @param: df_all_train_users
+   * @return: void
+   * @author: wx
+   * @Date: 2021/1/4
+   */
+  def saveTrainUsers(trainTime: String, df_all_train_users: DataFrame) = {
+
+    val trainSetUsersPath = hdfsPath + "data/train/userpay/trainUsers" + trainTime.split(" ")(0)
+    saveProcessedData(df_all_train_users, trainSetUsersPath)
+  }
+
+
+  def savePredictUsers(predictTime: String, df_all_predict_users: DataFrame) = {
+    val predictSetUsersPath = hdfsPath + "data/predict/userpay/predictUsers" + predictTime.split(" ")(0)
+    saveProcessedData(df_all_predict_users, predictSetUsersPath)
+  }
+/**
+ * @description:  Train User
+ * @param: sparkSession
+ * @param: now
+ * @return: org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
+ * @author: wx
+ * @Date: 2021/1/4
+ */
+  def getTrainUser(sparkSession: SparkSession, now: String) = {
+    val trainUsersPath = hdfsPath + "data/train/userpay/trainUsers" + now.split(" ")(0)
+    getData(sparkSession, trainUsersPath)
+  }
+
+  def getPredictUser(sparkSession: SparkSession, now: String) = {
+    val predictUsersPath = hdfsPath + "data/train/userpay/predictUsers" + now.split(" ")(0)
+    getData(sparkSession, predictUsersPath)
+  }
+
+  /**
+   * User Profile Data Save Functions and Get Functions
+   */
+  def saveUserProfileOrderPart(now:String, df_user_profile_order: DataFrame) = {
+
+    val userProfileOrderPartSavePath = hdfsPath + "data/train/common/processed/userpay/userprofileorderpart" + now.split(" ")(0)
+    saveProcessedData(df_user_profile_order, userProfileOrderPartSavePath)
+  }
+
+  def getUserProfileOrderPart(sparkSession: SparkSession, now:String) = {
+    val userProfileOrderPartPath = hdfsPath + "data/train/common/processed/userpay/userprofileorderpart" + now.split(" ")(0)
+    getData(sparkSession, userProfileOrderPartPath)
+  }
+
+  def saveUserProfilePlayPart(now:String, df_user_profile_play: DataFrame) = {
+
+    val userProfilePlayPartSavePath = hdfsPath + "data/train/common/processed/userpay/userprofileplaypart" + now.split(" ")(0)
+
+    saveProcessedData(df_user_profile_play, userProfilePlayPartSavePath)
+  }
+
+
+  def getUserProfilePlayPart(sparkSession: SparkSession, now:String) = {
+
+    val userProfilePlayPartPath = hdfsPath + "data/train/common/processed/userpay/userprofileplaypart" + now.split(" ")(0)
+    getData(sparkSession, userProfilePlayPartPath)
+  }
+
+
+  def saveUserProfilePreferencePart(now:String, df_user_profile_pf: DataFrame) = {
+
+    val userProfilePreferencePartSavePath = hdfsPath + "data/train/common/processed/userpay/userprofilepreferencepart" + now.split(" ")(0)
+
+    saveProcessedData(df_user_profile_pf, userProfilePreferencePartSavePath)
+  }
+
+
+  def getUserProfilePreferencePart(sparkSession: SparkSession, now:String) = {
+    val userProfilePreferencePartSavePath = hdfsPath + "data/train/common/processed/userpay/userprofilepreferencepart" + now.split(" ")(0)
+    getData(sparkSession, userProfilePreferencePartSavePath)
+  }
+
+  /**
+   * Medias Label Get Functions
+   */
+
+  def getVideoFirstCategory() = {
+    val videoFirstCategoryTempPath = hdfsPath + "data/train/common/processed/videofirstcategorytemp.txt"
+    spark.read.format("csv").load(videoFirstCategoryTempPath)
+  }
+  def getVideoSecondCategory() = {
+
+    val videoSecondCategoryTempPath = hdfsPath + "data/train/common/processed/videosecondcategorytemp.txt"
+    spark.read.format("csv").load(videoSecondCategoryTempPath)
+  }
+
+
+  def getVideoLabel() = {
+
+    val labelTempPath = hdfsPath + "data/train/common/processed/labeltemp.txt"
+    spark.read.format("csv").load(labelTempPath)
+  }
+
+  /**
+   *  Train Set
+   */
+  def saveTrainSet(now:String, df_train_set: DataFrame) = {
+    val trainUserProfileSavePath = hdfsPath + "data/train/userpay/trainUserProfile" + now.split(" ")(0)
+    saveProcessedData(df_train_set, trainUserProfileSavePath)
   }
 
 }
