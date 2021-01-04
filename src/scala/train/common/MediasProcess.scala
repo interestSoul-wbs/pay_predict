@@ -1,6 +1,6 @@
 package train.common
 
-import mam.Dic
+import mam.{Dic, SparkSessionInit}
 import mam.Utils._
 import org.apache.spark.ml.feature.Imputer
 import org.apache.spark.sql.types._
@@ -8,56 +8,52 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import mam.GetSaveData._
+import mam.SparkSessionInit.spark
+
 import scala.collection.mutable
 
 object MediasProcess {
 
   def main(args: Array[String]): Unit = {
 
-    sysParamSetting() // Konverse - 上传 master 时，删除
+    // 1 Spark初始化
+    SparkSessionInit.init()
 
-    val spark = SparkSession
-      .builder()
-      //.master("local[6]") // Konverse - 上传 master 时，删除
-      //      .enableHiveSupport() // Konverse - 这个如果不影响本地运行，就不用注释；
-      .getOrCreate()
-
-    // 2 - 所有这些 文件 的读取和存储路径，全部包含到函数里，不再当参数传入，见例子 - getRawMediaData
-    // 以下的这些 路径， 都不应该在存在于这个文件中， 见例子 - getRawMediaData 的读取方式
-    val hdfsPath = "hdfs:///pay_predict/"
-    //    val hdfsPath = ""
-
-    val videoFirstCategoryTempPath = hdfsPath + "data/train/common/processed/videofirstcategorytemp.txt"
-    val videoSecondCategoryTempPath = hdfsPath + "data/train/common/processed/videosecondcategorytemp.txt"
-    val labelTempPath = hdfsPath + "data/train/common/processed/labeltemp.txt"
-
-    // 3 - 获取原始数据
-    // 在 GetAndSaveData 中，创建同名的 读取或存储函数 - spark允许，同名但是传入参数不同的 函数存在；
-    // 例： 有 2个getRawMediaData，一个是我调用的，一个是你调用的，它们同名，但是传参不一样；
-    // 参考 Konverse分支中，相关读取、存储数据函数的命名；
+    // 2 數據讀取
     val df_raw_medias = getRawMediaData(spark)
+
     printDf("输入 df_raw_medias", df_raw_medias)
 
-    // 对数据进行处理
+    // 3 对数据进行处理 及 存儲
+    // 3-1
     val df_medias_processed = mediasProcess(df_raw_medias)
-    //    saveProcessedMedia(df_medias_processed)
+
+    saveProcessedMedia(df_medias_processed)
+
     printDf("输出 df_medias_processed", df_medias_processed)
 
-    // 保存标签
+    // 3-2
     val df_label_one = getSingleStrColLabel(df_medias_processed, Dic.colVideoOneLevelClassification)
-    //    saveLabel(df_label_one, videoFirstCategoryTempPath)
+
+    saveLabel(df_label_one, "saveaPath")
+
     printDf("输出 df_label_one", df_label_one)
 
-    val df_label_two = getArrayStrColLabel(df_medias_processed, Dic.colVideoTwoLevelClassificationList )
-    //    saveLabel(df_label_two, videoSecondCategoryTempPath)
+    // 3-3
+    val df_label_two = getArrayStrColLabel(df_medias_processed, Dic.colVideoTwoLevelClassificationList)
+
+    saveLabel(df_label_two, "saveaPath")
+
     printDf("输出 df_label_two", df_label_two)
 
+    // 3-4
     val df_label_tags = getArrayStrColLabel(df_medias_processed, Dic.colVideoTagList)
-    //    saveLabel(df_label_tags, labelTempPath)
+
+    saveLabel(df_label_tags, "saveaPath")
+
     printDf("输出 df_label_tags", df_label_tags)
 
-
-    println("媒资数据处理完成！")
+    println("MediasProcess over~~~~~~~~~~~")
   }
 
   def mediasProcess(df_raw_media: DataFrame) = {
@@ -109,14 +105,13 @@ object MediasProcess {
     df_medias_mean
   }
 
-
+  /**
+    * @author wj
+    * @param [dfModifiedFormat ]
+    * @return org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
+    * @description 将指定的列使用均值进行填充
+    */
   def meanFill(dfModifiedFormat: DataFrame, cols: Array[String]) = {
-    /**
-     * @author wj
-     * @param [dfModifiedFormat ]
-     * @return org.apache.spark.sql.Dataset<org.apache.spark.sql.Row>
-     * @description 将指定的列使用均值进行填充
-     */
 
     val imputer = new Imputer()
       .setInputCols(cols)

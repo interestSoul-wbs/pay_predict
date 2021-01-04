@@ -1,31 +1,33 @@
 package train.common
 
 import mam.Dic
+import mam.SparkSessionInit._
 import mam.GetSaveData._
 import mam.Utils._
 import org.apache.spark.sql.functions.{col, udf, when}
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
+import org.apache.spark.sql.{DataFrame, SaveMode}
+import mam.SparkSessionInit
 
 object OrdersProcess {
 
   def main(args: Array[String]): Unit = {
 
-    sysParamSetting()
+    // 1 SparkSession init
+    SparkSessionInit.init()
 
-    val spark = SparkSession
-      .builder()
-      .master("local[6]") // Konverse - 上传 master 时，删除
-//      .enableHiveSupport() // Konverse - 这个如果不影响本地运行，就不用注释；
-      .getOrCreate()
-
+    // 2 數據讀取
     val df_order_raw = getRawOrders(spark)
+
     printDf("输入 df_order_raw", df_order_raw)
 
+    // 3 數據處理
     val df_order_processed = orderProcess(df_order_raw)
+
     printDf("输出 df_order_processed", df_order_processed)
 
-//    saveProcessedOrder(df_order_processed)
+    // 4 數據存儲
+    saveProcessedOrder(df_order_processed)
 
     println("订单数据处理完成！")
   }

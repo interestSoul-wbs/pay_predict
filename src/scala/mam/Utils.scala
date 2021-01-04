@@ -269,16 +269,16 @@ object Utils {
 
   }
 
+  /**
+    * @description 统一有效时长
+    * @author wx
+    * @param [timeValidity] 订单有效时长
+    * @param [resourceType] 订单资源类型
+    * @return {@link int }
+    * */
   def udfUniformTimeValidity = udf(uniformTimeValidity _)
 
   def uniformTimeValidity(timeValidity: Int, resourceType: Int): Int = {
-    /**
-     * @description 统一有效时长
-     * @author wx
-     * @param [timeValidity] 订单有效时长
-     * @param [resourceType] 订单资源类型
-     * @return {@link int }
-     * */
 
     if (resourceType == 0 || resourceType >= 4) {
       return timeValidity
