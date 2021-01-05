@@ -1,50 +1,47 @@
 package predict.userpay
 
-import mam.Dic
-import mam.GetSaveData.saveProcessedData
+import mam.{Dic, SparkSessionInit}
+import mam.GetSaveData.{getPredictUser, getProcessedOrder, saveProcessedData, saveUserProfileOrderPart}
+import mam.SparkSessionInit.spark
 import mam.Utils.{calDate, getData, printDf, sysParamSetting, udfGetDays}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 object UserProfileGenerateOrderPartForUserpay {
 
   val timeWindow = 30
 
   def main(args: Array[String]): Unit = {
-    sysParamSetting()
-    val spark: SparkSession = new sql.SparkSession.Builder()
-      .appName("userProfileGenerateOrderPartUserpayForPredict")
-//      .master("local[4]")
-      //      .enableHiveSupport()
-      .getOrCreate()
 
+    // 1 SparkSession init
+    sysParamSetting()
+    SparkSessionInit.init()
+
+
+    // 2 Get Data
     val now = args(0) + " " + args(1)
     println(now)
 
-    userProfileGenerateOrderPart(spark, now)
+    val df_orders = getProcessedOrder(spark)
+    printDf("输入 df_orders", df_orders)
+
+    val df_predict_users = getPredictUser(spark, now)
+    printDf("输入 df_predict_users", df_predict_users)
+
+    // 3 Process Data
+    val df_user_profile_order = userProfileGenerateOrderPart(spark, now, df_orders, df_predict_users)
+
+    // 4 Save Data
+    saveUserProfileOrderPart(now, df_user_profile_order, "predict")
+    printDf("输出  df_user_profile_order", df_user_profile_order)
+    println("用户画像Order部分生成完毕。")
 
 
   }
 
-  def userProfileGenerateOrderPart(spark: SparkSession, now: String): Unit = {
+  def userProfileGenerateOrderPart(spark: SparkSession, now: String, df_orders: DataFrame, df_predict_users:DataFrame): DataFrame = {
 
-
-    val hdfsPath = "hdfs:///pay_predict/"
-    //val hdfsPath = ""
-    val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders3"
-    val predictUserPath = hdfsPath + "data/predict/userpay/predictUsers" + now.split(" ")(0)
-    val userProfileOrderPartSavePath = hdfsPath + "data/predict/common/processed/userpay/userprofileorderpart" + now.split(" ")(0)
-
-
-    /**
-     * Get Data
-     */
-    val df_orders = getData(spark, ordersProcessedPath)
-    printDf("输入 df_orders", df_orders)
-
-    val df_predict_users = getData(spark, predictUserPath)
-    printDf("输入 df_predict", df_predict_users)
 
     val df_predict_id = df_predict_users.select(Dic.colUserId)
 
@@ -180,8 +177,6 @@ object UserProfileGenerateOrderPartForUserpay {
       )
 
 
-    //当前是否是连续包月
-
     val df_user_profile_order = df_predict_id.join(df_order_part_1, joinKeysUserId, "left")
       .join(df_order_part_2, joinKeysUserId, "left")
       .join(df_order_part_3, joinKeysUserId, "left")
@@ -195,12 +190,9 @@ object UserProfileGenerateOrderPartForUserpay {
       .join(df_order_part_11, joinKeysUserId, "left")
       .join(df_order_part_12, joinKeysUserId, "left")
 
-    printDf("输出 df_user_profile_order", df_user_profile_order)
 
 
-   saveProcessedData(df_user_profile_order, userProfileOrderPartSavePath)
-
-
+    df_user_profile_order
   }
 
 

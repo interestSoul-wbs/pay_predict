@@ -1,10 +1,10 @@
 package train.userpay
 
 import mam.{Dic, SparkSessionInit}
-import mam.GetSaveData.{getTrainUser, getUserProfileOrderPart, getUserProfilePlayPart, getUserProfilePreferencePart, getVideoFirstCategory, getVideoLabel, getVideoSecondCategory,saveTrainSet}
+import mam.GetSaveData.{getTrainUser, getUserProfileOrderPart, getUserProfilePlayPart, getUserProfilePreferencePart, getVideoFirstCategory, getVideoLabel, getVideoSecondCategory, saveDataSet}
 import mam.SparkSessionInit.spark
-import mam.Utils.{getData, printDf, sysParamSetting}
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import mam.Utils.{printDf, sysParamSetting}
+import org.apache.spark.sql.{DataFrame}
 import org.apache.spark.sql.functions.{col, lit, udf}
 
 import scala.collection.mutable.ArrayBuffer
@@ -24,13 +24,13 @@ object TrainSetProcess {
 
     // 2 Get Data
 
-    val df_user_profile_play = getUserProfilePlayPart(spark, trainTime)
+    val df_user_profile_play = getUserProfilePlayPart(spark, trainTime, "train")
     printDf("输入 df_user_profile_play", df_user_profile_play)
 
-    val df_user_profile_pref = getUserProfilePreferencePart(spark, trainTime)
+    val df_user_profile_pref = getUserProfilePreferencePart(spark, trainTime, "train")
     printDf("输入 df_user_profile_pref", df_user_profile_pref)
 
-    val df_user_profile_order = getUserProfileOrderPart(spark, trainTime)
+    val df_user_profile_order = getUserProfileOrderPart(spark, trainTime, "train")
     printDf("输入 df_user_profile_order", df_user_profile_order)
 
     val df_video_first_category = getVideoFirstCategory()
@@ -51,7 +51,7 @@ object TrainSetProcess {
       df_video_first_category, df_video_second_category, df_label, df_train_user)
 
     // 4 Save Train Users
-    saveTrainSet(trainTime, df_train_set)
+    saveDataSet(trainTime, df_train_set, "train")
     printDf("输出 df_train_set", df_train_set)
     println("Train Set Process Done！")
 

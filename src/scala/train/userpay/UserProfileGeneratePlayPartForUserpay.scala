@@ -33,10 +33,10 @@ object UserProfileGeneratePlayPartForUserpay {
     printDf("输入 df_train_users", df_train_users)
 
     // 3 Process Data
-    val df_user_profile_play = userProfileGeneratePlayPart(spark, now, df_plays, df_train_users, df_medias)
+    val df_user_profile_play = userProfileGeneratePlayPart(now, df_plays, df_train_users, df_medias)
 
     // 4 Save Data
-    saveUserProfilePlayPart(now, df_user_profile_play)
+    saveUserProfilePlayPart(now, df_user_profile_play, "train")
     printDf("输出 df_user_profile_play", df_user_profile_play)
 
     println("用户画像play部分生成完毕。")
@@ -45,7 +45,7 @@ object UserProfileGeneratePlayPartForUserpay {
 
   }
 
-  def userProfileGeneratePlayPart(spark: SparkSession, now: String, df_plays:DataFrame, df_train_users:DataFrame, df_medias:DataFrame):DataFrame = {
+  def userProfileGeneratePlayPart(now: String, df_plays:DataFrame, df_train_users:DataFrame, df_medias:DataFrame):DataFrame = {
 
 
     val df_train_id = df_train_users.select(Dic.colUserId)

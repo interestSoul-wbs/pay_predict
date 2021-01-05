@@ -2543,9 +2543,9 @@ object GetSaveData {
 
   }
 
-  def saveLabel(df_label: DataFrame, labelSavedPath: String) = {
-
-    df_label.coalesce(1).write.mode(SaveMode.Overwrite).option("header", "false").csv(labelSavedPath)
+  def saveLabel(df_label: DataFrame, fileName: String) = {
+    val path = hdfsPath + "data/train/common/processed/"
+    df_label.coalesce(1).write.mode(SaveMode.Overwrite).option("header", "false").csv(path + fileName)
   }
 
 
@@ -2712,49 +2712,49 @@ object GetSaveData {
   }
 
   def getPredictUser(sparkSession: SparkSession, now: String) = {
-    val predictUsersPath = hdfsPath + "data/train/userpay/predictUsers" + now.split(" ")(0)
+    val predictUsersPath = hdfsPath + "data/predict/userpay/predictUsers" + now.split(" ")(0)
     getData(sparkSession, predictUsersPath)
   }
 
   /**
    * User Profile Data Save Functions and Get Functions
    */
-  def saveUserProfileOrderPart(now:String, df_user_profile_order: DataFrame) = {
+  def saveUserProfileOrderPart(now:String, df_user_profile_order: DataFrame, state:String) = {
 
-    val userProfileOrderPartSavePath = hdfsPath + "data/train/common/processed/userpay/userprofileorderpart" + now.split(" ")(0)
+    val userProfileOrderPartSavePath = hdfsPath + "data/"+ state +"/common/processed/userpay/userprofileorderpart" + now.split(" ")(0)
     saveProcessedData(df_user_profile_order, userProfileOrderPartSavePath)
   }
 
-  def getUserProfileOrderPart(sparkSession: SparkSession, now:String) = {
-    val userProfileOrderPartPath = hdfsPath + "data/train/common/processed/userpay/userprofileorderpart" + now.split(" ")(0)
+  def getUserProfileOrderPart(sparkSession: SparkSession, now:String, state:String) = {
+    val userProfileOrderPartPath = hdfsPath + "data/"+state+"/common/processed/userpay/userprofileorderpart" + now.split(" ")(0)
     getData(sparkSession, userProfileOrderPartPath)
   }
 
-  def saveUserProfilePlayPart(now:String, df_user_profile_play: DataFrame) = {
+  def saveUserProfilePlayPart(now:String, df_user_profile_play: DataFrame, state:String) = {
 
-    val userProfilePlayPartSavePath = hdfsPath + "data/train/common/processed/userpay/userprofileplaypart" + now.split(" ")(0)
+    val userProfilePlayPartSavePath = hdfsPath + "data/"+ state +"/common/processed/userpay/userprofileplaypart" + now.split(" ")(0)
 
     saveProcessedData(df_user_profile_play, userProfilePlayPartSavePath)
   }
 
 
-  def getUserProfilePlayPart(sparkSession: SparkSession, now:String) = {
+  def getUserProfilePlayPart(sparkSession: SparkSession, now:String, state:String) = {
 
-    val userProfilePlayPartPath = hdfsPath + "data/train/common/processed/userpay/userprofileplaypart" + now.split(" ")(0)
+    val userProfilePlayPartPath = hdfsPath + "data/"+state+"/common/processed/userpay/userprofileplaypart" + now.split(" ")(0)
     getData(sparkSession, userProfilePlayPartPath)
   }
 
 
-  def saveUserProfilePreferencePart(now:String, df_user_profile_pf: DataFrame) = {
+  def saveUserProfilePreferencePart(now:String, df_user_profile_pf: DataFrame, state:String) = {
 
-    val userProfilePreferencePartSavePath = hdfsPath + "data/train/common/processed/userpay/userprofilepreferencepart" + now.split(" ")(0)
+    val userProfilePreferencePartSavePath = hdfsPath + "data/"+ state +"/common/processed/userpay/userprofilepreferencepart" + now.split(" ")(0)
 
     saveProcessedData(df_user_profile_pf, userProfilePreferencePartSavePath)
   }
 
 
-  def getUserProfilePreferencePart(sparkSession: SparkSession, now:String) = {
-    val userProfilePreferencePartSavePath = hdfsPath + "data/train/common/processed/userpay/userprofilepreferencepart" + now.split(" ")(0)
+  def getUserProfilePreferencePart(sparkSession: SparkSession, now:String, state:String) = {
+    val userProfilePreferencePartSavePath = hdfsPath + "data/"+state+"/common/processed/userpay/userprofilepreferencepart" + now.split(" ")(0)
     getData(sparkSession, userProfilePreferencePartSavePath)
   }
 
@@ -2782,9 +2782,9 @@ object GetSaveData {
   /**
    *  Train Set
    */
-  def saveTrainSet(now:String, df_train_set: DataFrame) = {
-    val trainUserProfileSavePath = hdfsPath + "data/train/userpay/trainUserProfile" + now.split(" ")(0)
-    saveProcessedData(df_train_set, trainUserProfileSavePath)
+  def saveDataSet(now:String, df_data: DataFrame, state:String) = {
+    val Path = hdfsPath + "data/"+ state +"/userpay/trainUserProfile" + now.split(" ")(0)
+    saveProcessedData(df_data, Path)
   }
 
 }

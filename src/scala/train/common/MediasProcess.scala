@@ -17,6 +17,7 @@ object MediasProcess {
   def main(args: Array[String]): Unit = {
 
     // 1 Spark初始化
+    sysParamSetting
     SparkSessionInit.init()
 
     // 2 數據讀取
@@ -29,27 +30,26 @@ object MediasProcess {
     val df_medias_processed = mediasProcess(df_raw_medias)
 
     saveProcessedMedia(df_medias_processed)
-
     printDf("输出 df_medias_processed", df_medias_processed)
 
     // 3-2
     val df_label_one = getSingleStrColLabel(df_medias_processed, Dic.colVideoOneLevelClassification)
 
-    saveLabel(df_label_one, "saveaPath")
+    saveLabel(df_label_one, "videofirstcategorytemp.txt")
 
     printDf("输出 df_label_one", df_label_one)
 
     // 3-3
     val df_label_two = getArrayStrColLabel(df_medias_processed, Dic.colVideoTwoLevelClassificationList)
 
-    saveLabel(df_label_two, "saveaPath")
+    saveLabel(df_label_two, "videosecondcategorytemp.txt")
 
     printDf("输出 df_label_two", df_label_two)
 
     // 3-4
     val df_label_tags = getArrayStrColLabel(df_medias_processed, Dic.colVideoTagList)
 
-    saveLabel(df_label_tags, "saveaPath")
+    saveLabel(df_label_tags, "labeltemp.txt")
 
     printDf("输出 df_label_tags", df_label_tags)
 

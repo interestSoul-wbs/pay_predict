@@ -32,7 +32,7 @@ object UserProfileGenerateOrderPartForUserpay {
     val df_user_profile_order = userProfileGenerateOrderPart(spark, now, df_orders, df_train_users)
 
     // 4 Save Data
-    saveUserProfileOrderPart(now, df_user_profile_order)
+    saveUserProfileOrderPart(now, df_user_profile_order,"train")
     printDf("输出  df_user_profile_order", df_user_profile_order)
 
     println("用户画像订单部分生成完毕。")

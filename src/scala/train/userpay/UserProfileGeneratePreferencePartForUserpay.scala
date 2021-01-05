@@ -35,8 +35,8 @@ object UserProfileGeneratePreferencePartForUserpay {
     val df_user_profile_pref = userProfileGeneratePreferencePart(now, df_plays, df_train_users, df_medias)
 
     // 4 Save Data
-    saveUserProfilePreferencePart(now, df_user_profile_pref)
-    printDf("输出 df_user_profile_pf", df_user_profile_pref)
+    saveUserProfilePreferencePart(now, df_user_profile_pref, "train")
+    printDf("输出 df_user_profile_pref", df_user_profile_pref)
 
     println("用户画像Preference部分生成完毕。")
 
