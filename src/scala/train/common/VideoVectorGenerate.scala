@@ -36,7 +36,7 @@ object VideoVectorGenerate {
     println("thirtyDaysAgo is : " + thirtyDaysAgo)
 
     // 1 - get play data.
-    val df_plays = getProcessedPlay(spark, partitiondate, license)
+    val df_plays = getProcessedPlay(partitiondate, license)
 
     printDf("df_plays", df_plays)
 
@@ -53,7 +53,7 @@ object VideoVectorGenerate {
     printDf("df_video_dict", df_video_dict)
 
     // 4 - save
-    saveVideoVector(spark, df_video_dict, partitiondate, license)
+    saveVideoVector(df_video_dict, partitiondate, license)
   }
 
 }

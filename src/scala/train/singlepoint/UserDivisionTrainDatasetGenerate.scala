@@ -32,13 +32,13 @@ object UserDivisionTrainDatasetGenerate {
 
     val spark = SparkSession.builder().enableHiveSupport().config("spark.sql.crossJoin.enabled", "true").getOrCreate()
 
-    val df_user_profile_play_part = getUserProfilePlayPart(spark, partitiondate, license, "train")
+    val df_user_profile_play_part = getUserProfilePlayPart(partitiondate, license, "train")
 
-    val df_user_profile_preference_part = getuserProfilePreferencePart(spark, partitiondate, license, "train")
+    val df_user_profile_preference_part = getuserProfilePreferencePart(partitiondate, license, "train")
 
-    val df_user_profile_order_part = getUserProfileOrderPart(spark, partitiondate, license, "train")
+    val df_user_profile_order_part = getUserProfileOrderPart(partitiondate, license, "train")
 
-    val df_orders = getProcessedOrder(spark, partitiondate, license)
+    val df_orders = getProcessedOrder(partitiondate, license)
 
     val joinKeysUserId = Seq(Dic.colUserId)
 
@@ -112,12 +112,12 @@ object UserDivisionTrainDatasetGenerate {
     println("df_all_users_not_null count: ", df_all_users_not_null.count())
 
     // MinMaxScaler
-    val exclude_cols = Array(Dic.colUserId)
+    val exclude_cols = Array(Dic.colUserId, Dic.colOrderStatus)
 
     val df_result = scaleData(df_all_users_not_null, exclude_cols)
 
     printDf("df_result", df_result)
 
-    saveSinglepointUserDivisionData(spark, df_result, partitiondate, license, "train")
+    saveSinglepointUserDivisionData(df_result, partitiondate, license, "train")
   }
 }

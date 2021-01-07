@@ -21,19 +21,19 @@ object RankPredictDatasetGenerate {
       .config("spark.sql.crossJoin.enabled", "true") //spark2.x默认不能进行笛卡尔积的操作需要进行设置
       .getOrCreate()
 
-    val df_orders = getProcessedOrder(spark, partitiondate, license)
+    val df_orders = getProcessedOrder(partitiondate, license)
 
-    val df_user_profile_play_part = getUserProfilePlayPart(spark, partitiondate, license, "valid")
+    val df_user_profile_play_part = getUserProfilePlayPart(partitiondate, license, "valid")
 
-    val df_user_profile_preference_part = getuserProfilePreferencePart(spark, partitiondate, license, "valid")
+    val df_user_profile_preference_part = getuserProfilePreferencePart(partitiondate, license, "valid")
 
-    val df_user_profile_order_part = getUserProfileOrderPart(spark, partitiondate, license, "valid")
+    val df_user_profile_order_part = getUserProfileOrderPart(partitiondate, license, "valid")
 
-    val df_video_profile = getVideoProfile(spark, partitiondate, license, "valid")
+    val df_video_profile = getVideoProfile(partitiondate, license, "valid")
 
-    val df_video_vector = getVideoVector(spark, partitiondate, license)
+    val df_video_vector = getVideoVector(partitiondate, license)
 
-    val df_user_division = getUserDivisionResult(spark, partitiondate, license, "valid")
+    val df_user_division = getUserDivisionResult(partitiondate, license, "valid")
 
     printDf("df_user_division", df_user_division)
 
@@ -85,7 +85,7 @@ object RankPredictDatasetGenerate {
 
     printDf("df_result", df_result)
 
-    saveSinglepointRankData(spark, df_result, partitiondate, license, "valid")
+    saveSinglepointRankData(df_result, partitiondate, license, "valid")
   }
 
 }

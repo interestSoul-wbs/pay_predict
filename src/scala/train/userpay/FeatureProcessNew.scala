@@ -23,11 +23,11 @@ object FeatureProcessNew {
     val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
 
     //最初生成的用户画像数据集路径
-    val df_user_profile_play_part = getUserProfilePlayPart(spark, partitiondate, license, "train")
+    val df_user_profile_play_part = getUserProfilePlayPart(partitiondate, license, "train")
 
-    val df_user_profile_preference_part = getuserProfilePreferencePart(spark, partitiondate, license, "train")
+    val df_user_profile_preference_part = getuserProfilePreferencePart(partitiondate, license, "train")
 
-    val df_user_profile_order_part = getUserProfileOrderPart(spark, partitiondate, license, "train")
+    val df_user_profile_order_part = getUserProfileOrderPart(partitiondate, license, "train")
 
     val joinKeysUserId = Seq(Dic.colUserId)
 
@@ -35,7 +35,7 @@ object FeatureProcessNew {
       .join(df_user_profile_preference_part, joinKeysUserId, "left")
       .join(df_user_profile_order_part, joinKeysUserId, "left")
 
-    val df_user_list = getTrainUser(spark, partitiondate, license, "train", "new")
+    val df_user_list = getTrainUser(partitiondate, license, "train", "new")
 
     val trainSet = df_user_list.join(userProfiles, joinKeysUserId, "left")
 
@@ -64,11 +64,11 @@ object FeatureProcessNew {
     var videoSecondCategoryMap: Map[String, Int] = Map()
     var labelMap: Map[String, Int] = Map()
 
-    val df_video_first_category = getVideoCategory(spark, partitiondate, license, "one_level")
+    val df_video_first_category = getVideoCategory(partitiondate, license, "one_level")
 
-    val df_video_second_category = getVideoCategory(spark, partitiondate, license, "two_level")
+    val df_video_second_category = getVideoCategory(partitiondate, license, "two_level")
 
-    val df_label_tmp = getVideoCategory(spark, partitiondate, license, "video_tag")
+    val df_label_tmp = getVideoCategory(partitiondate, license, "video_tag")
 
     var conList = df_video_first_category.collect()
     for (elem <- conList) {
@@ -140,6 +140,6 @@ object FeatureProcessNew {
 
     printDf("df_result", df_result)
 
-    saveFeatureProcessResult(spark, df_result, partitiondate, license, "train", "new")
+    saveFeatureProcessResult(df_result, partitiondate, license, "train", "new")
   }
 }

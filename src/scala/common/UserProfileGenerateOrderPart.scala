@@ -1,11 +1,11 @@
-package train.common
+package common
 
+import com.github.nscala_time.time.Imports._
 import mam.Dic
+import mam.GetSaveData.{getProcessedOrder, getProcessedPlay, saveUserProfileOrderPart}
 import mam.Utils.{calDate, printDf, udfGetDays}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import mam.GetSaveData._
-import com.github.nscala_time.time.Imports._
 
 object UserProfileGenerateOrderPart {
 
@@ -15,22 +15,29 @@ object UserProfileGenerateOrderPart {
   var vodVersion: String = _
   var sector: Int = _
   var date: DateTime = _
-  var thirtyDaysAgo: String = _
+  var nDaysFromStartDate: Int = _
+  var dataSplitDate: String = _
 
   def main(args: Array[String]): Unit = {
 
     partitiondate = args(0)
     license = args(1)
-    vodVersion = args(2) // 2020-12-1 - union1.x
+    vodVersion = args(2) // union1.x
     sector = args(3).toInt
+    nDaysFromStartDate = args(4).toInt // 1/7/14 - 各跑一次
 
     date = DateTime.parse(partitiondate, DateTimeFormat.forPattern("yyyyMMdd"))
-    thirtyDaysAgo = (date - 30.days).toString(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:SS"))
+    dataSplitDate = (date - (30 - nDaysFromStartDate).days).toString(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:SS"))
 
-    val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
+    val spark = SparkSession
+      .builder()
+      .enableHiveSupport()
+      .getOrCreate()
 
-    // 训练集的划分时间点 - 输入时间的30天之前
-    println("thirtyDaysAgo is : " + thirtyDaysAgo)
+    // 训练集的划分时间点 - 0 - 输入时间的30天之前
+    // 单点视频训练集的划分时间点 - 7 - 输入时间的23天之前
+    // 训练集的划分时间点 - 14 - 输入时间的16天之前
+    println("data time is : " + dataSplitDate)
 
     // 1 - get play data.
     val df_plays = getProcessedPlay(partitiondate, license, vodVersion, sector)
@@ -43,20 +50,18 @@ object UserProfileGenerateOrderPart {
     printDf("df_orders", df_orders)
 
     // 3 - data process
-    val df_result = userProfileGenerateOrderPart(thirtyDaysAgo, 30, df_plays, df_orders)
+    val df_result = userProfileGenerateOrderPart(dataSplitDate, 30, df_plays, df_orders)
 
     printDf("df_result", df_result)
 
     // 4 - save
-    saveUserProfileOrderPart(df_result, partitiondate, license, "train")
+    saveUserProfileOrderPart(df_result, partitiondate, license, vodVersion, sector, nDaysFromStartDate)
   }
 
   def userProfileGenerateOrderPart(now: String, timeWindow: Int, df_plays: DataFrame, df_orders: DataFrame) = {
 
     val df_user_id = df_plays
       .select(col(Dic.colUserId)).distinct()
-
-    printDf("df_user_id", df_user_id)
 
     val pre_30 = calDate(now, -30)
 

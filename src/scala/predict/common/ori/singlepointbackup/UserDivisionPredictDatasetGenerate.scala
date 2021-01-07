@@ -19,11 +19,11 @@ object UserDivisionPredictDatasetGenerate {
 
     val spark = SparkSession.builder().enableHiveSupport().config("spark.sql.crossJoin.enabled", "true").getOrCreate()
 
-    val df_user_profile_play_part = getUserProfilePlayPart(spark, partitiondate, license, "valid")
+    val df_user_profile_play_part = getUserProfilePlayPart(partitiondate, license, "valid")
 
-    val df_user_profile_preference_part = getuserProfilePreferencePart(spark, partitiondate, license, "valid")
+    val df_user_profile_preference_part = getuserProfilePreferencePart(partitiondate, license, "valid")
 
-    val df_user_profile_order_part = getUserProfileOrderPart(spark, partitiondate, license, "valid")
+    val df_user_profile_order_part = getUserProfileOrderPart(partitiondate, license, "valid")
 
     val joinKeysUserId = Seq(Dic.colUserId)
 
@@ -46,7 +46,7 @@ object UserDivisionPredictDatasetGenerate {
 
     printDf("df_result", df_result)
 
-    saveSinglepointUserDivisionData(spark, df_result, partitiondate, license, "valid")
+    saveSinglepointUserDivisionData(df_result, partitiondate, license, "valid")
   }
 
 }

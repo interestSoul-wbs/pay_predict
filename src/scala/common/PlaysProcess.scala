@@ -1,18 +1,20 @@
-package train.common
+package common
 
 import com.github.nscala_time.time.Imports._
 import mam.Dic
-import mam.Utils.{printDf, udfAddSuffix}
+import mam.GetSaveData._
+import mam.Utils.{printDf, udfAddSuffix, _}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import mam.GetSaveData._
-import mam.Utils._
+import rs.common.SparkSessionInit
 
 object PlaysProcess {
 
   var tempTable = "temp_table"
   var partitiondate: String = _
   var license: String = _
+  var vodVersion: String = _
+  var sector: Int = _
   var date: DateTime = _
   var halfYearAgo: String = _
   val time_max_limit = 43200
@@ -20,27 +22,32 @@ object PlaysProcess {
 
   def main(args: Array[String]): Unit = {
 
-    val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
+    SparkSessionInit.init()
 
     partitiondate = args(0)
     license = args(1)
+    vodVersion = args(2) // 2020-12-1 - union1.x
+    sector = args(3).toInt
 
     date = DateTime.parse(partitiondate, DateTimeFormat.forPattern("yyyyMMdd"))
     halfYearAgo = (date - 180.days).toString(DateTimeFormat.forPattern("yyyyMMdd"))
 
-    // 1 - get sample users' play data.
-    val df_raw_play = getRawPlayByDateRangeSmpleUsers(halfYearAgo, partitiondate, license)
+    // 1 - Get original sub_id from vodrs.paypredict_user_subid
+    val df_sub_id = getAllRawSubid(partitiondate, license, vodVersion, sector)
 
-    printDf("df_raw_play", df_raw_play)
+    // 2 - get sample users' play data.
+    val df_all_raw_play = getRawPlayByDateRangeAllUsers(halfYearAgo, partitiondate, license)
 
-    // 2 - process of play data.
+    // 3 - join
+    val df_raw_play = df_sub_id
+      .join(df_all_raw_play, Seq(Dic.colSubscriberid))
+      .withColumnRenamed(Dic.colSubscriberid, Dic.colUserId)
+
+    // 4 - process of play data.
     val df_play = playProcess(df_raw_play)
 
-    printDf("df_play", df_play)
-
     // 3 - save data to hive.
-    // 可能需要改动 - 2020-11-11
-    saveProcessedPlay(df_play, partitiondate, license)
+    saveProcessedPlay(df_play, partitiondate, license, vodVersion, sector)
   }
 
 

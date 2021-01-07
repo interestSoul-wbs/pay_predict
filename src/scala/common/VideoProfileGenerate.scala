@@ -1,12 +1,13 @@
-package train.common
+package common
 
+import com.github.nscala_time.time.Imports._
 import mam.Dic
+import mam.GetSaveData._
 import mam.Utils._
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{DataFrame, SparkSession}
-import mam.GetSaveData._
 import org.apache.spark.sql.types.IntegerType
-import com.github.nscala_time.time.Imports._
+import org.apache.spark.sql.{DataFrame, SparkSession}
+
 import scala.collection.mutable.ListBuffer
 
 object VideoProfileGenerate {
@@ -14,21 +15,24 @@ object VideoProfileGenerate {
   var tempTable = "temp_table"
   var partitiondate: String = _
   var license: String = _
+  var vodVersion: String = _
+  var sector: Int = _
   var date: DateTime = _
-  var thirtyDaysAgo: String = _
+  var nDaysFromStartDate: Int = _
+  var dataSplitDate: String = _
 
   def main(args: Array[String]): Unit = {
 
     partitiondate = args(0)
     license = args(1)
+    vodVersion = args(2) // 2020-12-1 - union1.x
+    sector = args(3).toInt
+    nDaysFromStartDate = args(4).toInt // 1/7/14 - 各跑一次
 
     date = DateTime.parse(partitiondate, DateTimeFormat.forPattern("yyyyMMdd"))
-    thirtyDaysAgo = (date - 30.days).toString(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:SS"))
+    dataSplitDate = (date - (30 - nDaysFromStartDate).days).toString(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:SS"))
 
     val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
-
-    // 训练集的划分时间点 - 输入时间的30天之前
-    println("thirtyDaysAgo is : " + thirtyDaysAgo)
 
     // 1 - processed df_medias
     val df_medias = getProcessedMedias(partitiondate, license)
@@ -53,22 +57,22 @@ object VideoProfileGenerate {
     printDf("df_medias_purged", df_medias_purged)
 
     // 2 - processed play data
-    val df_plays = getProcessedPlay(partitiondate, license)
+    val df_plays = getProcessedPlay(partitiondate, license, vodVersion, sector)
 
     printDf("df_plays", df_plays)
 
     // 3 - processed order data
-    val df_orders = getProcessedOrder(partitiondate, license)
+    val df_orders = getProcessedOrder(partitiondate, license, vodVersion, sector)
 
     printDf("df_orders", df_orders)
 
     // 4 - data process
-    val df_result = videoProfileGenerate(thirtyDaysAgo, 30, df_medias_purged, df_plays, df_orders)
+    val df_result = videoProfileGenerate(dataSplitDate, 30, df_medias_purged, df_plays, df_orders)
 
     printDf("df_result", df_result)
 
     // 5 - save data
-    saveVideoProfileGenerate(df_result, partitiondate, license, "train")
+    saveVideoProfileGenerate(df_result, partitiondate, license, vodVersion, sector, nDaysFromStartDate)
   }
 
   def videoProfileGenerate(now: String, timeWindow: Int, df_medias: DataFrame, df_plays: DataFrame, df_orders: DataFrame) = {

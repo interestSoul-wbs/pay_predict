@@ -1,9 +1,7 @@
 package train.common
 
 /**
-  * @Author wj
-  * @Date 2020/09
-  * @Version 1.0
+  * Konverse - 2020-11-30
   */
 
 import mam.Dic
@@ -30,32 +28,27 @@ object MediasProcess {
     license = args(1)
 
     // 2 - get raw media data
-    // 2020-11-3 - Konverse - 上线时，partitiondate 需根据时间进行修改
-    val df_raw_media = getRawMediaData(spark, partitiondate, license)
-    printDf("df_raw_media", df_raw_media)
+    val df_raw_media = getRawMediaData(partitiondate, license)
 
     // 3 - media data process
     val df_media = mediaDataProcess(df_raw_media)
 
     df_raw_media.unpersist()
-    printDf("df_media", df_media)
 
     // 4 - Dic.colVideoOneLevelClassification, Dic.colVideoTwoLevelClassificationList, Dic.colVideoTagList
     // extract tags and save
-    getSingleStrColLabelAndSave(spark, df_media, Dic.colVideoOneLevelClassification, Dic.colOneLevel)
+    getSingleStrColLabelAndSave(df_media, Dic.colVideoOneLevelClassification, Dic.colOneLevel)
 
-    getArrayStrColLabelAndSave(spark, df_media, Dic.colVideoTwoLevelClassificationList, Dic.colTwoLevel)
+    getArrayStrColLabelAndSave(df_media, Dic.colVideoTwoLevelClassificationList, Dic.colTwoLevel)
 
-    getArrayStrColLabelAndSave(spark, df_media, Dic.colVideoTagList, Dic.colVideoTag)
+    getArrayStrColLabelAndSave(df_media, Dic.colVideoTagList, Dic.colVideoTag)
 
     // 5 - Fill Dic.colScore, Dic.colVideoTime Na with MEAN value
     val cols = Array(Dic.colScore, Dic.colVideoTime)
     val df_media_processed = fillNaWithMean(df_media, cols)
 
-    printDf("df_media_processed", df_media_processed)
-
     // 6 - save processed media
-    saveProcessedMedia(spark, df_media_processed, partitiondate, license)
+    saveProcessedMedia(df_media_processed, partitiondate, license)
 
     println("预测阶段媒资数据处理完成！")
   }
@@ -106,12 +99,8 @@ object MediasProcess {
 
   /**
     * Process video_one_level_classification and save data to hive
-    *
-    * @param df_media
-    * @param col_name
-    * @param category
     */
-  def getSingleStrColLabelAndSave(spark: SparkSession, df_media: DataFrame, col_name: String, category: String) = {
+  def getSingleStrColLabelAndSave(df_media: DataFrame, col_name: String, category: String) = {
 
     val df_label = df_media
       .select(col(col_name))
@@ -122,7 +111,7 @@ object MediasProcess {
 
     printDf("df_label", df_label)
 
-    saveLabel(spark, df_label, partitiondate, license, category)
+    saveLabel(df_label, partitiondate, license, category)
   }
 
   /**
@@ -132,7 +121,7 @@ object MediasProcess {
     * @param col_name
     * @param category
     */
-  def getArrayStrColLabelAndSave(spark: SparkSession, df_media: DataFrame, col_name: String, category: String) = {
+  def getArrayStrColLabelAndSave(df_media: DataFrame, col_name: String, category: String) = {
 
     val df_label = df_media
       .select(
@@ -145,7 +134,7 @@ object MediasProcess {
 
     printDf("df_label", df_label)
 
-    saveLabel(spark, df_label, partitiondate, license, category)
+    saveLabel(df_label, partitiondate, license, category)
   }
 
   /**

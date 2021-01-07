@@ -27,22 +27,22 @@ object GetLableofPredictData {
     val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
 
     // 1 - 抽取有效的订单信息
-    val df_processed_orders = getProcessedOrder(spark, partitiondate, license)
+    val df_processed_orders = getProcessedOrder(partitiondate, license)
 
     val df_effective_order = getPredictUsersLabel(df_processed_orders, sixteenDaysAgo)
 
     // 2 - predict中 Old 用户打上label
-    val df_old_user_list_raw = getTrainUser(spark, partitiondate, license, "valid", "old")
+    val df_old_user_list_raw = getTrainUser(partitiondate, license, "valid", "old")
 
-    joinLabelAndSave(spark, df_old_user_list_raw, df_effective_order,partitiondate, license, "valid_true", "old")
+    joinLabelAndSave(df_old_user_list_raw, df_effective_order,partitiondate, license, "valid_true", "old")
 
     // 3 - predict中 New 用户打上label
-    val df_new_user_list_raw = getTrainUser(spark, partitiondate, license, "valid", "new")
+    val df_new_user_list_raw = getTrainUser(partitiondate, license, "valid", "new")
 
-    joinLabelAndSave(spark, df_new_user_list_raw, df_effective_order,partitiondate, license, "valid_true", "new")
+    joinLabelAndSave(df_new_user_list_raw, df_effective_order,partitiondate, license, "valid_true", "new")
   }
 
-  def joinLabelAndSave(spark: SparkSession, df_user_list_raw: DataFrame, df_effective_order: DataFrame,
+  def joinLabelAndSave(df_user_list_raw: DataFrame, df_effective_order: DataFrame,
                        partitiondate: String, license: String, category: String, new_or_old: String) = {
 
     val df_user_label = df_user_list_raw
@@ -51,7 +51,7 @@ object GetLableofPredictData {
       .join(df_effective_order, Seq(Dic.colUserId), "left")
       .na.fill(0)
 
-    saveUserSplitResult(spark, df_user_label, partitiondate, license, category, new_or_old)
+    saveUserSplitResult(df_user_label, partitiondate, license, category, new_or_old)
   }
 
 }

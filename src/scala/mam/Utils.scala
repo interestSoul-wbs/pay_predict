@@ -19,13 +19,7 @@ object Utils {
 
 
   def printDf(df_name: String, df: DataFrame) = {
-    /**
-      * @description dataframe信息输出
-      * @author wx
-      * @param [df_name ]
-      * @param [df ]
-      * @return { @link void }
-      **/
+
     println("_____________________\n" * 2)
     println(df_name)
     println("_____________________\n")
@@ -33,7 +27,6 @@ object Utils {
     println("_____________________\n")
     df.printSchema()
     println("_____________________\n" * 2)
-
   }
 
   def printArray(array_name: String, array_self: Array[Row]) = {
@@ -46,6 +39,30 @@ object Utils {
 
   }
 
+  /**
+    * @description 统一有效时长
+    * @author wx
+    * @param [timeValidity] 订单有效时长
+    * @param [resourceType] 订单资源类型
+    * @return {@link int }
+    * */
+  def udfUniformTimeValidity = udf(uniformTimeValidity _)
+
+  def uniformTimeValidity(timeValidity: Int, resourceType: Int): Int = {
+
+    if (resourceType == 0 || resourceType >= 4) {
+      return timeValidity
+    }
+    if (timeValidity >= 360) {
+      365
+    } else if (timeValidity >= 183) {
+      183
+    } else if (timeValidity >= 80) {
+      92
+    } else {
+      30
+    }
+  }
 
   //orderProcess
   /**
@@ -247,17 +264,18 @@ object Utils {
     }
   }
 
+  /**
+    * @description 订单打折描述填充
+    * @author wx
+    * @param [resourceType ] 订单资源类型
+    * @param [timeValidity ] 订单有效时长
+    * @return { @link java.lang.String }
+    **/
   //根据 time_validity 和 resource_type 填充order中 discount_description 为 null的数值
   def udfFillDiscountDescription = udf(fillDiscountDescription _)
 
   def fillDiscountDescription(resourceType: Double, timeValidity: Int): String = {
-    /**
-      * @description 订单打折描述填充
-      * @author wx
-      * @param [resourceType ] 订单资源类型
-      * @param [timeValidity ] 订单有效时长
-      * @return { @link java.lang.String }
-      **/
+
     var dis = ""
     if (resourceType == 0.0) {
       dis = "单点"
@@ -857,5 +875,18 @@ object Utils {
       .toDF(final_df_schema: _*)
 
     df_result
+  }
+
+  def asUnsigned(unsignedInt: Int) = (BigInt(unsignedInt >>> 1) << 1) + (unsignedInt & 1)
+
+  def udfUidHash = udf(uidHash _)
+
+  def uidHash(subid: String): String = {
+    var hash: Int = 0
+    for (i <- 0 until subid.length()) {
+      hash = 31 * hash + subid.charAt(i).toInt
+      hash = asUnsigned(hash).toInt
+    }
+    return (asUnsigned(hash).toString())
   }
 }

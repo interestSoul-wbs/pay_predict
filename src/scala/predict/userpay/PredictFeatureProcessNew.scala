@@ -1,10 +1,13 @@
 package predict.userpay
 
+import com.github.nscala_time.time.Imports.DateTime
 import mam.Dic
 import mam.GetSaveData._
 import mam.Utils._
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
+import rs.common.SparkSessionInit
+
 import scala.collection.mutable.ArrayBuffer
 
 
@@ -13,20 +16,28 @@ object PredictFeatureProcessNew {
   var tempTable = "temp_table"
   var partitiondate: String = _
   var license: String = _
+  var vodVersion: String = _
+  var sector: Int = _
+  var date: DateTime = _
+  var nDaysFromStartDate: Int = _
+  var dataSplitDate: String = _
 
   def main(args: Array[String]): Unit = {
 
+    SparkSessionInit.init()
+
     partitiondate = args(0)
     license = args(1)
-
-    val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
+    vodVersion = args(2) // union1.x
+    sector = args(3).toInt
+    nDaysFromStartDate = args(4).toInt // 1/14 - 各跑一次
 
     //最初生成的用户画像数据集路径
-    val df_user_profile_play_part = getUserProfilePlayPart(spark, partitiondate, license, "valid")
+    val df_user_profile_play_part = getUserProfilePlayPart(partitiondate, license, vodVersion, sector, nDaysFromStartDate)
 
-    val df_user_profile_preference_part = getuserProfilePreferencePart(spark, partitiondate, license, "valid")
+    val df_user_profile_preference_part = getuserProfilePreferencePart(partitiondate, license, vodVersion, sector, nDaysFromStartDate)
 
-    val df_user_profile_order_part = getUserProfileOrderPart(spark, partitiondate, license, "valid")
+    val df_user_profile_order_part = getUserProfileOrderPart(partitiondate, license, vodVersion, sector, nDaysFromStartDate)
 
     val joinKeysUserId = Seq(Dic.colUserId)
 
@@ -34,7 +45,7 @@ object PredictFeatureProcessNew {
       .join(df_user_profile_preference_part, joinKeysUserId, "left")
       .join(df_user_profile_order_part, joinKeysUserId, "left")
 
-    val df_user_list = getTrainUser(spark, partitiondate, license, "valid", "new")
+    val df_user_list = getTrainUser(partitiondate, license, "new", vodVersion, sector, nDaysFromStartDate)
 
     val trainSet = df_user_list.join(userProfiles, joinKeysUserId, "left")
 
@@ -50,9 +61,9 @@ object PredictFeatureProcessNew {
     val trainSetNotNull = tempTrainSet.na.fill(0, numColList)
 
     //# 观看时长异常数据处理：1天24h
-    val df_video_first_category = getVideoCategory(spark, partitiondate, license, "one_level")
+    val df_video_first_category = getVideoCategory(partitiondate, license, "one_level")
 
-    val df_video_second_category = getVideoCategory(spark, partitiondate, license, "two_level")
+    val df_video_second_category = getVideoCategory(partitiondate, license, "two_level")
 
     val videoFirstCategoryMap = getCategoryMap(df_video_first_category)
 
@@ -85,8 +96,6 @@ object PredictFeatureProcessNew {
       }
     }
 
-    printDf("tempDataFrame_3", tempDataFrame)
-
     for (elem <- pre) {
       if (elem.equals(Dic.colVideoOneLevelPreference)) {
         tempDataFrame = tempDataFrame.na.fill(videoFirstCategoryMap.size, List(elem + "_1", elem + "_2", elem + "_3"))
@@ -94,8 +103,6 @@ object PredictFeatureProcessNew {
         tempDataFrame = tempDataFrame.na.fill(videoSecondCategoryMap.size, List(elem + "_1", elem + "_2", elem + "_3"))
       }
     }
-
-    printDf("tempDataFrame_4", tempDataFrame)
 
     val columnTypeList = tempDataFrame.dtypes.toList
     val columnList = ArrayBuffer[String]()
@@ -107,9 +114,10 @@ object PredictFeatureProcessNew {
     }
 
     val df_result = tempDataFrame.select(columnList.map(tempDataFrame.col(_)): _*)
+        .na.fill(0)
 
     printDf("df_result", df_result)
 
-    saveFeatureProcessResult(spark, df_result, partitiondate, license, "valid", "new")
+    saveFeatureProcessResult(df_result, partitiondate, license, "new", vodVersion, sector, nDaysFromStartDate)
   }
 }

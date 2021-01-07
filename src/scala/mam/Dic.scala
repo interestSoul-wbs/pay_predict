@@ -10,11 +10,25 @@ object Dic {
   /**
     * play数据集中的属性
     */
+  //原始属性
   val colUserId = "user_id"
   val colPlayEndTime = "play_end_time"
   val colBroadcastTime = "broadcast_time"
-  val colPlayEndTimeTmp = "play_end_time_tmp"
-  //还有一个video_id
+  //处理过程中添加
+  val colPlayStartTime = "play_start_time"
+  val colTimeSum = "time_sum"
+  val colStartTimeLeadSameVideo = "start_time_lead_Same_video"
+  val colStartTimeLeadPlay = "start_time_lead_play"
+  val colTimeGapLeadSameVideo = "time_gap_lead_same_video"
+  val colTimeGap30minSign = "timeGap_30min_sign"
+  val colTimeGap30minSignLag = "timeGap_30min_sign_lag"
+  val colTimeGap3hSign = "timeGap_3h_sign"
+  val colTimeGap3hSignLag = "timeGap_3h_sign_lag"
+  val colConvertEndTime = "convert_end_time"
+  val colSessionSign = "session_sign"
+  val colConvertTime = "convert_time"
+  val colCreationGap = "creation_gap"
+  val colPlayDate = "play_date"
 
   /**
     * medias数据集中的属性
@@ -240,7 +254,12 @@ object Dic {
   val colOneLevel = "one_level"
   val colTwoLevel = "two_level"
   val colVideoTag = "video_tag"
+  val colSubId = "sub_id"
   val colSubscriberid = "subscriberid"
+  val colCustomerid: String = "customerid"
+  val colDeviceid: String = "deviceid"
+  val colShuntSubid = "shunt_subid"
+  val colSector = "sector"
   val colFee = "fee"
   val colResourcetype = "resourcetype"
   val colResourceid = "resourceid"
@@ -281,5 +300,7 @@ object Dic {
   val colScaledFeatures: String = "scaled_features"
   val colKeepOriginalFeatures: String = "keep_original_features"
   val colTmp: String = "tmp"
-
+  val colPartitiondate: String = "partitiondate"
+  val colVodVersion: String = "vod_version"
+  val colPlayEndTimeTmp = "play_end_time_tmp"
 }

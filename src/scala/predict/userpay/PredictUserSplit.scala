@@ -14,30 +14,34 @@ object PredictUserSplit {
   var tempTable = "temp_table"
   var partitiondate: String = _
   var license: String = _
+  var vodVersion: String = _
+  var sector: Int = _
   var timeWindow: Int = 30
   var date: DateTime = _
-  var sixteenDaysAgo: String = _
+  var nDaysFromStartDate: Int = _
+  var dataSplitDate: String = _
 
   def main(args: Array[String]): Unit = {
 
     partitiondate = args(0)
     license = args(1)
+    vodVersion = args(2) // union1.x
+    sector = args(3).toInt
+    nDaysFromStartDate = args(4).toInt // train - 0/predict - 14 - 各跑一次
 
     date = DateTime.parse(partitiondate, DateTimeFormat.forPattern("yyyyMMdd"))
-    sixteenDaysAgo = (date - 16.days).toString(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:SS"))
+    dataSplitDate = (date - (30 - nDaysFromStartDate).days).toString(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:SS"))
 
     val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
 
     // 1 - processed play data
-    val df_plays = getProcessedPlay(spark, partitiondate, license)
+    val df_plays = getProcessedPlay(partitiondate, license, vodVersion, sector)
 
     // 2 - 所有用户id的dataframe
     val df_all_users = df_plays.select(col(Dic.colUserId)).distinct()
 
     // 3 - processed order data
-    val df_orders = getProcessedOrder(spark, partitiondate, license)
-
-    printDf("df_orders", df_orders)
+    val df_orders = getProcessedOrder(partitiondate, license, vodVersion, sector)
 
     // 选择套餐订单
     val df_order_package = df_orders
@@ -45,13 +49,13 @@ object PredictUserSplit {
         col(Dic.colResourceType).>(0)
           && col(Dic.colResourceType).<(4))
 
-    val predictTimePre = calDate(sixteenDaysAgo, days = -timeWindow)
+    val predictTimePre = calDate(dataSplitDate, days = -timeWindow)
 
     var predictOrderOld = df_order_package
       .filter(
         col(Dic.colOrderStatus).>(1)
-          && ((col(Dic.colCreationTime).>(predictTimePre) && col(Dic.colCreationTime).<(sixteenDaysAgo))
-          || (col(Dic.colOrderEndTime).>(sixteenDaysAgo) && col(Dic.colCreationTime).<(sixteenDaysAgo))))
+          && ((col(Dic.colCreationTime).>(predictTimePre) && col(Dic.colCreationTime).<(dataSplitDate))
+          || (col(Dic.colOrderEndTime).>(dataSplitDate) && col(Dic.colCreationTime).<(dataSplitDate))))
 
     val joinKeysUserId = Seq(Dic.colUserId)
 
@@ -67,7 +71,7 @@ object PredictUserSplit {
 
     printDf("df_predict_old", df_predict_old)
 
-    saveUserSplitResult(spark, df_predict_old, partitiondate, license, "valid", "old")
+    saveUserSplitResult(df_predict_old, partitiondate, license, "old", vodVersion, sector, nDaysFromStartDate)
 
     val df_predict_new = df_all_users.except(df_predict_old.select(col(Dic.colUserId)))
       .withColumn(Dic.colOrderStatus, lit(-1))
@@ -75,7 +79,7 @@ object PredictUserSplit {
 
     printDf("df_predict_new", df_predict_new)
 
-    saveUserSplitResult(spark, df_predict_new, partitiondate, license, "valid", "new")
+    saveUserSplitResult(df_predict_new, partitiondate, license, "new", vodVersion, sector, nDaysFromStartDate)
 
     println("需要预测的老用户的数量：" + df_predict_old.count())
 

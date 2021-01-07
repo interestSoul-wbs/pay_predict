@@ -1,32 +1,41 @@
-package train.common
+package common
 
+import com.github.nscala_time.time.Imports._
 import mam.Dic
+import mam.GetSaveData.{getProcessedMedias, getProcessedPlay, saveUserProfilePlayData}
 import mam.Utils.{calDate, printDf, udfGetDays}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import mam.GetSaveData._
-import com.github.nscala_time.time.Imports._
 
 object UserProfileGeneratePlayPart {
 
   var tempTable = "temp_table"
   var partitiondate: String = _
   var license: String = _
+  var vodVersion: String = _
+  var sector: Int = _
   var date: DateTime = _
-  var thirtyDaysAgo: String = _
+  var nDaysFromStartDate: Int = _
+  var dataSplitDate: String = _
 
   def main(args: Array[String]): Unit = {
 
     partitiondate = args(0)
     license = args(1)
+    vodVersion = args(2) // union1.x
+    sector = args(3).toInt
+    nDaysFromStartDate = args(4).toInt // 1/7/14 - 各跑一次
 
     date = DateTime.parse(partitiondate, DateTimeFormat.forPattern("yyyyMMdd"))
-    thirtyDaysAgo = (date - 30.days).toString(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:SS"))
+    dataSplitDate = (date - (30 - nDaysFromStartDate).days).toString(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:SS"))
 
-    val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
+    val spark = SparkSession
+      .builder()
+      .enableHiveSupport()
+      .getOrCreate()
 
     // 训练集的划分时间点 - 输入时间的30天之前
-    println("thirtyDaysAgo is : " + thirtyDaysAgo)
+    println("data date is : " + dataSplitDate)
 
     // 1 - processed medias -
     val df_medias = getProcessedMedias(partitiondate, license)
@@ -34,17 +43,17 @@ object UserProfileGeneratePlayPart {
     printDf("df_medias", df_medias)
 
     // 2 - processed play data
-    val df_plays = getProcessedPlay(partitiondate, license)
+    val df_plays = getProcessedPlay(partitiondate, license, vodVersion, sector)
 
     printDf("df_plays", df_plays)
 
     // 3 - data process
-    val df_result = userProfileGeneratePlayPart(thirtyDaysAgo, 30, df_medias, df_plays)
+    val df_result = userProfileGeneratePlayPart(dataSplitDate, 30, df_medias, df_plays)
 
     printDf("df_result", df_result)
 
     // 4 - save data
-    saveUserProfilePlayData(df_result, partitiondate, license, "train")
+    saveUserProfilePlayData(df_result, partitiondate, license, vodVersion, sector, nDaysFromStartDate)
   }
 
   def userProfileGeneratePlayPart(now: String, timeWindow: Int, df_medias: DataFrame, df_plays: DataFrame) = {

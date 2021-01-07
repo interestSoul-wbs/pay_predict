@@ -32,12 +32,12 @@ object UserSplit {
     println("thirtyDaysAgo is : " + thirtyDaysAgo)
 
     // 2 - processed df_plays
-    val df_plays = getProcessedPlay(spark, partitiondate, license)
+    val df_plays = getProcessedPlay(partitiondate, license)
 
     //所有用户id的dataframe
     val df_all_users = df_plays.select(col(Dic.colUserId)).distinct()
 
-    val df_orders = getProcessedOrder(spark, partitiondate, license)
+    val df_orders = getProcessedOrder(partitiondate, license)
 
     // 选择套餐订单
     val df_order_package = df_orders
@@ -96,7 +96,7 @@ object UserSplit {
 
     println("老用户数据集生成完成！")
 
-    saveUserSplitResult(spark, df_train_old_result, partitiondate, license, "train", "old")
+    saveUserSplitResult(df_train_old_result, partitiondate, license, "train", "old")
 
     //构造新用户的训练样本，首先找出新用户
     //order中在train_time时间段支付套餐订单且不是老用户的用户为新用户的正样本，其余非老用户为负样本
@@ -146,7 +146,7 @@ object UserSplit {
 
     println("新用户数据集生成完成！")
 
-    saveUserSplitResult(spark, trainNewResult, partitiondate, license, "train", "new")
+    saveUserSplitResult(trainNewResult, partitiondate, license, "train", "new")
   }
 
 

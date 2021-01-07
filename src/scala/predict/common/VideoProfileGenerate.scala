@@ -14,6 +14,8 @@ object VideoProfileGenerate {
   var tempTable = "temp_table"
   var partitiondate: String = _
   var license: String = _
+  var vodVersion: String = _
+  var sector: Int = _
   var date: DateTime = _
   var sixteenDaysAgo: String = _
 
@@ -21,6 +23,8 @@ object VideoProfileGenerate {
 
     partitiondate = args(0)
     license = args(1)
+    vodVersion = args(2) // 2020-12-1 - union1.x
+    sector = args(3).toInt
 
     date = DateTime.parse(partitiondate, DateTimeFormat.forPattern("yyyyMMdd"))
     // 测试集的划分时间点 - 例：2020-09-15 00:00:00， 截止日期是 2020-10-01
@@ -29,7 +33,7 @@ object VideoProfileGenerate {
     val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
 
     // 1 - processed df_medias
-    val df_medias = getProcessedMedias(spark, partitiondate, license)
+    val df_medias = getProcessedMedias(partitiondate, license)
 
     printDf("df_medias", df_medias)
 
@@ -51,12 +55,12 @@ object VideoProfileGenerate {
     printDf("df_medias_purged", df_medias_purged)
 
     // 2 - processed play data
-    val df_plays = getProcessedPlay(spark, partitiondate, license)
+    val df_plays = getProcessedPlay(partitiondate, license, vodVersion, sector)
 
     printDf("df_plays", df_plays)
 
     // 3 - processed order data
-    val df_orders = getProcessedOrder(spark, partitiondate, license)
+    val df_orders = getProcessedOrder(partitiondate, license, vodVersion, sector)
 
     printDf("df_orders", df_orders)
 
@@ -66,7 +70,7 @@ object VideoProfileGenerate {
     printDf("df_result", df_result)
 
     // 5 - save data
-    saveVideoProfileGenerate(spark, df_result, partitiondate, license, "valid")
+    saveVideoProfileGenerate(df_result, partitiondate, license, "predict", vodVersion, sector)
   }
 
   def videoProfileGenerate(now: String, timeWindow: Int, df_medias: DataFrame, df_plays: DataFrame, df_orders: DataFrame) = {
@@ -228,102 +232,4 @@ object VideoProfileGenerate {
     df_result
   }
 
-  /**
-    * Save data.
-    *
-    * @param spark
-    * @param df_result
-    */
-  def saveVideoProfileGenerate(spark: SparkSession, df_result: DataFrame, partitiondate: String, license: String, category: String) = {
-
-    spark.sql(
-      """
-        |CREATE TABLE IF NOT EXISTS
-        |     vodrs.paypredict_user_video_profile(
-        |            video_id string,
-        |            video_title string,
-        |            video_one_level_classification string,
-        |            video_two_level_classification_list array<string>,
-        |            video_tag_list array<string>,
-        |            director_list array<string>,
-        |            actor_list array<string>,
-        |            country string,
-        |            language string,
-        |            release_date string,
-        |            storage_time string,
-        |            video_time double,
-        |            score double,
-        |            is_paid double,
-        |            package_id string,
-        |            is_single double,
-        |            is_trailers double,
-        |            supplier string,
-        |            introduction string,
-        |            number_of_plays_in_30_days long,
-        |            number_of_views_within_30_days long,
-        |            number_of_plays_in_14_days long,
-        |            number_of_views_within_14_days long,
-        |            number_of_plays_in_7_days long,
-        |            number_of_views_within_7_days long,
-        |            number_of_plays_in_3_days long,
-        |            number_of_views_within_3_days long,
-        |            abs_of_number_of_days_between_storage_and_current integer,
-        |            number_of_times_purchased_within_30_days long,
-        |            number_of_times_purchased_within_14_days long,
-        |            number_of_times_purchased_within_7_days long,
-        |            number_of_times_purchased_within_3_days long,
-        |            number_of_times_purchased_total long)
-        |PARTITIONED BY
-        |    (partitiondate string, license string, category string)
-      """.stripMargin)
-
-    println("save data to hive........... \n" * 4)
-    df_result.createOrReplaceTempView(tempTable)
-
-    val insert_sql =
-      s"""
-         |INSERT OVERWRITE TABLE
-         |    vodrs.paypredict_user_video_profile
-         |PARTITION
-         |    (partitiondate='$partitiondate', license='$license', category='$category')
-         |SELECT
-         |    video_id,
-         |    video_title,
-         |    video_one_level_classification,
-         |    video_two_level_classification_list,
-         |    video_tag_list,
-         |    director_list,
-         |    actor_list,
-         |    country,
-         |    language,
-         |    release_date,
-         |    storage_time,
-         |    video_time,
-         |    score,
-         |    is_paid,
-         |    package_id,
-         |    is_single,
-         |    is_trailers,
-         |    supplier,
-         |    introduction,
-         |    number_of_plays_in_30_days,
-         |    number_of_views_within_30_days,
-         |    number_of_plays_in_14_days,
-         |    number_of_views_within_14_days,
-         |    number_of_plays_in_7_days,
-         |    number_of_views_within_7_days,
-         |    number_of_plays_in_3_days,
-         |    number_of_views_within_3_days,
-         |    abs_of_number_of_days_between_storage_and_current,
-         |    number_of_times_purchased_within_30_days,
-         |    number_of_times_purchased_within_14_days,
-         |    number_of_times_purchased_within_7_days,
-         |    number_of_times_purchased_within_3_days,
-         |    number_of_times_purchased_total
-         |FROM
-         |    $tempTable
-      """.stripMargin
-    spark.sql(insert_sql)
-    println("over over........... \n" * 4)
-  }
 }

@@ -1,11 +1,12 @@
-package predict.common
+package predict.common.ori2
 
+import com.github.nscala_time.time.Imports._
 import mam.Dic
-import mam.GetSaveData._
+import mam.GetSaveData.{getProcessedOrder, getProcessedPlay}
 import mam.Utils.{calDate, printDf, udfGetDays}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import com.github.nscala_time.time.Imports._
+import rs.common.SparkSessionInit.spark
 
 object UserProfileGenerateOrderPart {
 
@@ -27,12 +28,12 @@ object UserProfileGenerateOrderPart {
     val spark = SparkSession.builder().enableHiveSupport().getOrCreate()
 
     // 1 - get play data.
-    val df_plays = getProcessedPlay(spark, partitiondate, license)
+    val df_plays = getProcessedPlay(partitiondate, license)
 
     printDf("df_plays", df_plays)
 
     // 2 - get order data.
-    val df_orders = getProcessedOrder(spark, partitiondate, license)
+    val df_orders = getProcessedOrder(partitiondate, license)
 
     printDf("df_orders", df_orders)
 
@@ -43,7 +44,7 @@ object UserProfileGenerateOrderPart {
 
     // 4 - save
     // 可能修改 - 2020-11-11
-    saveUserProfileOrderPart(spark, df_result, partitiondate, license, "valid")
+    saveUserProfileOrderPart(df_result, partitiondate, license, "valid")
   }
 
   def userProfileGenerateOrderPart(now: String, timeWindow: Int, df_plays: DataFrame, df_orders: DataFrame) = {
@@ -188,7 +189,7 @@ object UserProfileGenerateOrderPart {
     * @param spark
     * @param df_result
     */
-  def saveUserProfileOrderPart(spark: SparkSession, df_result: DataFrame, partitiondate: String, license: String, category: String) = {
+  def saveUserProfileOrderPart(df_result: DataFrame, partitiondate: String, license: String, category: String) = {
 
     spark.sql(
       """

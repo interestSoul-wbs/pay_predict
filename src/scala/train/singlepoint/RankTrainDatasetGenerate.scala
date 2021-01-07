@@ -2,11 +2,12 @@ package train.singlepoint
 
 import mam.Dic
 import mam.Utils._
-import org.apache.spark.sql._
-import org.apache.spark.sql.functions._
+import rs.common.SparkSessionInit
 import mam.GetSaveData._
 import com.github.nscala_time.time.Imports._
 import scala.collection.mutable.ArrayBuffer
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
 
 object RankTrainDatasetGenerate {
 
@@ -20,6 +21,8 @@ object RankTrainDatasetGenerate {
   var vectorDimension: Int = 64
 
   def main(args: Array[String]): Unit = {
+
+    SparkSessionInit.init()
 
     partitiondate = args(0)
     license = args(1)
@@ -36,21 +39,17 @@ object RankTrainDatasetGenerate {
 
     println("predictWindowEnd is : " + sixteenDaysAgo)
 
-    val spark = SparkSession.builder().enableHiveSupport()
-      .config("spark.sql.crossJoin.enabled", "true") //spark2.x默认不能进行笛卡尔积的操作需要进行设置
-      .getOrCreate()
+    val df_orders = getProcessedOrder(partitiondate, license)
 
-    val df_orders = getProcessedOrder(spark, partitiondate, license)
+    val df_user_profile_play_part = getUserProfilePlayPart(partitiondate, license, "train")
 
-    val df_user_profile_play_part = getUserProfilePlayPart(spark, partitiondate, license, "train")
+    val df_user_profile_preference_part = getuserProfilePreferencePart(partitiondate, license, "train")
 
-    val df_user_profile_preference_part = getuserProfilePreferencePart(spark, partitiondate, license, "train")
+    val df_user_profile_order_part = getUserProfileOrderPart(partitiondate, license, "train")
 
-    val df_user_profile_order_part = getUserProfileOrderPart(spark, partitiondate, license, "train")
+    val df_video_profile = getVideoProfile(partitiondate, license, "train")
 
-    val df_video_profile = getVideoProfile(spark, partitiondate, license, "train")
-
-    val df_video_vector = getVideoVector(spark, partitiondate, license)
+    val df_video_vector = getVideoVector(partitiondate, license)
 
     val joinKeysUserId = Seq(Dic.colUserId)
 
@@ -158,7 +157,7 @@ object RankTrainDatasetGenerate {
 
 //    printDf("df_result", df_result)
 
-    saveSinglepointRankData(spark, df_result, partitiondate, license, "train")
+    saveSinglepointRankData(df_result, partitiondate, license, "train")
   }
 
   def getW2vColsArray(w2v_demension: Int) = {
