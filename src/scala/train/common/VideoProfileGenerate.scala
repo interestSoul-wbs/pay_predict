@@ -1,49 +1,65 @@
 package train.common
 
-import java.text.SimpleDateFormat
 
-import mam.Utils.{calDate, printDf, udfGetDays}
-import mam.Dic
-import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql
-import org.apache.spark.sql.functions.udf
-import org.apache.spark.sql.{SaveMode, SparkSession}
+
+import mam.Utils.{calDate, printDf, sysParamSetting, udfGetDays}
+import mam.{Dic, SparkSessionInit}
+import mam.GetSaveData._
+import mam.SparkSessionInit.spark
+import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
+import org.apache.spark.sql.functions._
 
 import scala.collection.mutable.ListBuffer
 
 
 object VideoProfileGenerate {
-
-  def videoProfileGenerate(now:String,timeWindow:Int,medias_path:String,plays_path:String,orders_path:String,hdfsPath:String): Unit ={
-    System.setProperty("hadoop.home.dir", "c:\\winutils")
-    Logger.getLogger("org").setLevel(Level.ERROR)
-    val spark: SparkSession = new sql.SparkSession.Builder()
-      .appName("VideoProfileGenerate")
-      //.master("local[6]")
-      .getOrCreate()
-    //设置shuffle过程中分区数
-    // spark.sqlContext.setConf("spark.sql.shuffle.partitions", "1000")
-    import org.apache.spark.sql.functions._
-
-    val medias = spark.read.format("parquet").load(medias_path)
-    val plays = spark.read.format("parquet").load(plays_path)
-    val orders = spark.read.format("parquet").load(orders_path)
+  def main(args:Array[String]): Unit = {
 
 
-    printDf("输入  medias",medias)
-    printDf("输入  plays",plays)
-    printDf("输入  orders",orders)
+    // 1 SparkSession init
+    sysParamSetting()
+    SparkSessionInit.init()
+
+
+    // 2 Get Data
+    val now = args(0) + " " + args(1)
+    val df_medias=getProcessedMedias(spark)
+    printDf("输入 df_media",df_medias)
+    val df_orders=getProcessedOrder(spark)
+    printDf("输入 df_order",df_orders)
+    val df_plays=getProcessedPlay(spark)
+    printDf("输入 df_play",df_plays)
+
+    //3 Process Data
+    val df_video_profile=videoProfileGenerate(now, df_medias, df_plays, df_orders)
+
+
+    //4 Save Data
+    saveVideoProfile(now,df_video_profile,"train")
+    printDf("输出 df_video_profile",df_video_profile)
+    println("VideoProfileGenerate  over~~~~~~~~~~~")
+
+
+
+
+
+
+
+  }
+
+  def videoProfileGenerate(now:String,df_medias:DataFrame,df_plays:DataFrame,df_orders:DataFrame)={
+
 
 
     val pre_30 = calDate(now, -30)
-    val pre_14 = calDate(now, days = -14)
+    val pre_14 = calDate(now,  -14)
     val pre_7 = calDate(now, -7)
     val pre_3 = calDate(now, -3)
     val pre_1 = calDate(now, -1)
     val joinKeysVideoId = Seq(Dic.colVideoId)
 
 
-    val part_11=plays
+    val part_11=df_plays
       .filter(
         col(Dic.colPlayEndTime).<(now)
           && col(Dic.colPlayEndTime).>=(pre_30)
@@ -53,7 +69,7 @@ object VideoProfileGenerate {
         count(col(Dic.colVideoId)).as(Dic.colNumberOfPlaysIn30Days),
         countDistinct(col(Dic.colUserId)).as(Dic.colNumberOfViewsWithin30Days)
       )
-    val part_12=plays
+    val part_12=df_plays
       .filter(
         col(Dic.colPlayEndTime).<(now)
           && col(Dic.colPlayEndTime).>=(pre_14)
@@ -63,7 +79,7 @@ object VideoProfileGenerate {
         count(col(Dic.colVideoId)).as(Dic.colNumberOfPlaysIn14Days),
         countDistinct(col(Dic.colUserId)).as(Dic.colNumberOfViewsWithin14Days)
       )
-    val part_13=plays
+    val part_13=df_plays
       .filter(
         col(Dic.colPlayEndTime).<(now)
           && col(Dic.colPlayEndTime).>=(pre_7)
@@ -73,7 +89,7 @@ object VideoProfileGenerate {
         count(col(Dic.colVideoId)).as(Dic.colNumberOfPlaysIn7Days),
         countDistinct(col(Dic.colUserId)).as(Dic.colNumberOfViewsWithin7Days)
       )
-    val part_14=plays
+    val part_14=df_plays
       .filter(
         col(Dic.colPlayEndTime).<(now)
           && col(Dic.colPlayEndTime).>=(pre_3)
@@ -84,13 +100,13 @@ object VideoProfileGenerate {
         countDistinct(col(Dic.colUserId)).as(Dic.colNumberOfViewsWithin3Days)
       )
 
-    val part_15=medias
+    val part_15=df_medias
       .withColumn(Dic.colAbsOfNumberOfDaysBetweenStorageAndCurrent,udfGetDays(col(Dic.colStorageTime),lit(now)))
       .select(col(Dic.colVideoId),col(Dic.colAbsOfNumberOfDaysBetweenStorageAndCurrent))
 
 
 
-    var result=medias.join(part_11,joinKeysVideoId,"left")
+    val df_medias_play=df_medias.join(part_11,joinKeysVideoId,"left")
       .join(part_12,joinKeysVideoId,"left")
       .join(part_13,joinKeysVideoId,"left")
       .join(part_14,joinKeysVideoId,"left")
@@ -98,7 +114,7 @@ object VideoProfileGenerate {
 
 
 
-    val part_21=orders.filter(
+    val part_21=df_orders.filter(
       col(Dic.colCreationTime).<(now)
       && col(Dic.colCreationTime).>=(pre_30)
       && col(Dic.colOrderStatus).>(1)
@@ -106,8 +122,8 @@ object VideoProfileGenerate {
       .groupBy(col(Dic.colResourceId))
       .agg(
           count(col(Dic.colResourceId)).as(Dic.colNumberOfTimesPurchasedWithin30Days)
-      )
-    val part_22=orders.filter(
+      ).withColumnRenamed(Dic.colResourceId,Dic.colVideoId)
+    val part_22=df_orders.filter(
       col(Dic.colCreationTime).<(now)
         && col(Dic.colCreationTime).>=(pre_14)
         && col(Dic.colOrderStatus).>(1)
@@ -115,8 +131,8 @@ object VideoProfileGenerate {
       .groupBy(col(Dic.colResourceId))
       .agg(
         count(col(Dic.colResourceId)).as(Dic.colNumberOfTimesPurchasedWithin14Days)
-      )
-    val part_23=orders.filter(
+      ).withColumnRenamed(Dic.colResourceId,Dic.colVideoId)
+    val part_23=df_orders.filter(
       col(Dic.colCreationTime).<(now)
         && col(Dic.colCreationTime).>=(pre_7)
         && col(Dic.colOrderStatus).>(1)
@@ -124,8 +140,8 @@ object VideoProfileGenerate {
       .groupBy(col(Dic.colResourceId))
       .agg(
         count(col(Dic.colResourceId)).as(Dic.colNumberOfTimesPurchasedWithin7Days)
-      )
-    val part_24=orders.filter(
+      ).withColumnRenamed(Dic.colResourceId,Dic.colVideoId)
+    val part_24=df_orders.filter(
       col(Dic.colCreationTime).<(now)
         && col(Dic.colCreationTime).>=(pre_3)
         && col(Dic.colOrderStatus).>(1)
@@ -133,63 +149,44 @@ object VideoProfileGenerate {
       .groupBy(col(Dic.colResourceId))
       .agg(
         count(col(Dic.colResourceId)).as(Dic.colNumberOfTimesPurchasedWithin3Days)
-      )
-    val part_25=orders.filter(
+      ).withColumnRenamed(Dic.colResourceId,Dic.colVideoId)
+    val part_25=df_orders.filter(
       col(Dic.colCreationTime).<(now)
         && col(Dic.colOrderStatus).>(1)
     )
       .groupBy(col(Dic.colResourceId))
       .agg(
         count(col(Dic.colResourceId)).as(Dic.colNumberOfTimesPurchasedTotal)
-      )
-    result=result.join(part_21,result.col(Dic.colVideoId)===part_21.col(Dic.colResourceId),"left")
-      .select(result.col("*"),part_21.col(Dic.colNumberOfTimesPurchasedWithin30Days))
-    result=result.join(part_22,result.col(Dic.colVideoId)===part_22.col(Dic.colResourceId),"left")
-      .select(result.col("*"),part_22.col(Dic.colNumberOfTimesPurchasedWithin14Days))
-    result=result.join(part_23,result.col(Dic.colVideoId)===part_23.col(Dic.colResourceId),"left")
-      .select(result.col("*"),part_23.col(Dic.colNumberOfTimesPurchasedWithin7Days))
-    result=result.join(part_24,result.col(Dic.colVideoId)===part_24.col(Dic.colResourceId),"left")
-      .select(result.col("*"),part_24.col(Dic.colNumberOfTimesPurchasedWithin3Days))
-    result=result.join(part_25,result.col(Dic.colVideoId)===part_25.col(Dic.colResourceId),"left")
-      .select(result.col("*"),part_25.col(Dic.colNumberOfTimesPurchasedTotal))
+      ).withColumnRenamed(Dic.colResourceId,Dic.colVideoId)
 
-    //result10.show()
+    val df_video_profile=df_medias_play.join(part_21,joinKeysVideoId,"left")
+      .join(part_22,joinKeysVideoId,"left")
+      .join(part_23,joinKeysVideoId,"left")
+      .join(part_24,joinKeysVideoId,"left")
+      .join(part_25,joinKeysVideoId,"left")
+
+
     //选出数据类型为数值类型的列
     val numColumns=new ListBuffer[String]
-    for(elem<-result.dtypes){
+    for(elem<-df_video_profile.dtypes){
       if(elem._2.equals("DoubleType")||elem._2.equals("LongType")||elem._2.equals("IntegerType")){
           numColumns.insert(numColumns.length,elem._1)
       }
     }
 
-    //将其他类型的列转化为字符串，容易保存为csv文件
-    val anoColumns=result.columns.diff(numColumns)
-    result= anoColumns.foldLeft(result){
+
+    val anoColumns=df_video_profile.columns.diff(numColumns)
+    val df_profile= anoColumns.foldLeft(df_video_profile){
       (currentDF, column) => currentDF.withColumn(column, col(column).cast("string"))
     }
-    result.na.fill(0,numColumns)
-    //result.na.fill(0,numColumns)
+    df_profile.na.fill(0,numColumns)
 
+    df_profile
 
-    printDf("输出  videoProfile",result)
-    val videoProfilePath=hdfsPath+"data/train/common/processed/videoprofile"+now.split(" ")(0)
-   // val videoProfileSavePath="pay_predict/data/train/common/processed/videoprofile.csv"
-    result.write.mode(SaveMode.Overwrite).format("parquet").save(videoProfilePath)
-    //result11.write.mode(SaveMode.Overwrite).format("parquet").save(userProfileOrderPartSavePath)
 
 
   }
 
-  def main(args:Array[String]): Unit = {
-    val hdfsPath="hdfs:///pay_predict/"
-    //val hdfsPath=""
-    val mediasProcessedPath=hdfsPath+"data/train/common/processed/mediastemp"
-    val playsProcessedPath=hdfsPath+"data/train/common/processed/plays"
-    val ordersProcessedPath=hdfsPath+"data/train/common/processed/orders"
-    val now=args(0)+" "+args(1)
-    videoProfileGenerate(now,30,mediasProcessedPath,playsProcessedPath,ordersProcessedPath,hdfsPath)
 
-
-  }
 
 }

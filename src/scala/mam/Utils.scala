@@ -3,16 +3,96 @@ package mam
 import java.text.SimpleDateFormat
 import java.util.Calendar
 
+import org.apache.log4j.{Level, Logger}
 import org.apache.directory.shared.kerberos.codec.krbCredInfo.actions.StoreStartTime
 import org.apache.spark
 import org.apache.spark.sql
-import org.apache.spark.sql.{DataFrame, Dataset, Row}
-import org.apache.spark.sql.functions.{length, udf}
+import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
+import org.apache.spark.sql.functions.{col, explode, length, mean, struct, udf}
 import org.apache.spark.ml.linalg.Vector
+
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
 
 object Utils {
+  def sysParamSetting() = {
+
+    System.setProperty("hadoop.home.dir", "c:\\winutils")
+    Logger.getLogger("org").setLevel(Level.ERROR)
+  }
+  def udfGetLastVideo=udf(getLastVideo _)
+  def getLastVideo(orderList:mutable.WrappedArray[String])={
+    orderList.last
+  }
+
+  def getData(spark: SparkSession, path: String) = {
+
+    spark.read.format("parquet").load(path)
+  }
+  def udfCalVectorSimilarity=udf(calVectorSimilarity _)
+  def calVectorSimilarity(row:Row)={
+    val vector_1=row.getAs[Vector](Dic.colVector)
+    val vector_2=row.getAs[Vector]("vector_1")
+    if (vector_1==null || vector_2==null)
+      0.0
+    else{
+      val array_1=vectorToArray(vector_1)
+      val array_2=vectorToArray(vector_2)
+      val member=array_1.zip(array_2).map(d=>d._1*d._2).reduce(_+_).toDouble
+      val temp1=math.sqrt(array_1.map(num=>math.pow(num,2)).reduce(_+_))
+      val temp2=math.sqrt(array_2.map(num=>math.pow(num,2)).reduce(_+_))
+      member/(temp1*temp2)
+    }
+  }
+  def getOrderHistorySimilarity(trainDataset:DataFrame,orderHistory:DataFrame,videoVector:DataFrame)={
+    val joinKeysUserId=Seq(Dic.colUserId)
+    val joinKeysVideoId=Seq(Dic.colVideoId)
+    val trainDatasetWithHistory=trainDataset.join(orderHistory,joinKeysUserId,"left")
+    val trainHistoryExplode=trainDatasetWithHistory.withColumn("videoInOrder",explode(col(Dic.colOrderList)))
+      .select(col(Dic.colUserId),col(Dic.colVideoId),col("videoInOrder"))
+      .dropDuplicates()
+      .join(videoVector,joinKeysVideoId,"left")
+      .select(col(Dic.colUserId),col(Dic.colVideoId),col("videoInOrder"),col(Dic.colVector))
+    //    trainHistoryExplode.show()
+    val videoVectorRename=videoVector
+      .withColumnRenamed(Dic.colVideoId,"videoInOrder")
+      .withColumnRenamed(Dic.colVector,"vector_1")
+    val joinKeysVideoInOrder=Seq("videoInOrder")
+    val trainSiM=trainHistoryExplode
+      .join(videoVectorRename,joinKeysVideoInOrder,"left")
+      .select(col(Dic.colUserId),col(Dic.colVideoId),col("videoInOrder"),col(Dic.colVector),col("vector_1"))
+    val trainOrderSim=trainSiM.withColumn("orderSim",udfCalVectorSimilarity(struct(col(Dic.colVector),col("vector_1"))))
+      .groupBy(col(Dic.colUserId),col(Dic.colVideoId)).agg(mean(col("orderSim")).as("orderSim"))
+      .select(col(Dic.colUserId),col(Dic.colVideoId),col("orderSim"))
+    trainOrderSim
+
+
+  }
+  def getPlayHistorySimilarity(trainDataset:DataFrame,playHistory:DataFrame,videoVector:DataFrame)={
+    val joinKeysUserId=Seq(Dic.colUserId)
+    val joinKeysVideoId=Seq(Dic.colVideoId)
+    val trainDatasetWithHistory=trainDataset.join(playHistory,joinKeysUserId,"left")
+    val trainHistoryExplode=trainDatasetWithHistory.withColumn("videoInPlay",explode(col(Dic.colPlayList)))
+      .select(col(Dic.colUserId),col(Dic.colVideoId),col("videoInPlay"))
+      .dropDuplicates()
+      .join(videoVector,joinKeysVideoId,"left")
+      .select(col(Dic.colUserId),col(Dic.colVideoId),col("videoInPlay"),col(Dic.colVector))
+    //    trainHistoryExplode.show()
+    val videoVectorRename=videoVector
+      .withColumnRenamed(Dic.colVideoId,"videoInPlay")
+      .withColumnRenamed(Dic.colVector,"vector_1")
+    val joinKeysVideoInOrder=Seq("videoInPlay")
+    val trainSiM=trainHistoryExplode
+      .join(videoVectorRename,joinKeysVideoInOrder,"left")
+      .select(col(Dic.colUserId),col(Dic.colVideoId),col("videoInPlay"),col(Dic.colVector),col("vector_1"))
+    val trainPlaySim=trainSiM.withColumn("playSim",udfCalVectorSimilarity(struct(col(Dic.colVector),col("vector_1"))))
+      .groupBy(col(Dic.colUserId),col(Dic.colVideoId)).agg(mean(col("playSim")).as("playSim"))
+      .select(col(Dic.colUserId),col(Dic.colVideoId),col("playSim"))
+    trainPlaySim
+
+  }
+
+
 
 
   def printDf(df_name:String, df:DataFrame) = {
@@ -41,6 +121,30 @@ object Utils {
     array_self.take(10).foreach(println)
     println("_____________________\n"*2)
 
+  }
+  /**
+   * @description 统一有效时长
+   * @author wx
+   * @param [timeValidity] 订单有效时长
+   * @param [resourceType] 订单资源类型
+   * @return {@link int }
+   * */
+  def udfUniformTimeValidity = udf(uniformTimeValidity _)
+
+  def uniformTimeValidity(timeValidity: Int, resourceType: Int): Int = {
+
+    if (resourceType == 0 || resourceType >= 4) {
+      return timeValidity
+    }
+    if (timeValidity >= 360) {
+      365
+    } else if (timeValidity >= 183) {
+      183
+    } else if (timeValidity >= 80) {
+      92
+    } else {
+      30
+    }
   }
 
 

@@ -1,10 +1,11 @@
 package mam
 
-import mam.Utils.udfVectorToArray
+import mam.Utils.{getData, udfVectorToArray}
 import org.apache.spark.ml.feature.{MinMaxScaler, VectorAssembler}
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.types.{FloatType, StringType, StructField, StructType}
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -15,32 +16,33 @@ import scala.collection.mutable.ArrayBuffer
  * @describe
  */
 object GetSaveData {
+  val hdfsPath="hdfs:///pay_predict/"
+//  val hdfsPath=""
 
-  def getRawPlays(spark:SparkSession,playRawPath:String)={
+  def getRawPlays(spark: SparkSession) = {
+
+    val playRawPath = hdfsPath + "data/train/common/raw/plays/*"
+
     val schema = StructType(
       List(
         StructField(Dic.colUserId, StringType),
         StructField(Dic.colPlayEndTime, StringType),
         StructField(Dic.colVideoId, StringType),
-        StructField(Dic.colBroadcastTime, FloatType)
-      )
-    )
+        StructField(Dic.colBroadcastTime, FloatType)))
+
     val df = spark.read
       .option("delimiter", "\t")
       .option("header", false)
       .schema(schema)
       .csv(playRawPath)
-    df
 
+    df
   }
 
-  /**
-   * 读取原始媒资数据
-   * @param spark
-   * @return
-   */
-  def getRawMedias(spark: SparkSession,mediasRawPath:String) = {
+  def getRawMediaData(spark: SparkSession) = {
 
+    //
+    val mediasRawPath = hdfsPath + "data/train/common/raw/medias/*"
 
     val schema = StructType(
       List(
@@ -67,23 +69,44 @@ object GetSaveData {
         StructField(Dic.colIntroduction, StringType)
       )
     )
-    val dfRawMedias = spark.read
+
+    // Konverse - 注意 df 的命名 - df_相关属性 - 不要 dfRawMedia
+    val df_raw_media = spark.read
       .option("delimiter", "\t")
       .option("header", false)
       .schema(schema)
       .csv(mediasRawPath)
+      .select(
+        when(col(Dic.colVideoId) === "NULL", null).otherwise(col(Dic.colVideoId)).as(Dic.colVideoId),
+        when(col(Dic.colVideoTitle) === "NULL", null).otherwise(col(Dic.colVideoTitle)).as(Dic.colVideoTitle),
+        when(col(Dic.colVideoOneLevelClassification) === "NULL" or (col(Dic.colVideoOneLevelClassification) === ""), null)
+          .otherwise(col(Dic.colVideoOneLevelClassification)).as(Dic.colVideoOneLevelClassification),
+        from_json(col(Dic.colVideoTwoLevelClassificationList), ArrayType(StringType, containsNull = true)).as(Dic.colVideoTwoLevelClassificationList),
+        from_json(col(Dic.colVideoTagList), ArrayType(StringType, containsNull = true)).as(Dic.colVideoTagList),
+        from_json(col(Dic.colDirectorList), ArrayType(StringType, containsNull = true)).as(Dic.colDirectorList),
+        from_json(col(Dic.colActorList), ArrayType(StringType, containsNull = true)).as(Dic.colActorList),
+//        when(col(Dic.colVideoOneLevelClassification).isNotNull, col(Dic.colVideoOneLevelClassification)), // Konverse - 这一步 相当于缺失值填充，被移动到了 process
+        when(col(Dic.colCountry) === "NULL", null).otherwise(col(Dic.colCountry)).as(Dic.colCountry),
+        when(col(Dic.colLanguage) === "NULL", null).otherwise(col(Dic.colLanguage)).as(Dic.colLanguage),
+        when(col(Dic.colReleaseDate) === "NULL", null).otherwise(col(Dic.colReleaseDate)).as(Dic.colReleaseDate),
+        when(col(Dic.colStorageTime) === "NULL", null).otherwise(col(Dic.colStorageTime)).as(Dic.colStorageTime), // Konverse - 这一步的udf被移动到了 process
+        when(col(Dic.colVideoTime) === "NULL", null).otherwise(col(Dic.colVideoTime) cast DoubleType).as(Dic.colVideoTime),
+        when(col(Dic.colScore) === "NULL", null).otherwise(col(Dic.colScore) cast DoubleType).as(Dic.colScore),
+        when(col(Dic.colIsPaid) === "NULL", null).otherwise(col(Dic.colIsPaid) cast DoubleType).as(Dic.colIsPaid),
+        when(col(Dic.colPackageId) === "NULL", null).otherwise(col(Dic.colPackageId)).as(Dic.colPackageId),
+        when(col(Dic.colIsSingle) === "NULL", null).otherwise(col(Dic.colIsSingle) cast DoubleType).as(Dic.colIsSingle),
+        when(col(Dic.colIsTrailers) === "NULL", null).otherwise(col(Dic.colIsTrailers) cast DoubleType).as(Dic.colIsTrailers),
+        when(col(Dic.colSupplier) === "NULL", null).otherwise(col(Dic.colSupplier)).as(Dic.colSupplier),
+        when(col(Dic.colIntroduction) === "NULL", null).otherwise(col(Dic.colIntroduction)).as(Dic.colIntroduction))
 
-    dfRawMedias
+    df_raw_media
   }
 
-  /**
-   * 读取原始订单数据
-   * @param orderRawPath
-   * @param spark
-   * @return
-   */
-  def getRawOrders(spark:SparkSession,orderRawPath:String)={
-    val schema= StructType(
+  def getRawOrders(spark: SparkSession) = {
+
+    val orderRawPath = hdfsPath + "data/train/common/raw/orders/*"
+
+    val schema = StructType(
       List(
         StructField(Dic.colUserId, StringType),
         StructField(Dic.colMoney, StringType),
@@ -94,18 +117,168 @@ object GetSaveData {
         StructField(Dic.colDiscountDescription, StringType),
         StructField(Dic.colOrderStatus, StringType),
         StructField(Dic.colOrderStartTime, StringType),
-        StructField(Dic.colOrderEndTime, StringType)
+        StructField(Dic.colOrderEndTime, StringType)))
 
-      )
-    )
     val df = spark.read
       .option("delimiter", "\t")
       .option("header", false)
       .schema(schema)
       .csv(orderRawPath)
+
     df
+  }
+
+
+
+  def saveProcessedData(df: DataFrame, path: String) = {
+
+    df.write.mode(SaveMode.Overwrite).format("parquet").save(path)
 
   }
+
+  def saveLabel(df_label: DataFrame, fileName: String) = {
+    val path = hdfsPath + "data/train/common/processed/"
+    df_label.coalesce(1).write.mode(SaveMode.Overwrite).option("header", "false").csv(path + fileName)
+  }
+
+  def saveProcessedMedia(df_processed_media: DataFrame) = {
+    val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
+    saveProcessedData(df_processed_media, mediasProcessedPath)
+  }
+  def saveProcessedPlay(df_play_processed: DataFrame) = {
+
+    val playProcessedPath = hdfsPath + "data/train/common/processed/plays"
+    //    df_play_processed.write.mode(SaveMode.Overwrite).format("parquet").save(playProcessedPath)
+    saveProcessedData(df_play_processed, playProcessedPath)
+  }
+
+  def saveProcessedOrder(df_order_processed: DataFrame) = {
+
+
+    val orderProcessedPath = hdfsPath + "data/train/common/processed/orders"
+    saveProcessedData(df_order_processed, orderProcessedPath)
+  }
+
+
+
+  def getProcessedMedias(sparkSession: SparkSession) = {
+
+    val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
+    sparkSession.read.format("parquet").load(mediasProcessedPath)
+
+  }
+  def getProcessedOrder(sparkSession: SparkSession) = {
+
+    val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders"
+    sparkSession.read.format("parquet").load(ordersProcessedPath)
+
+  }
+  def getProcessedPlay(sparkSession: SparkSession) = {
+
+    val playsProcessedPath = hdfsPath + "data/train/common/processed/plays"
+    sparkSession.read.format("parquet").load(playsProcessedPath)
+
+  }
+
+
+
+  def saveUserProfileOrderPart(now: String, df_user_profile_order: DataFrame, state: String) = {
+   //这里保存的位置和套餐付费的不一样
+    val userProfileOrderPartSavePath = hdfsPath + "data/" + state + "/common/processed/userprofileorderpart" + now.split(" ")(0)
+    saveProcessedData(df_user_profile_order, userProfileOrderPartSavePath)
+  }
+  def saveUserProfilePlayPart(now: String, df_user_profile_play: DataFrame, state: String) = {
+    //这里保存的位置和套餐付费的不一样
+    val userProfilePlayPartSavePath = hdfsPath + "data/" + state + "/common/processed/userprofileplaypart" + now.split(" ")(0)
+    saveProcessedData(df_user_profile_play, userProfilePlayPartSavePath)
+  }
+  def saveUserProfilePreferencePart(now: String, df_user_profile_preference: DataFrame, state: String) = {
+    //这里保存的位置和套餐付费的不一样
+    val userProfilePreferencePartSavePath = hdfsPath + "data/" + state + "/common/processed/userprofilepreferencepart" + now.split(" ")(0)
+    saveProcessedData(df_user_profile_preference, userProfilePreferencePartSavePath)
+  }
+  def getUserProfileOrderPart(sparkSession: SparkSession, now: String, state: String) = {
+    val userProfileOrderPartPath = hdfsPath + "data/" + state + "/common/processed/userprofileorderpart" + now.split(" ")(0)
+    getData(sparkSession, userProfileOrderPartPath)
+  }
+
+  def getUserProfilePlayPart(sparkSession: SparkSession, now: String, state: String) = {
+
+    val userProfilePlayPartPath = hdfsPath + "data/" + state + "/common/processed/userprofileplaypart" + now.split(" ")(0)
+    getData(sparkSession, userProfilePlayPartPath)
+  }
+  def getUserProfilePreferencePart(sparkSession: SparkSession, now: String, state: String) = {
+    val userProfilePreferencePartSavePath = hdfsPath + "data/" + state + "/common/processed/userprofilepreferencepart" + now.split(" ")(0)
+    getData(sparkSession, userProfilePreferencePartSavePath)
+  }
+
+  def saveVideoProfile(now:String,df_video_profile:DataFrame,state:String): Unit ={
+    val videoProfilePath = hdfsPath + "data/" + state + "/common/processed/videoprofile" + now.split(" ")(0)
+    saveProcessedData(df_video_profile, videoProfilePath)
+
+  }
+
+  def getVideoProfile(sparkSession: SparkSession, now: String, state: String)={
+    val videoProfilePath = hdfsPath + "data/" + state + "/common/processed/videoprofile" + now.split(" ")(0)
+    getData(sparkSession, videoProfilePath)
+  }
+  def saveVideoVector(now:String,df_video_vector:DataFrame,state:String): Unit ={
+    val videoProfilePath = hdfsPath + "data/" + state + "/common/processed/videovector" + now.split(" ")(0)
+    saveProcessedData(df_video_vector, videoProfilePath)
+
+  }
+  def getVideoVector(sparkSession: SparkSession, now: String, state: String)={
+    val videoVectorPath = hdfsPath + "data/" + state + "/common/processed/videovector" + now.split(" ")(0)
+    getData(sparkSession, videoVectorPath)
+  }
+  def savePlayList(now:String,df_play_list:DataFrame,state:String):Unit={
+    val playListPath = hdfsPath + "data/" + state + "/common/processed/playlist" + now.split(" ")(0)
+    saveProcessedData(df_play_list, playListPath)
+  }
+  def getPlayList(sparkSession: SparkSession, now: String, state: String)={
+    val playListPath = hdfsPath + "data/" + state + "/common/processed/playlist" + now.split(" ")(0)
+    getData(sparkSession, playListPath)
+  }
+
+  def saveOrderList(now:String,df_order_list:DataFrame,state:String):Unit={
+    val orderListPath = hdfsPath + "data/" + state + "/common/processed/orderlist" + now.split(" ")(0)
+    saveProcessedData(df_order_list, orderListPath)
+  }
+  def getOrderList(sparkSession: SparkSession, now: String, state: String)={
+    val orderListPath = hdfsPath + "data/" + state + "/common/processed/orderlist" + now.split(" ")(0)
+    getData(sparkSession,orderListPath)
+  }
+  def saveSinglePointTrainUsers(timeWindowStart: String,timeWindowEnd:String,df_all_train_users: DataFrame):Unit= {
+
+    val trainSetUsersPath = hdfsPath + "data/train/singlepoint/userdivisiontraindata" + timeWindowStart.split(" ")(0)+"-"+timeWindowEnd.split(" ")(0)
+    saveProcessedData(df_all_train_users, trainSetUsersPath)
+  }
+  def saveSinglePointTrainSamples(timeWindowStart: String,timeWindowEnd:String,df_all_train_users: DataFrame):Unit={
+    val trainSetSamplesPath = hdfsPath + "data/train/singlepoint/ranktraindata" + timeWindowStart.split(" ")(0)+"-"+timeWindowEnd.split(" ")(0)
+    saveProcessedData(df_all_train_users, trainSetSamplesPath)
+  }
+  def saveSinglePointPredictUsers(timeWindowStart: String,timeWindowEnd:String,df_all_predict_users: DataFrame):Unit= {
+
+    val predictSetUsersPath = hdfsPath + "data/predict/singlepoint/userdivisionpredictdata" + timeWindowStart.split(" ")(0)+"-"+timeWindowEnd.split(" ")(0)
+    saveProcessedData(df_all_predict_users, predictSetUsersPath)
+  }
+  def getUserDivisionResult(sparkSession: SparkSession, timeWindowStart: String,timeWindowEnd:String)={
+    val userDivisionResult=hdfsPath + "data/predict/singlepoint/userdivisionresult"+timeWindowStart.split(" ")(0)+"-"+timeWindowEnd.split(" ")(0)
+
+    getData(sparkSession,userDivisionResult)
+  }
+  def saveSinglePointPredictSamples(timeWindowStart: String,timeWindowEnd:String,df_all_predict_samples: DataFrame):Unit={
+    val predictSetSamplesPath = hdfsPath + "data/predict/singlepoint/rankpredictdata" + timeWindowStart.split(" ")(0)+"-"+timeWindowEnd.split(" ")(0)
+    saveProcessedData(df_all_predict_samples, predictSetSamplesPath)
+  }
+
+
+
+
+
+
+
+
 
 
 

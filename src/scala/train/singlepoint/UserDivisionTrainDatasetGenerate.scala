@@ -1,12 +1,14 @@
 package train.singlepoint
 
-import mam.Dic
-import mam.GetSaveData.scaleData
-import mam.Utils.{printDf, udfAddOrderStatus, udfGetString}
+import mam.{Dic, SparkSessionInit}
+import mam.GetSaveData.{getProcessedOrder, getUserProfileOrderPart, getUserProfilePlayPart, getUserProfilePreferencePart, saveSinglePointTrainUsers, scaleData}
+import mam.SparkSessionInit.spark
+import mam.Utils.{printDf, sysParamSetting, udfAddOrderStatus, udfGetString}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql
+import org.apache.spark.sql.catalyst.expressions.TimeWindow
 import org.apache.spark.sql.functions.udf
-import org.apache.spark.sql.{SaveMode, SparkSession}
+import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import org.apache.spark.sql.functions._
 
 import scala.collection.mutable.ArrayBuffer
@@ -16,46 +18,45 @@ object UserDivisionTrainDatasetGenerate {
 
 
   def main(args:Array[String]): Unit ={
-    System.setProperty("hadoop.home.dir", "c:\\winutils")
-    Logger.getLogger("org").setLevel(Level.ERROR)
-    val hdfsPath="hdfs:///pay_predict/"
-    //val hdfsPath=""
-    val orderProcessedPath=hdfsPath+"data/train/common/processed/orders"
-    val userProfilePlayPartPath=hdfsPath+"data/train/common/processed/userprofileplaypart"+args(0)
-    val userProfilePreferencePartPath=hdfsPath+"data/train/common/processed/userprofilepreferencepart"+args(0)
-    val userProfileOrderPartPath=hdfsPath+"data/train/common/processed/userprofileorderpart"+args(0)
-    val spark: SparkSession = new sql.SparkSession.Builder()
-      .appName("UserDivisionTrainDatasetGenerate")
-      //.master("local[6]")
-      .getOrCreate()
-    val userProfilePlayPart = spark.read.format("parquet").load(userProfilePlayPartPath)
-    val userProfilePreferencePart = spark.read.format("parquet").load(userProfilePreferencePartPath)
-    val userProfileOrderPart = spark.read.format("parquet").load(userProfileOrderPartPath)
-    val orders = spark.read.format("parquet").load(orderProcessedPath).toDF()
+
+    // 1 SparkSession init
+    sysParamSetting()
+    SparkSessionInit.init()
+
+    // 2 Get Data
+    val timeWindowStart=args(0)+" "+args(1)
+    val timeWindowEnd=args(2)+" "+args(3)
+    val df_orders=getProcessedOrder(spark)
+    printDf("输入 df_order",df_orders)
+    val userProfileOrderPart=getUserProfileOrderPart(spark,timeWindowStart,"train")
+    val userProfilePlayPart=getUserProfilePlayPart(spark,timeWindowStart,"train")
+    val userProfilePreferencePart=getUserProfilePreferencePart(spark,timeWindowStart,"train")
 
     val joinKeysUserId = Seq(Dic.colUserId)
-    val temp=userProfilePlayPart.join(userProfilePreferencePart,joinKeysUserId,"left")
-    val userProfiles=temp.join(userProfileOrderPart,joinKeysUserId,"left")
+    val userProfiles=userProfilePlayPart.join(userProfilePreferencePart,joinKeysUserId,"left")
+      .join(userProfileOrderPart,joinKeysUserId,"left")
+    printDf("输入 userProfiles",userProfiles)
+    //3 Process Data
+    val df_result=processTrainUsers(df_orders,userProfiles,timeWindowStart,timeWindowEnd)
+    printDf("输出  df_result", df_result)
+    //4 Save Data
+    saveSinglePointTrainUsers(timeWindowStart,timeWindowEnd,df_result)
 
-    printDf("输入  userProfilePlayPart",userProfilePlayPart)
-    printDf("输入  userProfilePreferencePart",userProfilePreferencePart)
-    printDf("输入  userProfileOrderPart",userProfileOrderPart)
-    printDf("输入  orders",orders)
+    println("UserDivisionTrainDatasetGenerate  over~~~~~~~~~~~")
 
-    //println(orders.count())
-   // println(userProfiles.count())
 
-    //val predictWindowStart="2020-04-24 00:00:00"
-    val predictWindowStart=args(0)+" "+args(1)
-    val predictWindowEnd=args(2)+" "+args(3)
-    //在预测时间窗口内的单点视频的订单
-    val singlePaidOrders=orders.filter(
-      col(Dic.colCreationTime).>=(predictWindowStart)
-      && col(Dic.colCreationTime).<=(predictWindowEnd)
-      && col(Dic.colResourceType).===(0)
-      && col(Dic.colOrderStatus).>(1)
+  }
+
+
+  def   processTrainUsers(df_orders:DataFrame,userProfiles:DataFrame,timeWindowStart:String,timeWindowEnd:String)={
+    //在用来训练的时间窗口内的单点视频的订单
+    val singlePaidOrders=df_orders.filter(
+      col(Dic.colCreationTime).>=(timeWindowStart)
+        && col(Dic.colCreationTime).<=(timeWindowEnd)
+        && col(Dic.colResourceType).===(0)
+        && col(Dic.colOrderStatus).>(1)
     )
-    //过滤掉偏好
+    //过滤掉偏好等不需要输入模型中的信息
     val colTypeList=userProfiles.dtypes.toList
     val colList=ArrayBuffer[String]()
     for(elem<- colTypeList){
@@ -67,7 +68,7 @@ object UserDivisionTrainDatasetGenerate {
     val seqColList=colList.toSeq
 
     //找出订购了单点视频的用户的用户画像作为正样本
-
+    val joinKeysUserId = Seq(Dic.colUserId)
     val usersPaidProfile=userProfiles
       .join(singlePaidOrders,joinKeysUserId,"inner")
       .select(seqColList.map(userProfiles.col(_)):_*)
@@ -75,7 +76,7 @@ object UserDivisionTrainDatasetGenerate {
     //usersPaidProfile.show()
     println("正样本的条数为："+usersPaidProfile.count())
     val positiveCount:Int=usersPaidProfile.count().toInt
-    //构造负样本，确定正负样本的比例为1:10
+    //构造负样本，确定正负样本的比例为1:10，不同的负样本的比例对于AUC指标的影响不大，但是对于召回的结果影响比较大。
     val NEGATIVE_N:Int=10
     val negativeUsers=userProfiles.select(seqColList.map(userProfiles.col(_)):_*)
       .except(usersPaidProfile).sample(fraction = 1.0).limit(NEGATIVE_N*positiveCount)
@@ -86,31 +87,15 @@ object UserDivisionTrainDatasetGenerate {
     //将正负样本组合在一起并shuffle
     val allUsers=usersPaidWithLabel.union(negativeUsersWithLabel).sample(fraction = 1.0)
     println("总样本的条数为："+allUsers.count())
-
+    //填补缺失值
     val allUsersNotNull=allUsers.na.fill(30,List(Dic.colDaysSinceLastPurchasePackage,Dic.colDaysSinceLastClickPackage,
       Dic.colDaysFromLastActive,Dic.colDaysSinceFirstActiveInTimewindow))
       .na.fill(0)
       .na.drop()
-
-
-
+    //对数据进行归一化
     val exclude_cols = Array(Dic.colUserId)
     val df_result = scaleData(allUsersNotNull, exclude_cols)
-    printDf("输出  df_result", df_result)
-    val dataPath=hdfsPath+"data/train/singlepoint/userdivisiontraindata"
-    printDf("输出  allUsersNotNull",allUsersNotNull)
-    df_result.write.mode(SaveMode.Overwrite).format("parquet").save(dataPath+"_scaled"+args(0)+"-"+args(2))
-    allUsersNotNull.write.mode(SaveMode.Overwrite).format("parquet").save(dataPath+args(0)+"-"+args(2))
-
-
-
-
-
-
-
-
-
-
+    df_result
   }
 
 }

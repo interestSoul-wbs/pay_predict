@@ -1,10 +1,10 @@
-package train.common
+package predict.common
 
-import mam.{Dic, SparkSessionInit}
 import mam.GetSaveData._
 import mam.SparkSessionInit.spark
 import mam.Utils.{calDate, printDf, sysParamSetting, udfSortByPlayTime}
-import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
+import mam.{Dic, SparkSessionInit}
+import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 
 /**
@@ -33,15 +33,15 @@ object UserOrderAndPlayHistory {
     printDf("输入 df_orders", df_orders)
 
 
-    //3 Process Data
+
     val df_order_list=getUserOrdersList(df_orders,now)
     val df_play_list=getUserPlaysList(df_plays,now,df_medias)
     printDf("输出 orderList",df_order_list)
     printDf("输出 playList",df_play_list)
 
-    //4 Save Data
-    savePlayList(now,df_play_list,"train")
-    saveOrderList(now,df_order_list,"train")
+    //3 Save Data
+    savePlayList(now,df_play_list,"predict")
+    saveOrderList(now,df_order_list,"predict")
 
     println("UserOrderAndPlayHistory over~~~~~~~~~~~")
 
@@ -54,17 +54,15 @@ object UserOrderAndPlayHistory {
   def getUserPlaysList(plays:DataFrame,now:String,medias:DataFrame)={
     //选取最近一周的观看历史
    // print(calDate(now,-7))
-    val joinKeysVideoId=Seq(Dic.colVideoId)
-    val playsList=plays.join(medias.select(col(Dic.colVideoId),
+   val joinKeysVideoId=Seq(Dic.colVideoId)
+    var playsList=plays.join(medias.select(col(Dic.colVideoId),
       col(Dic.colVideoOneLevelClassification),col(Dic.colIsPaid)),joinKeysVideoId,"inner")
-    //主要选取用户对付费视频和电影等视频的观看历史，并且选取观看时长大于6分钟的（小于6分钟的看作噪音）
     val playsSelect=playsList.filter(
       col(Dic.colPlayEndTime).<(now)
       && col(Dic.colPlayEndTime).>(calDate(now,-7))
         && col(Dic.colBroadcastTime).>(360)
         && (col(Dic.colIsPaid).===(1) || col(Dic.colVideoOneLevelClassification).===("电影"))
     ).groupBy(col(Dic.colUserId))
-      //对观看序列按照观看时间进行排序
       .agg(udfSortByPlayTime(collect_list(struct(col(Dic.colVideoId),col(Dic.colPlayEndTime)))).as(Dic.colPlayList))
       .select(col(Dic.colUserId),col(Dic.colPlayList))
 
@@ -73,13 +71,12 @@ object UserOrderAndPlayHistory {
   }
   def getUserOrdersList(orders:DataFrame,now:String)={
 
-    //因为单点视频的比较稀疏需要考虑用户的全部订单，
     val orderSinglePoint=orders.filter(
       col(Dic.colOrderStartTime).<(now)
-      && col(Dic.colOrderStatus).>(1)  //是否要考虑未支付订单的作用
+     // && col(Dic.colOrderStatus).>(1)  是否要考虑未支付订单的作用
       && col(Dic.colResourceType).===(0)
     )
-
+  //orderSinglePoint.withColumn("row_number",row_number().over(Window.partitionBy(Dic.colUserId).orderBy(col(Dic.colCreationTime).desc))).show()
     orderSinglePoint
       .select(col(Dic.colUserId),col(Dic.colResourceId),col(Dic.colCreationTime).cast("string"))
       .groupBy(col(Dic.colUserId))

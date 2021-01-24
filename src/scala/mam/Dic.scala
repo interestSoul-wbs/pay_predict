@@ -13,8 +13,11 @@ object Dic {
     //原始属性
   val colUserId = "user_id"
 
+  //注意这里有改动，如果使用套餐预测生成的play数据集
   val colPlayEndTime = "play_end_time"
   val colBroadcastTime =  "broadcast_time"
+
+
   //处理过程中添加
   val colPlayStartTime ="play_start_time"
   val colTimeSum = "time_sum"
@@ -300,7 +303,22 @@ object Dic {
   val colIsLongtypeTimeOrderEndTime: String = "is_longtype_time_order_end_time"
   val colFeatures="features"
   val colScaledFeatures="scaled_features"
+  val colConvertTime="convert_time"
 
+
+
+
+
+  val colPlayList="play_list"
+  val colOrderList="order_list"
+
+  //召回阶段需要用到
+  val colUserIdIndex="user_id_index"
+  val colVideoIdIndex="video_id_index"
+  val colView="view"
+  val colRecommendations="recommendations"
+  val colRating="rating"
+  val colSimVideos="sim_videos"
 
 
 

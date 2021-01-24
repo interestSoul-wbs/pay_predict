@@ -1,43 +1,53 @@
 package predict.common
 
-import mam.Dic
-import mam.Utils.{calDate, printDf, udfGetDays}
-import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql
-import org.apache.spark.sql.{SaveMode, SparkSession}
+import mam.GetSaveData.{getProcessedOrder, saveUserProfileOrderPart}
+import mam.SparkSessionInit.spark
+import mam.Utils.{calDate, printDf, sysParamSetting, udfGetDays}
+import mam.{Dic, SparkSessionInit}
+import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.functions._
 
 object UserProfileGenerateOrderPart {
 
-  def userProfileGenerateOrderPart(now:String,timeWindow:Int,medias_path:String,plays_path:String,orders_path:String,hdfsPath:String): Unit = {
-     System.setProperty("hadoop.home.dir", "c:\\winutils")
-    Logger.getLogger("org").setLevel(Level.ERROR)
-    val spark: SparkSession = new sql.SparkSession.Builder()
-      .appName("PredictUserProfileGenerateOrderPart")
-      //.master("local[6]")
-      .getOrCreate()
-    //设置shuffle过程中分区数
-    // spark.sqlContext.setConf("spark.sql.shuffle.partitions", "1000")
-    import org.apache.spark.sql.functions._
-
-    //val medias = spark.read.format("parquet").load(medias_path)
-    val plays = spark.read.format("parquet").load(plays_path)
-    val orders = spark.read.format("parquet").load(orders_path)
-
-    printDf("plays",plays)
-    printDf("orders",orders)
+  val timeWindow = 30
 
 
-    var result = plays.select(col(Dic.colUserId)).distinct()
+  def main(args:Array[String]): Unit ={
+
+    // 1 SparkSession init
+    sysParamSetting()
+    SparkSessionInit.init()
 
 
-    val pre_30 = calDate(now, -30)
-    val pre_14 = calDate(now, days = -14)
-    val pre_7 = calDate(now, -7)
-    val pre_3 = calDate(now, -3)
-    val pre_1 = calDate(now, -1)
+    // 2 Get Data
+    val now = args(0) + " " + args(1)
+
+    val df_orders = getProcessedOrder(spark)
+    printDf("输入 df_orders", df_orders)
+
+    val df_user_profile_order=userProfileGenerateOrderPart(now,timeWindow,df_orders)
+
+
+
+    // 4 Save Data
+    saveUserProfileOrderPart(now, df_user_profile_order,"predict")
+    printDf("输出  df_user_profile_order", df_user_profile_order)
+
+    println("UserProfileGenerateOrderPart  over~~~~~~~~~~~\")")
+
+
+
+  }
+
+  def userProfileGenerateOrderPart( now:String, timeWindow:Int, df_orders:DataFrame) = {
+
+    val df_order_users = df_orders.select(col(Dic.colUserId)).distinct()
+
+
+    val pre_30 = calDate(now, -timeWindow)
     val joinKeysUserId = Seq(Dic.colUserId)
 
-    val user_order=orders.filter(col(Dic.colCreationTime).<(now))
+    val user_order=df_orders.filter(col(Dic.colCreationTime).<(now))
     val order_part_1=user_order
       .filter(
         col(Dic.colResourceType).>(0)
@@ -164,48 +174,26 @@ object UserProfileGenerateOrderPart {
 
 
 
-     result=result.join(order_part_1,joinKeysUserId,"left")
-     .join(order_part_2,joinKeysUserId, "left")
-     .join(order_part_3,joinKeysUserId,"left")
-     .join(order_part_4,joinKeysUserId, "left")
-     .join(order_part_5,joinKeysUserId, "left")
-     .join(order_part_6,joinKeysUserId, "left")
-     .join(order_part_7,joinKeysUserId, "left")
-     .join(order_part_8,joinKeysUserId,"left")
-     .join(order_part_9,joinKeysUserId, "left")
-     .join(order_part_10,joinKeysUserId, "left")
-     .join(order_part_11,joinKeysUserId, "left")
-     .join(order_part_12,joinKeysUserId, "left")
+    val df_user_profile_order=df_order_users.join(order_part_1,joinKeysUserId,"left")
+    .join(order_part_2,joinKeysUserId, "left")
+    .join(order_part_3,joinKeysUserId,"left")
+    .join(order_part_4,joinKeysUserId, "left")
+    .join(order_part_5,joinKeysUserId, "left")
+    .join(order_part_6,joinKeysUserId, "left")
+    .join(order_part_7,joinKeysUserId, "left")
+    .join(order_part_8,joinKeysUserId,"left")
+    .join(order_part_9,joinKeysUserId, "left")
+    .join(order_part_10,joinKeysUserId, "left")
+    .join(order_part_11,joinKeysUserId, "left")
+    .join(order_part_12,joinKeysUserId, "left")
 
-      //result.show()
-    printDf("result",result)
-
-    val userProfileOrderPartSavePath=hdfsPath+"data/predict/common/processed/userprofileorderpart"+now.split(" ")(0)
-    //大约有85万用户
-    result.write.mode(SaveMode.Overwrite).format("parquet").save(userProfileOrderPartSavePath)
-
-
-
-
-  }
-
-
-    def main(args:Array[String]): Unit ={
-      val hdfsPath="hdfs:///pay_predict/"
-      //val hdfsPath=""
-      val mediasProcessedPath=hdfsPath+"data/predict/common/processed/mediastemp"
-      val playsProcessedPath=hdfsPath+"data/predict/common/processed/plays"
-      val ordersProcessedPath=hdfsPath+"data/predict/common/processed/orders"
-      val now=args(0)+" "+args(1)
-      userProfileGenerateOrderPart(now,30,mediasProcessedPath,playsProcessedPath,ordersProcessedPath,hdfsPath)
-
-
-
+     df_user_profile_order
 
 
 
 
 
   }
+
 
 }
