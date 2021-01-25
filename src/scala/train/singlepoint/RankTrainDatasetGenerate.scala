@@ -103,8 +103,8 @@ object RankTrainDatasetGenerate {
       ).select(col(Dic.colUserId),col(Dic.colResourceId))
       .withColumn(Dic.colOrderStatus,udfAddOrderStatus(col(Dic.colUserId)))
       .withColumnRenamed(Dic.colResourceId,Dic.colVideoId)
-    val dataset1=orderSinglePoint.join(userProfile,joinKeysUserId,"inner")
-      .join(videoProfile,joinKeysVideoId,"inner")
+    val dataset1=orderSinglePoint.join(userProfile,joinKeysUserId,"left")
+      .join(videoProfile,joinKeysVideoId,"left")
     println("第一部分数据条数："+dataset1.count())
     //temp.show()
 

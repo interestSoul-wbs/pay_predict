@@ -9,15 +9,10 @@ import org.apache.spark.sql.types._
 
 import scala.collection.mutable.ArrayBuffer
 
-/**
- * @author wj
- * @date 2020/11/23 ${Time}
- * @version 0.1
- * @describe
- */
+
 object GetSaveData {
   val hdfsPath="hdfs:///pay_predict/"
-//  val hdfsPath=""
+  //val hdfsPath=""
 
   def getRawPlays(spark: SparkSession) = {
 
