@@ -9,8 +9,14 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 object GetSaveData {
 
   var tempTable = "temp_table"
-    val hdfsPath = ""
-  //val hdfsPath = "hdfs:///pay_predict/"
+//  val hdfsPath = ""
+  val hdfsPath = "hdfs:///pay_predict_3/"
+
+  def saveDataForXXK(df_data:DataFrame, state: String, fileName: String) = {
+      val path = hdfsPath + "data/" + state + "/xxkang/" + fileName
+      saveProcessedData(df_data, path)
+  }
+
 
 
   def getOrignalSubId(spark: SparkSession, partitiondate: String, license: String, vod_version: String) = {
@@ -2625,7 +2631,7 @@ object GetSaveData {
    */
   def saveProcessedPlay(df_play_processed: DataFrame) = {
 
-    val playProcessedPath = hdfsPath + "data/train/common/processed/plays"
+    val playProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3"
     df_play_processed.write.mode(SaveMode.Overwrite).format("parquet").save(playProcessedPath)
   }
 
