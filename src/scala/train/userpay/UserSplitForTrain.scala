@@ -13,7 +13,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 object UserSplitForTrain {
 
   val timeLength = 14
-  val predictResourceId = Array(100201, 100202) //要预测的套餐id
+  val predictResourceId = Array(100201,100202,101101,101103,101301,101601,101701,101801,101803,101810) //要预测的套餐id
 
 
   def main(args: Array[String]): Unit = {
@@ -62,8 +62,7 @@ object UserSplitForTrain {
           && col(Dic.colCreationTime) < calDate(trainTime, timeLength)
           && col(Dic.colResourceType).>(0)
           && col(Dic.colResourceType).<(4)
-          && (col(Dic.colResourceId) === predictResourceId(0)
-          || col(Dic.colResourceId) === predictResourceId(1))
+          && (col(Dic.colResourceId).isin(predictResourceId: _*))
           && (col(Dic.colIsMoneyError) === 1)
       ).select(Dic.colUserId).distinct()
 
@@ -74,8 +73,7 @@ object UserSplitForTrain {
           && col(Dic.colCreationTime) < calDate(trainTime, timeLength)
           && col(Dic.colResourceType).>(0)
           && col(Dic.colResourceType).<(4)
-          && (col(Dic.colResourceId) === predictResourceId(0)
-          || col(Dic.colResourceId) === predictResourceId(1))
+          && (col(Dic.colResourceId).isin(predictResourceId: _*))
           && col(Dic.colOrderStatus).>(1)
       ).select(Dic.colUserId).distinct()
       .except(df_illegal_users)
