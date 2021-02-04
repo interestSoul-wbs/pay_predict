@@ -1,5 +1,6 @@
 package mam
 
+import mam.Utils.udfIsOnlyNumber
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
@@ -56,7 +57,7 @@ object GetSaveData {
   /**
     * Save data to hive.
     */
-  def saveSubIdAndShuntIdInfo(df_result: DataFrame) = {
+  def saveSubIdAndShuntIdInfoDynamic(df_result: DataFrame) = {
 
     spark.sql(
       """
@@ -110,22 +111,25 @@ object GetSaveData {
 
   def getAllRawUserInfos(partitiondate: String, license: String, vod_version: String, sector: Int) = {
 
-    val sample_user_order_ori_sql =
+    val get_data_sql =
       s"""
          |select
-         |    subscriberid,
-         |    customerid,
-         |    deviceid,
-         |    sector
+         |    subscriberid
+         |    ,customerid
+         |    ,deviceid
+         |    ,sector
          |from
          |    vodrs.paypredict_user_subid_all
          |where
-         |    partitiondate='$partitiondate' and license='$license' and vod_version='$vod_version' and sector=$sector
+         |    partitiondate = '$partitiondate'
+         |    and license = '$license'
+         |    and vod_version = '$vod_version'
+         |    and sector = $sector
       """.stripMargin
 
-    val df_user_all_info = spark.sql(sample_user_order_ori_sql)
+    val df_result = spark.sql(get_data_sql)
 
-    df_user_all_info
+    df_result
   }
 
   def getAllRawSubid(partitiondate: String, license: String, vod_version: String, sector: Int) = {
@@ -137,7 +141,10 @@ object GetSaveData {
          |from
          |    vodrs.paypredict_user_subid_all
          |where
-         |    partitiondate='$partitiondate' and license='$license' and vod_version='$vod_version' and sector=$sector
+         |    partitiondate='$partitiondate'
+         |    and license='$license'
+         |    and vod_version='$vod_version'
+         |    and sector=$sector
       """.stripMargin
 
     val df_user_all_info = spark.sql(sample_user_order_ori_sql)
@@ -150,20 +157,22 @@ object GetSaveData {
     val user_order_ori_sql =
       s"""
          |select
-         |    deviceid,
-         |    customerid,
-         |    fee,
-         |    resourcetype,
-         |    resourceid,
-         |    resourcename,
-         |    createdtime,
-         |    status,
-         |    starttime,
-         |    endtime
+         |    deviceid
+         |    ,customerid
+         |    ,fee
+         |    ,resourcetype
+         |    ,resourceid
+         |    ,resourcename
+         |    ,createdtime
+         |    ,status
+         |    ,starttime
+         |    ,endtime
          |from
          |    vodbasicdim.o_com_vod_all_order
          |where
-         |    partitiondate>='$start_date' and partitiondate<='$end_date'  and licence='$license'
+         |    partitiondate>='$start_date'
+         |    and partitiondate<='$end_date'
+         |    and licence='$license'
       """.stripMargin
 
     val df_order_all = spark.sql(user_order_ori_sql)
@@ -219,6 +228,9 @@ object GetSaveData {
        """.stripMargin
 
     val df_medias = spark.sql(get_result_sql)
+      .withColumn(Dic.colIsOnlyNumberVideoId, udfIsOnlyNumber(col(Dic.colVideoId)))
+      .filter(col(Dic.colIsOnlyNumberVideoId).===(1))
+      .drop(Dic.colIsOnlyNumberVideoId)
 
     df_medias
   }
@@ -318,6 +330,39 @@ object GetSaveData {
     val df_order = spark.sql(user_order_sql)
 
     df_order
+  }
+
+
+  def getProcessedOrderV2(partitiondate: String, license: String, vod_version: String, sector: Int, category: String) = {
+
+    // 1 - 获取用户购买记录
+    val get_data_sql =
+      s"""
+         |SELECT
+         |    user_id
+         |    ,money
+         |    ,resource_type
+         |    ,resource_id
+         |    ,resource_title
+         |    ,creation_time
+         |    ,discount_description
+         |    ,order_status
+         |    ,order_start_time
+         |    ,order_end_time
+         |    ,time_validity
+         |FROM
+         |    vodrs.paypredict_processed_order_all_v2
+         |WHERE
+         |    partitiondate='$partitiondate'
+         |    and license='$license'
+         |    and vod_version='$vod_version'
+         |    and sector=$sector
+         |    and category = '$category'
+      """.stripMargin
+
+    val df_result = spark.sql(get_data_sql)
+
+    df_result
   }
 
   def getRawPlayByDateRangeAllUsers(start_date: String, end_date: String, license: String) = {
@@ -490,6 +535,66 @@ object GetSaveData {
     df_user_profile_play
   }
 
+  def getUserProfilePlayPartV2(partitiondate: String, license: String, vod_version: String, sector: Int, category: String) = {
+
+    val data_sql =
+      s"""
+         |SELECT
+         |        user_id
+         |        , active_days_last_30_days
+         |        , total_time_last_30_days
+         |        , days_from_last_active
+         |        , days_since_first_active_in_timewindow
+         |        , active_days_last_14_days
+         |        , total_time_last_14_days
+         |        , active_days_last_7_days
+         |        , total_time_last_7_days
+         |        , active_days_last_3_days
+         |        , total_time_last_3_days
+         |        , total_time_paid_videos_last_30_days
+         |        , total_time_paid_videos_last_14_days
+         |        , total_time_paid_videos_last_7_days
+         |        , total_time_paid_videos_last_3_days
+         |        , total_time_paid_videos_last_1_days
+         |        , total_time_in_package_videos_last_30_days
+         |        , var_time_in_package_videos_last_30_days
+         |        , number_in_package_videos_last_30_days
+         |        , total_time_in_package_videos_last_14_days
+         |        , var_time_in_package_videos_last_14_days
+         |        , number_in_package_videos_last_14_days
+         |        , total_time_in_package_videos_last_7_days
+         |        , var_time_in_package_videos_last_7_days
+         |        , number_in_package_videos_last_7_days
+         |        , total_time_in_package_videos_last_3_days
+         |        , var_time_in_package_videos_last_3_days
+         |        , number_in_package_videos_last_3_days
+         |        , total_time_in_package_videos_last_1_days
+         |        , var_time_in_package_videos_last_1_days
+         |        , number_in_package_videos_last_1_days
+         |        , total_time_children_videos_last_30_days
+         |        , number_children_videos_last_30_days
+         |        , total_time_children_videos_last_14_days
+         |        , number_children_videos_last_14_days
+         |        , total_time_children_videos_last_7_days
+         |        , number_children_videos_last_7_days
+         |        , total_time_children_videos_last_3_days
+         |        , number_children_videos_last_3_days
+         |        , total_time_children_videos_last_1_days
+         |        , number_children_videos_last_1_days
+         |FROM
+         |    vodrs.paypredict_user_profile_play_part_v2
+         |WHERE
+         |     partitiondate = '$partitiondate'
+         |     AND license = '$license'
+         |     AND vod_version = '$vod_version'
+         |     AND sector = $sector
+         |     AND category = '$category'
+      """.stripMargin
+
+    val df_user_profile_play = spark.sql(data_sql)
+
+    df_user_profile_play
+  }
 
   def getUserProfilePlayPart(partitiondate: String, license: String, vod_version: String,
                              sector: Int, n_days_from_start_date: Int) = {
@@ -592,6 +697,53 @@ object GetSaveData {
     df_user_profile_preference
   }
 
+
+  def getUserProfilePreferencePartV2(partitiondate: String, license: String, vod_version: String, sector: Int, category: String) = {
+
+    val data_sql =
+      s"""
+         |SELECT
+         |        user_id
+         |        ,total_time_movies_last_30_days
+         |        ,total_time_movies_last_14_days
+         |        ,total_time_movies_last_7_days
+         |        ,total_time_movies_last_3_days
+         |        ,total_time_movies_last_1_days
+         |        ,total_time_paid_movies_last_30_days
+         |        ,total_time_paid_movies_last_14_days
+         |        ,total_time_paid_movies_last_7_days
+         |        ,total_time_paid_movies_last_3_days
+         |        ,total_time_paid_movies_last_1_days
+         |        ,active_workdays_last_30_days
+         |        ,avg_workdaily_time_videos_last_30_days
+         |        ,active_restdays_last_30_days
+         |        ,avg_restdaily_time_videos_last_30_days
+         |        ,avg_workdaily_time_paid_videos_last_30_days
+         |        ,avg_restdaily_time_paid_videos_last_30_days
+         |        ,video_one_level_preference
+         |        ,video_two_level_preference
+         |        ,tag_preference
+         |        ,movie_two_level_preference
+         |        ,movie_tag_preference
+         |        ,single_two_level_preference
+         |        ,single_tag_preference
+         |        ,in_package_video_two_level_preference
+         |        ,in_package_tag_preference
+         |FROM
+         |    vodrs.paypredict_user_profile_preference_part_all_v2
+         |WHERE
+         |     partitiondate = '$partitiondate'
+         |     and license = '$license'
+         |     and vod_version = '$vod_version'
+         |     and sector = $sector
+         |     and category = '$category'
+      """.stripMargin
+
+    val df_user_profile_preference = spark.sql(data_sql)
+
+    df_user_profile_preference
+
+  }
 
   def getuserProfilePreferencePart(partitiondate: String, license: String, vod_version: String,
                                    sector: Int, n_days_from_start_date: Int) = {
@@ -715,6 +867,47 @@ object GetSaveData {
     df_user_profile_order_part
   }
 
+  def getUserProfileOrderPartV2(partitiondate: String, license: String, vod_version: String, sector: Int, category: String) = {
+
+    val data_sql =
+      s"""
+         |SELECT
+         |    user_id
+         |    , number_packages_purchased
+         |    , total_money_packages_purchased
+         |    , max_money_package_purchased
+         |    , min_money_package_purchased
+         |    , avg_money_package_purchased
+         |    , var_money_package_purchased
+         |    , number_singles_purchased
+         |    , total_money_singles_purchased
+         |    , total_money_consumption
+         |    , number_packages_unpurchased
+         |    , money_packages_unpurchased
+         |    , number_singles_unpurchased
+         |    , money_singles_unpurchased
+         |    , days_since_last_purchase_package
+         |    , days_since_last_click_package
+         |    , number_orders_last_30_days
+         |    , number_paid_orders_last_30_days
+         |    , number_paid_package_last_30_days
+         |    , number_paid_single_last_30_days
+         |    , days_remaining_package
+         |FROM
+         |    vodrs.paypredict_user_profile_order_part_v2
+         |WHERE
+         |     partitiondate = '$partitiondate'
+         |     and license = '$license'
+         |     and vod_version = '$vod_version'
+         |     and sector = $sector
+         |     and category='$category'
+      """.stripMargin
+
+    val df_user_profile_order_part = spark.sql(data_sql)
+
+    df_user_profile_order_part
+  }
+
   def getVideoCategory(partitiondate: String, license: String, category: String) = {
 
     val data_sql =
@@ -724,7 +917,9 @@ object GetSaveData {
          |FROM
          |    vodrs.paypredict_processed_media_label
          |WHERE
-         |    partitiondate='$partitiondate' and license='$license' and category='$category'
+         |    partitiondate = '$partitiondate'
+         |    and license = '$license'
+         |    and category = '$category'
       """.stripMargin
 
     val df_video_first_category = spark.sql(data_sql)
@@ -910,39 +1105,39 @@ object GetSaveData {
     val exec_sql =
       s"""
          |SELECT
-         |    video_id,
-         |    video_title,
-         |    video_one_level_classification,
-         |    video_two_level_classification_list,
-         |    video_tag_list,
-         |    director_list,
-         |    actor_list,
-         |    country,
-         |    language,
-         |    release_date,
-         |    storage_time,
-         |    video_time,
-         |    score,
-         |    is_paid,
-         |    package_id,
-         |    is_single,
-         |    is_trailers,
-         |    supplier,
-         |    introduction,
-         |    number_of_plays_in_30_days,
-         |    number_of_views_within_30_days,
-         |    number_of_plays_in_14_days,
-         |    number_of_views_within_14_days,
-         |    number_of_plays_in_7_days,
-         |    number_of_views_within_7_days,
-         |    number_of_plays_in_3_days,
-         |    number_of_views_within_3_days,
-         |    abs_of_number_of_days_between_storage_and_current,
-         |    number_of_times_purchased_within_30_days,
-         |    number_of_times_purchased_within_14_days,
-         |    number_of_times_purchased_within_7_days,
-         |    number_of_times_purchased_within_3_days,
-         |    number_of_times_purchased_total
+         |    video_id
+         |    ,video_title
+         |    ,video_one_level_classification
+         |    ,video_two_level_classification_list
+         |    ,video_tag_list
+         |    ,director_list
+         |    ,actor_list
+         |    ,country
+         |    ,language
+         |    ,release_date
+         |    ,storage_time
+         |    ,video_time
+         |    ,score
+         |    ,is_paid
+         |    ,package_id
+         |    ,is_single
+         |    ,is_trailers
+         |    ,supplier
+         |    ,introduction
+         |    ,number_of_plays_in_30_days
+         |    ,number_of_views_within_30_days
+         |    ,number_of_plays_in_14_days
+         |    ,number_of_views_within_14_days
+         |    ,number_of_plays_in_7_days
+         |    ,number_of_views_within_7_days
+         |    ,number_of_plays_in_3_days
+         |    ,number_of_views_within_3_days
+         |    ,abs_of_number_of_days_between_storage_and_current
+         |    ,number_of_times_purchased_within_30_days
+         |    ,number_of_times_purchased_within_14_days
+         |    ,number_of_times_purchased_within_7_days
+         |    ,number_of_times_purchased_within_3_days
+         |    ,number_of_times_purchased_total
          |FROM
          |    vodrs.paypredict_user_video_profile
          |WHERE
@@ -3083,25 +3278,34 @@ object GetSaveData {
   }
 
 
-  def saveProcessedOrderV2(df_order: DataFrame, partitiondate: String, license: String, vod_version: String, sector: Int) = {
+  def saveProcessedOrderV2(df_order: DataFrame, partitiondate: String, license: String, vod_version: String, sector: Int
+                           , category: String) = {
 
     spark.sql(
       """
         |CREATE TABLE IF NOT EXISTS
-        |     vodrs.paypredict_processed_order_all_v2(
-        |         user_id string,
-        |         money double,
-        |         resource_type double,
-        |         resource_id string,
-        |         resource_title string,
-        |         creation_time string,
-        |         discount_description string,
-        |         order_status double,
-        |         order_start_time string,
-        |         order_end_time string,
-        |         time_validity int)
+        |     vodrs.paypredict_processed_order_all_v2
+        |        (
+        |            user_id string
+        |            , resource_id long
+        |            , creation_time string
+        |            , order_start_time string
+        |            , order_status double
+        |            , money double
+        |            , resource_type double
+        |            , resource_title string
+        |            , discount_description string
+        |            , order_end_time string
+        |            , time_validity int
+        |         )
         |PARTITIONED BY
-        |    (partitiondate string, license string, vod_version string, sector int)
+        |    (
+        |     partitiondate string
+        |     , license string
+        |     , vod_version string
+        |     , sector int
+        |     , category string
+        |     )
       """.stripMargin)
 
     df_order.createOrReplaceTempView(tempTable)
@@ -3111,19 +3315,25 @@ object GetSaveData {
          |INSERT OVERWRITE TABLE
          |    vodrs.paypredict_processed_order_all_v2
          |PARTITION
-         |    (partitiondate='$partitiondate', license='$license', vod_version='$vod_version', sector=$sector)
+         |    (
+         |     partitiondate = '$partitiondate'
+         |     , license = '$license'
+         |     , vod_version = '$vod_version'
+         |     , sector = $sector
+         |     , category = '$category'
+         |     )
          |SELECT
-         |    user_id,
-         |    money,
-         |    resource_type,
-         |    resource_id,
-         |    resource_title,
-         |    creation_time,
-         |    discount_description,
-         |    order_status,
-         |    order_start_time,
-         |    order_end_time,
-         |    time_validity
+         |        user_id
+         |        , resource_id
+         |        , creation_time
+         |        , order_start_time
+         |        , order_status
+         |        , money
+         |        , resource_type
+         |        , resource_title
+         |        , discount_description
+         |        , order_end_time
+         |        , time_validity
          |FROM
          |    $tempTable
       """.stripMargin
@@ -3132,6 +3342,7 @@ object GetSaveData {
 
     println(insert_sql)
   }
+
 
   /**
     * Save processed media data to hive
@@ -3446,4 +3657,816 @@ object GetSaveData {
     df_sub_id
   }
 
+  def saveResultTestDynamic(df_result: DataFrame) = {
+
+    spark.sql(
+      """
+        |CREATE TABLE IF NOT EXISTS
+        | vodrs.paypredict_user_subid_all_test_test
+        |    (
+        |     subscriberid string
+        |     , customerid string
+        |     , deviceid string
+        |     , shunt_subid int
+        |     )
+        |PARTITIONED BY
+        |    (
+        |     partitiondate string
+        |     , license string
+        |     , vod_version string
+        |     , sector int
+        |     )
+      """.stripMargin)
+
+    df_result.createOrReplaceTempView(tempTable)
+
+    val insert_sql =
+      s"""
+         |INSERT OVERWRITE TABLE
+         |    vodrs.paypredict_user_subid_all_test_test
+         |PARTITION
+         |    (
+         |     partitiondate
+         |     , license
+         |     , vod_version
+         |     , sector
+         |     )
+         |SELECT
+         |    subscriberid
+         |    ,customerid
+         |    ,deviceid
+         |    ,shunt_subid
+         |    ,partitiondate
+         |    ,license
+         |    ,vod_version
+         |    ,sector
+         |FROM
+         |    $tempTable
+      """.stripMargin
+
+    spark.sql(insert_sql)
+
+    println(insert_sql)
+  }
+
+  def saveProcessedPlayBySplitV2(df_result: DataFrame, partitiondate: String, license: String, vod_version: String
+                                 , sector: Int, category: String) = {
+
+    spark.sql(
+      """
+        |CREATE TABLE IF NOT EXISTS
+        |     vodrs.paypredict_processed_play_split_v2
+        |           (
+        |            user_id string
+        |            ,video_id string
+        |            ,play_start_time string
+        |            ,time_sum double
+        |            )
+        |PARTITIONED BY
+        |    (
+        |     partitiondate string
+        |     , license string
+        |     , vod_version string
+        |     , sector int
+        |     , category string
+        |     )
+      """.stripMargin)
+
+    df_result.createOrReplaceTempView(tempTable)
+
+    val insert_sql =
+      s"""
+         |INSERT OVERWRITE TABLE
+         |    vodrs.paypredict_processed_play_split_v2
+         |PARTITION
+         |    (
+         |     partitiondate = '$partitiondate'
+         |     , license = '$license'
+         |     , vod_version = '$vod_version'
+         |     , sector =$sector
+         |     , category = '$category'
+         |     )
+         |SELECT
+         |    user_id
+         |    ,video_id
+         |    ,play_start_time
+         |    ,time_sum
+         |FROM
+         |    $tempTable
+      """.stripMargin
+
+    spark.sql(insert_sql)
+
+    println(insert_sql)
+  }
+
+  def getAllUsers(partitiondate: String, license: String, vod_version: String, sector: Int) = {
+
+    val get_result_sql =
+      s"""
+         |SELECT
+         |    subscriberid as user_id
+         |FROM
+         |    vodrs.paypredict_user_subid_all
+         |WHERE
+         |    partitiondate='$partitiondate'
+         |    and license='$license'
+         |    and vod_version='$vod_version'
+         |    and sector = $sector
+       """.stripMargin
+
+    val df_sub_id = spark.sql(get_result_sql)
+      .dropDuplicates()
+
+    df_sub_id
+  }
+
+
+  def saveUserpayFianlDataV2(df_result: DataFrame, partitiondate: String, license: String, vod_version: String, sector: Int, category: String) = {
+
+    spark.sql(
+      """
+        |CREATE TABLE IF NOT EXISTS
+        |     vodrs.paypredict_userpay_dataset_v2
+        |        (
+        |            user_id string
+        |            , order_status int
+        |            , active_days_last_30_days long
+        |            , total_time_last_30_days double
+        |            , days_from_last_active int
+        |            , days_since_first_active_in_timewindow int
+        |            , active_days_last_14_days long
+        |            , total_time_last_14_days double
+        |            , active_days_last_7_days long
+        |            , total_time_last_7_days double
+        |            , active_days_last_3_days long
+        |            , total_time_last_3_days double
+        |            , total_time_paid_videos_last_30_days double
+        |            , total_time_paid_videos_last_14_days double
+        |            , total_time_paid_videos_last_7_days double
+        |            , total_time_paid_videos_last_3_days double
+        |            , total_time_paid_videos_last_1_days double
+        |            , total_time_in_package_videos_last_30_days double
+        |            , var_time_in_package_videos_last_30_days double
+        |            , number_in_package_videos_last_30_days long
+        |            , total_time_in_package_videos_last_14_days double
+        |            , var_time_in_package_videos_last_14_days double
+        |            , number_in_package_videos_last_14_days long
+        |            , total_time_in_package_videos_last_7_days double
+        |            , var_time_in_package_videos_last_7_days double
+        |            , number_in_package_videos_last_7_days long
+        |            , total_time_in_package_videos_last_3_days double
+        |            , var_time_in_package_videos_last_3_days double
+        |            , number_in_package_videos_last_3_days long
+        |            , total_time_in_package_videos_last_1_days double
+        |            , var_time_in_package_videos_last_1_days double
+        |            , number_in_package_videos_last_1_days long
+        |            , total_time_children_videos_last_30_days double
+        |            , number_children_videos_last_30_days long
+        |            , total_time_children_videos_last_14_days double
+        |            , number_children_videos_last_14_days long
+        |            , total_time_children_videos_last_7_days double
+        |            , number_children_videos_last_7_days long
+        |            , total_time_children_videos_last_3_days double
+        |            , number_children_videos_last_3_days long
+        |            , total_time_children_videos_last_1_days double
+        |            , number_children_videos_last_1_days long
+        |            , total_time_movies_last_30_days double
+        |            , total_time_movies_last_14_days double
+        |            , total_time_movies_last_7_days double
+        |            , total_time_movies_last_3_days double
+        |            , total_time_movies_last_1_days double
+        |            , total_time_paid_movies_last_30_days double
+        |            , total_time_paid_movies_last_14_days double
+        |            , total_time_paid_movies_last_7_days double
+        |            , total_time_paid_movies_last_3_days double
+        |            , total_time_paid_movies_last_1_days double
+        |            , active_workdays_last_30_days long
+        |            , avg_workdaily_time_videos_last_30_days double
+        |            , active_restdays_last_30_days long
+        |            , avg_restdaily_time_videos_last_30_days double
+        |            , avg_workdaily_time_paid_videos_last_30_days double
+        |            , avg_restdaily_time_paid_videos_last_30_days double
+        |            , number_packages_purchased long
+        |            , total_money_packages_purchased double
+        |            , max_money_package_purchased double
+        |            , min_money_package_purchased double
+        |            , avg_money_package_purchased double
+        |            , var_money_package_purchased double
+        |            , number_singles_purchased long
+        |            , total_money_singles_purchased double
+        |            , total_money_consumption double
+        |            , number_packages_unpurchased long
+        |            , money_packages_unpurchased double
+        |            , number_singles_unpurchased long
+        |            , money_singles_unpurchased double
+        |            , days_since_last_purchase_package int
+        |            , days_since_last_click_package int
+        |            , number_orders_last_30_days long
+        |            , number_paid_orders_last_30_days long
+        |            , number_paid_package_last_30_days long
+        |            , number_paid_single_last_30_days long
+        |            , days_remaining_package int
+        |            , video_one_level_preference_1 int
+        |            , video_one_level_preference_2 int
+        |            , video_one_level_preference_3 int
+        |            , video_two_level_preference_1 int
+        |            , video_two_level_preference_2 int
+        |            , video_two_level_preference_3 int
+        |            , movie_two_level_preference_1 int
+        |            , movie_two_level_preference_2 int
+        |            , movie_two_level_preference_3 int
+        |            , single_two_level_preference_1 int
+        |            , single_two_level_preference_2 int
+        |            , single_two_level_preference_3 int
+        |            , in_package_video_two_level_preference_1 int
+        |            , in_package_video_two_level_preference_2 int
+        |            , in_package_video_two_level_preference_3 int
+        |         )
+        |PARTITIONED BY
+        |    (
+        |     partitiondate string
+        |     , license string
+        |     , vod_version string
+        |     , sector int
+        |     , category string
+        |     )
+      """.stripMargin)
+
+    df_result.createOrReplaceTempView(tempTable)
+
+    val insert_sql =
+      s"""
+         |INSERT OVERWRITE TABLE
+         |    vodrs.paypredict_userpay_dataset_v2
+         |PARTITION
+         |    (
+         |     partitiondate = '$partitiondate'
+         |     , license = '$license'
+         |     , vod_version = '$vod_version'
+         |     , sector = $sector
+         |     , category = '$category'
+         |     )
+         |SELECT
+         |        user_id
+         |        , order_status
+         |        , active_days_last_30_days
+         |        , total_time_last_30_days
+         |        , days_from_last_active
+         |        , days_since_first_active_in_timewindow
+         |        , active_days_last_14_days
+         |        , total_time_last_14_days
+         |        , active_days_last_7_days
+         |        , total_time_last_7_days
+         |        , active_days_last_3_days
+         |        , total_time_last_3_days
+         |        , total_time_paid_videos_last_30_days
+         |        , total_time_paid_videos_last_14_days
+         |        , total_time_paid_videos_last_7_days
+         |        , total_time_paid_videos_last_3_days
+         |        , total_time_paid_videos_last_1_days
+         |        , total_time_in_package_videos_last_30_days
+         |        , var_time_in_package_videos_last_30_days
+         |        , number_in_package_videos_last_30_days
+         |        , total_time_in_package_videos_last_14_days
+         |        , var_time_in_package_videos_last_14_days
+         |        , number_in_package_videos_last_14_days
+         |        , total_time_in_package_videos_last_7_days
+         |        , var_time_in_package_videos_last_7_days
+         |        , number_in_package_videos_last_7_days
+         |        , total_time_in_package_videos_last_3_days
+         |        , var_time_in_package_videos_last_3_days
+         |        , number_in_package_videos_last_3_days
+         |        , total_time_in_package_videos_last_1_days
+         |        , var_time_in_package_videos_last_1_days
+         |        , number_in_package_videos_last_1_days
+         |        , total_time_children_videos_last_30_days
+         |        , number_children_videos_last_30_days
+         |        , total_time_children_videos_last_14_days
+         |        , number_children_videos_last_14_days
+         |        , total_time_children_videos_last_7_days
+         |        , number_children_videos_last_7_days
+         |        , total_time_children_videos_last_3_days
+         |        , number_children_videos_last_3_days
+         |        , total_time_children_videos_last_1_days
+         |        , number_children_videos_last_1_days
+         |        , total_time_movies_last_30_days
+         |        , total_time_movies_last_14_days
+         |        , total_time_movies_last_7_days
+         |        , total_time_movies_last_3_days
+         |        , total_time_movies_last_1_days
+         |        , total_time_paid_movies_last_30_days
+         |        , total_time_paid_movies_last_14_days
+         |        , total_time_paid_movies_last_7_days
+         |        , total_time_paid_movies_last_3_days
+         |        , total_time_paid_movies_last_1_days
+         |        , active_workdays_last_30_days
+         |        , avg_workdaily_time_videos_last_30_days
+         |        , active_restdays_last_30_days
+         |        , avg_restdaily_time_videos_last_30_days
+         |        , avg_workdaily_time_paid_videos_last_30_days
+         |        , avg_restdaily_time_paid_videos_last_30_days
+         |        , number_packages_purchased
+         |        , total_money_packages_purchased
+         |        , max_money_package_purchased
+         |        , min_money_package_purchased
+         |        , avg_money_package_purchased
+         |        , var_money_package_purchased
+         |        , number_singles_purchased
+         |        , total_money_singles_purchased
+         |        , total_money_consumption
+         |        , number_packages_unpurchased
+         |        , money_packages_unpurchased
+         |        , number_singles_unpurchased
+         |        , money_singles_unpurchased
+         |        , days_since_last_purchase_package
+         |        , days_since_last_click_package
+         |        , number_orders_last_30_days
+         |        , number_paid_orders_last_30_days
+         |        , number_paid_package_last_30_days
+         |        , number_paid_single_last_30_days
+         |        , days_remaining_package
+         |        , video_one_level_preference_1
+         |        , video_one_level_preference_2
+         |        , video_one_level_preference_3
+         |        , video_two_level_preference_1
+         |        , video_two_level_preference_2
+         |        , video_two_level_preference_3
+         |        , movie_two_level_preference_1
+         |        , movie_two_level_preference_2
+         |        , movie_two_level_preference_3
+         |        , single_two_level_preference_1
+         |        , single_two_level_preference_2
+         |        , single_two_level_preference_3
+         |        , in_package_video_two_level_preference_1
+         |        , in_package_video_two_level_preference_2
+         |        , in_package_video_two_level_preference_3
+         |FROM
+         |    $tempTable
+      """.stripMargin
+
+    spark.sql(insert_sql)
+
+    println(insert_sql)
+  }
+
+
+  def saveUsersSplitDataV2(df_result: DataFrame, partitiondate: String, license: String, vod_version: String, sector: Int
+                           , category: String) = {
+
+    spark.sql(
+      """
+        |CREATE TABLE IF NOT EXISTS
+        |     vodrs.paypredict_user_split_result_v2
+        |        (
+        |         user_id string
+        |         ,order_status int
+        |         )
+        |PARTITIONED BY
+        |    (
+        |     partitiondate string
+        |     , license string
+        |     , vod_version string
+        |     , sector int
+        |     , category string
+        |     )
+      """.stripMargin)
+
+    df_result.createOrReplaceTempView(tempTable)
+
+    val insert_sql =
+      s"""
+         |INSERT OVERWRITE TABLE
+         |    vodrs.paypredict_user_split_result_v2
+         |PARTITION
+         |    (
+         |     partitiondate = '$partitiondate'
+         |     , license = '$license'
+         |     , vod_version = '$vod_version'
+         |     , sector = $sector
+         |     , category = '$category'
+         |     )
+         |SELECT
+         |    user_id
+         |    ,order_status
+         |FROM
+         |    $tempTable
+      """.stripMargin
+
+    spark.sql(insert_sql)
+
+    println(insert_sql)
+  }
+
+
+  def getUserSplitResultV2(partitiondate: String, license: String, vod_version: String, sector: Int, category: String) = {
+
+    val get_data_sql =
+      s"""
+         |SELECT
+         |    user_id
+         |    , order_status
+         |FROM
+         |    vodrs.paypredict_user_split_result_v2
+         |WHERE
+         |    partitiondate = '$partitiondate'
+         |    and license = '$license'
+         |    and vod_version = '$vod_version'
+         |    and sector = $sector
+         |    and category = '$category'
+      """.stripMargin
+
+    val df_result = spark.sql(get_data_sql)
+
+    df_result
+  }
+
+
+  def saveUserProfileOrderPartV2(df_result: DataFrame, partitiondate: String, license: String, vod_version: String
+                                 , sector: Int, category: String) = {
+
+    spark.sql(
+      """
+        |CREATE TABLE IF NOT EXISTS
+        |     vodrs.paypredict_user_profile_order_part_v2
+        |        (
+        |        user_id string
+        |        , number_packages_purchased long
+        |        , total_money_packages_purchased double
+        |        , max_money_package_purchased double
+        |        , min_money_package_purchased double
+        |        , avg_money_package_purchased double
+        |        , var_money_package_purchased double
+        |        , number_singles_purchased long
+        |        , total_money_singles_purchased double
+        |        , total_money_consumption double
+        |        , number_packages_unpurchased long
+        |        , money_packages_unpurchased double
+        |        , number_singles_unpurchased long
+        |        , money_singles_unpurchased double
+        |        , days_since_last_purchase_package int
+        |        , days_since_last_click_package int
+        |        , number_orders_last_30_days long
+        |        , number_paid_orders_last_30_days long
+        |        , number_paid_package_last_30_days long
+        |        , number_paid_single_last_30_days long
+        |        , days_remaining_package int
+        |         )
+        |PARTITIONED BY
+        |    (
+        |     partitiondate string
+        |     , license string
+        |     , vod_version string
+        |     , sector int
+        |     , category string
+        |     )
+      """.stripMargin)
+
+    df_result.createOrReplaceTempView(tempTable)
+
+    val insert_sql =
+      s"""
+         |INSERT OVERWRITE TABLE
+         |    vodrs.paypredict_user_profile_order_part_v2
+         |PARTITION
+         |    (
+         |     partitiondate = '$partitiondate'
+         |     , license = '$license'
+         |     , vod_version = '$vod_version'
+         |     , sector = '$sector'
+         |     , category = '$category'
+         |     )
+         |SELECT
+         |    user_id
+         |    , number_packages_purchased
+         |    , total_money_packages_purchased
+         |    , max_money_package_purchased
+         |    , min_money_package_purchased
+         |    , avg_money_package_purchased
+         |    , var_money_package_purchased
+         |    , number_singles_purchased
+         |    , total_money_singles_purchased
+         |    , total_money_consumption
+         |    , number_packages_unpurchased
+         |    , money_packages_unpurchased
+         |    , number_singles_unpurchased
+         |    , money_singles_unpurchased
+         |    , days_since_last_purchase_package
+         |    , days_since_last_click_package
+         |    , number_orders_last_30_days
+         |    , number_paid_orders_last_30_days
+         |    , number_paid_package_last_30_days
+         |    , number_paid_single_last_30_days
+         |    , days_remaining_package
+         |FROM
+         |    $tempTable
+      """.stripMargin
+
+    spark.sql(insert_sql)
+
+    println(insert_sql)
+  }
+
+
+  def getProcessedPlayV2(partitiondate: String, license: String, vod_version: String, sector: Int, category: String) = {
+
+    val get_data_sql =
+      s"""
+         |SELECT
+         |    user_id
+         |    ,video_id
+         |    ,play_start_time
+         |    ,time_sum
+         |FROM
+         |    vodrs.paypredict_processed_play_split_v2
+         |WHERE
+         |    partitiondate = '$partitiondate'
+         |    and license = '$license'
+         |    and vod_version = '$vod_version'
+         |    and sector = $sector
+         |    and category = '$category'
+       """.stripMargin
+
+    val df_result = spark.sql(get_data_sql)
+
+    df_result
+  }
+
+  def getProcessedMediasV2(partitiondate: String, license: String) = {
+
+    val get_data_sql =
+      s"""
+         |SELECT
+         |    video_id ,
+         |    video_title ,
+         |    video_one_level_classification ,
+         |    video_two_level_classification_list ,
+         |    video_tag_list ,
+         |    director_list ,
+         |    actor_list ,
+         |    country ,
+         |    language ,
+         |    release_date ,
+         |    storage_time ,
+         |    video_time ,
+         |    score ,
+         |    is_paid ,
+         |    package_id ,
+         |    is_single ,
+         |    is_trailers ,
+         |    supplier ,
+         |    introduction
+         |FROM
+         |    vodrs.paypredict_processed_media
+         |WHERE
+         |    partitiondate = '$partitiondate'
+         |    and license = '$license'
+       """.stripMargin
+
+    val df_result = spark.sql(get_data_sql)
+
+    df_result
+  }
+
+  def getTrainUserV2(partitiondate: String, license: String, vod_version: String, sector: Int, category: String) = {
+
+    val get_data_sql =
+      s"""
+         |SELECT
+         |    user_id
+         |    ,order_status
+         |FROM
+         |    vodrs.paypredict_processed_train_user_v2
+         |WHERE
+         |     partitiondate = '$partitiondate'
+         |     and license = '$license'
+         |     and vod_version = '$vod_version'
+         |     and sector = $sector
+         |     and category = '$category'
+       """.stripMargin
+
+    val df_result = spark.sql(get_data_sql)
+
+    df_result
+  }
+
+  def saveUserProfilePlayPartV2(df_result: DataFrame, partitiondate: String, license: String, vod_version: String
+                                , sector: Int, category: String) = {
+
+    spark.sql(
+      """
+        |CREATE TABLE IF NOT EXISTS
+        |     vodrs.paypredict_user_profile_play_part_v2
+        |        (
+        |            user_id string
+        |            , active_days_last_30_days long
+        |            , total_time_last_30_days double
+        |            , days_from_last_active int
+        |            , days_since_first_active_in_timewindow int
+        |            , active_days_last_14_days long
+        |            , total_time_last_14_days double
+        |            , active_days_last_7_days long
+        |            , total_time_last_7_days double
+        |            , active_days_last_3_days long
+        |            , total_time_last_3_days double
+        |            , total_time_paid_videos_last_30_days double
+        |            , total_time_paid_videos_last_14_days double
+        |            , total_time_paid_videos_last_7_days double
+        |            , total_time_paid_videos_last_3_days double
+        |            , total_time_paid_videos_last_1_days double
+        |            , total_time_in_package_videos_last_30_days double
+        |            , var_time_in_package_videos_last_30_days double
+        |            , number_in_package_videos_last_30_days long
+        |            , total_time_in_package_videos_last_14_days double
+        |            , var_time_in_package_videos_last_14_days double
+        |            , number_in_package_videos_last_14_days long
+        |            , total_time_in_package_videos_last_7_days double
+        |            , var_time_in_package_videos_last_7_days double
+        |            , number_in_package_videos_last_7_days long
+        |            , total_time_in_package_videos_last_3_days double
+        |            , var_time_in_package_videos_last_3_days double
+        |            , number_in_package_videos_last_3_days long
+        |            , total_time_in_package_videos_last_1_days double
+        |            , var_time_in_package_videos_last_1_days double
+        |            , number_in_package_videos_last_1_days long
+        |            , total_time_children_videos_last_30_days double
+        |            , number_children_videos_last_30_days long
+        |            , total_time_children_videos_last_14_days double
+        |            , number_children_videos_last_14_days long
+        |            , total_time_children_videos_last_7_days double
+        |            , number_children_videos_last_7_days long
+        |            , total_time_children_videos_last_3_days double
+        |            , number_children_videos_last_3_days long
+        |            , total_time_children_videos_last_1_days double
+        |            , number_children_videos_last_1_days long
+        |         )
+        |PARTITIONED BY
+        |    (
+        |     partitiondate string
+        |     , license string
+        |     , vod_version string
+        |     , sector int
+        |     , category string
+        |     )
+      """.stripMargin)
+
+    df_result.createOrReplaceTempView(tempTable)
+
+    val insert_sql =
+      s"""
+         |INSERT OVERWRITE TABLE
+         |    vodrs.paypredict_user_profile_play_part_v2
+         |PARTITION
+         |    (
+         |     partitiondate = '$partitiondate'
+         |     , license = '$license'
+         |     , vod_version = '$vod_version'
+         |     , sector = '$sector'
+         |     , category = '$category'
+         |     )
+         |SELECT
+         |        user_id
+         |        , active_days_last_30_days
+         |        , total_time_last_30_days
+         |        , days_from_last_active
+         |        , days_since_first_active_in_timewindow
+         |        , active_days_last_14_days
+         |        , total_time_last_14_days
+         |        , active_days_last_7_days
+         |        , total_time_last_7_days
+         |        , active_days_last_3_days
+         |        , total_time_last_3_days
+         |        , total_time_paid_videos_last_30_days
+         |        , total_time_paid_videos_last_14_days
+         |        , total_time_paid_videos_last_7_days
+         |        , total_time_paid_videos_last_3_days
+         |        , total_time_paid_videos_last_1_days
+         |        , total_time_in_package_videos_last_30_days
+         |        , var_time_in_package_videos_last_30_days
+         |        , number_in_package_videos_last_30_days
+         |        , total_time_in_package_videos_last_14_days
+         |        , var_time_in_package_videos_last_14_days
+         |        , number_in_package_videos_last_14_days
+         |        , total_time_in_package_videos_last_7_days
+         |        , var_time_in_package_videos_last_7_days
+         |        , number_in_package_videos_last_7_days
+         |        , total_time_in_package_videos_last_3_days
+         |        , var_time_in_package_videos_last_3_days
+         |        , number_in_package_videos_last_3_days
+         |        , total_time_in_package_videos_last_1_days
+         |        , var_time_in_package_videos_last_1_days
+         |        , number_in_package_videos_last_1_days
+         |        , total_time_children_videos_last_30_days
+         |        , number_children_videos_last_30_days
+         |        , total_time_children_videos_last_14_days
+         |        , number_children_videos_last_14_days
+         |        , total_time_children_videos_last_7_days
+         |        , number_children_videos_last_7_days
+         |        , total_time_children_videos_last_3_days
+         |        , number_children_videos_last_3_days
+         |        , total_time_children_videos_last_1_days
+         |        , number_children_videos_last_1_days
+         |FROM
+         |    $tempTable
+      """.stripMargin
+
+    spark.sql(insert_sql)
+
+    println(insert_sql)
+  }
+
+
+  def saveUserProfileGeneratePreferencePartV2(df_result: DataFrame, partitiondate: String, license: String, vod_version: String, sector: Int, category: String) = {
+
+    spark.sql(
+      """
+        |CREATE TABLE IF NOT EXISTS
+        |     vodrs.paypredict_user_profile_preference_part_all_v2
+        |           (
+        |            user_id string
+        |            ,total_time_movies_last_30_days double
+        |            ,total_time_movies_last_14_days double
+        |            ,total_time_movies_last_7_days double
+        |            ,total_time_movies_last_3_days double
+        |            ,total_time_movies_last_1_days double
+        |            ,total_time_paid_movies_last_30_days double
+        |            ,total_time_paid_movies_last_14_days double
+        |            ,total_time_paid_movies_last_7_days double
+        |            ,total_time_paid_movies_last_3_days double
+        |            ,total_time_paid_movies_last_1_days double
+        |            ,active_workdays_last_30_days long
+        |            ,avg_workdaily_time_videos_last_30_days double
+        |            ,active_restdays_last_30_days long
+        |            ,avg_restdaily_time_videos_last_30_days double
+        |            ,avg_workdaily_time_paid_videos_last_30_days double
+        |            ,avg_restdaily_time_paid_videos_last_30_days double
+        |            ,video_one_level_preference map<string, int>
+        |            ,video_two_level_preference map<string, int>
+        |            ,tag_preference map<string, int>
+        |            ,movie_two_level_preference map<string, int>
+        |            ,movie_tag_preference map<string, int>
+        |            ,single_two_level_preference map<string, int>
+        |            ,single_tag_preference map<string, int>
+        |            ,in_package_video_two_level_preference map<string, int>
+        |            ,in_package_tag_preference map<string, int>
+        |            )
+        |PARTITIONED BY
+        |    (
+        |     partitiondate string
+        |     , license string
+        |     , vod_version string
+        |     , sector int
+        |     , category string
+        |     )
+      """.stripMargin)
+
+    df_result.createOrReplaceTempView(tempTable)
+
+    val insert_sql =
+      s"""
+         |INSERT OVERWRITE TABLE
+         |    vodrs.paypredict_user_profile_preference_part_all_v2
+         |PARTITION
+         |    (
+         |     partitiondate = '$partitiondate'
+         |     , license = '$license'
+         |     , vod_version = '$vod_version'
+         |     , sector = '$sector'
+         |     , category = '$category'
+         |     )
+         |SELECT
+         |        user_id
+         |        ,total_time_movies_last_30_days
+         |        ,total_time_movies_last_14_days
+         |        ,total_time_movies_last_7_days
+         |        ,total_time_movies_last_3_days
+         |        ,total_time_movies_last_1_days
+         |        ,total_time_paid_movies_last_30_days
+         |        ,total_time_paid_movies_last_14_days
+         |        ,total_time_paid_movies_last_7_days
+         |        ,total_time_paid_movies_last_3_days
+         |        ,total_time_paid_movies_last_1_days
+         |        ,active_workdays_last_30_days
+         |        ,avg_workdaily_time_videos_last_30_days
+         |        ,active_restdays_last_30_days
+         |        ,avg_restdaily_time_videos_last_30_days
+         |        ,avg_workdaily_time_paid_videos_last_30_days
+         |        ,avg_restdaily_time_paid_videos_last_30_days
+         |        ,video_one_level_preference
+         |        ,video_two_level_preference
+         |        ,tag_preference
+         |        ,movie_two_level_preference
+         |        ,movie_tag_preference
+         |        ,single_two_level_preference
+         |        ,single_tag_preference
+         |        ,in_package_video_two_level_preference
+         |        ,in_package_tag_preference
+         |FROM
+         |    $tempTable
+      """.stripMargin
+
+    spark.sql(insert_sql)
+
+    println(insert_sql)
+  }
 }

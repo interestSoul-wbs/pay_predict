@@ -889,4 +889,35 @@ object Utils {
     }
     return (asUnsigned(hash).toString())
   }
+
+  def udfGetErrorMoneySign = udf(getErrorMoneySign _)
+
+  def getErrorMoneySign(resourceType: Int, money: Double): Int = {
+    /**
+      * @description: sign order with money error
+      * @param: resourceType
+      * @param: money
+      * @return: int
+      * @author: wx
+      * @Date: 2020/11/25
+      */
+
+    var sign = 0
+    if (resourceType > 0 && resourceType < 4 && (money == 0 || money == 100))
+      sign = 1
+
+    sign
+  }
+
+  def partitiondateToStandard(partitiondate: String) = {
+
+    val sdf = new SimpleDateFormat("yyyyMMdd")
+
+    val dt = sdf.parse(partitiondate)
+
+    val new_time = new SimpleDateFormat("yyyy-MM-dd HH:mm:SS").format(dt)
+
+    new_time
+  }
+
 }

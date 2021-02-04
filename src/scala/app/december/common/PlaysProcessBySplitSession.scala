@@ -1,13 +1,12 @@
-package common_v2
+package app.december.common
 
 import com.github.nscala_time.time.Imports._
 import mam.Dic
-import mam.Utils.{printDf, udfLongToDateTime}
 import mam.GetSaveData._
-import org.apache.spark.sql
+import mam.Utils.{printDf, udfLongToDateTime}
+import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.joda.time.format.DateTimeFormat
 import rs.common.SparkSessionInit
 
@@ -23,6 +22,8 @@ object PlaysProcessBySplitSession {
   var license: String = _
   var vodVersion: String = _
   var sector: Int = _
+  var category: String = _
+  var processedMediasData: String = _
   var date: DateTime = _
   var daysAgoDate: String = _
   val timeMaxLimit = 43200
@@ -37,42 +38,29 @@ object PlaysProcessBySplitSession {
     license = args(1)
     vodVersion = args(2) // 2020-12-1 - union1.x
     sector = args(3).toInt
+    category = args(4)
+    processedMediasData = args(5)
 
     date = DateTime.parse(partitiondate, DateTimeFormat.forPattern("yyyyMMdd"))
-    daysAgoDate = (date - 30.days).toString(DateTimeFormat.forPattern("yyyyMMdd"))
+    daysAgoDate = (date - 90.days).toString(DateTimeFormat.forPattern("yyyyMMdd"))
 
     // 1 - Get original sub_id from vodrs.paypredict_user_subid
-    val df_sub_id = getAllRawSubid(partitiondate, license, vodVersion, sector)
-
-    println("——————\n" * 4)
-
-    println(df_sub_id.count())
-
-    printDf("df_sub_id", df_sub_id)
+    val df_sub_id = getAllRawSubid(processedMediasData, license, vodVersion, sector)
 
     // 2 - get sample users' play data.
     val df_all_raw_play = getRawPlayByDateRangeAllUsers(daysAgoDate, partitiondate, license)
-
-    printDf("df_all_raw_play", df_all_raw_play)
 
     // 3 - get specifical users' history
     val df_play_raw = df_sub_id
       .join(df_all_raw_play, Seq(Dic.colSubscriberid))
       .withColumnRenamed(Dic.colSubscriberid, Dic.colUserId)
 
-    printDf("输入 df_play_raw", df_play_raw)
-
     // 4 - processed media
-    val df_medias_processed = getProcessedMedias(partitiondate, license)
-
-    printDf("输入 df_medias_processed", df_medias_processed)
+    val df_medias_processed = getProcessedMedias(processedMediasData, license)
 
     val df_plays_processed = playsProcessBySpiltSession(df_play_raw, df_medias_processed)
-    //    saveProcessedData(df_plays_processed, playProcessedPath)
 
-    printDf("输出 playProcessed", df_plays_processed)
-
-    println("播放数据处理完成！")
+    saveProcessedPlayBySplitV2(df_plays_processed, partitiondate, license, vodVersion, sector, category)
   }
 
   def playsProcessBySpiltSession(df_play_raw: DataFrame, df_medias_processed: DataFrame): DataFrame = {
@@ -95,8 +83,6 @@ object PlaysProcessBySplitSession {
 
     val df_play_in_medias = df_play
       .join(df_video_id, Seq(Dic.colVideoId), "inner")
-
-    printDf("play数据中video存在medias中的数据", df_play_in_medias)
 
     /**
       * 计算开始时间 start_time
@@ -131,8 +117,6 @@ object PlaysProcessBySplitSession {
       .na.fill(Map((Dic.colTimeGapLeadSameVideo, 0), (Dic.colSessionSign, 0))) //填充移动后产生的空值
       .filter(col(Dic.colTimeGapLeadSameVideo) >= 0) //筛选正确时间间隔的数据
 
-    printDf("df_play_gap", df_play_gap)
-
     /**
       * 合并session内相同video时间间隔在30min之内的播放时长
       */
@@ -145,8 +129,6 @@ object PlaysProcessBySplitSession {
       .agg(
         sum(col(Dic.colBroadcastTime)).as(Dic.colTimeSum))
 
-    printDf("df_play_sum_time", df_play_sum_time)
-
     val df_play_session = df_play_gap
       .join(df_play_sum_time, Seq(Dic.colUserId, Dic.colVideoId, Dic.colSessionSign), "inner")
       .select(
@@ -156,8 +138,6 @@ object PlaysProcessBySplitSession {
         Dic.colTimeSum,
         Dic.colTimeGapLeadSameVideo,
         Dic.colSessionSign)
-
-    printDf("df_play_session", df_play_session)
 
     /**
       * 同一个session内相同video只保留第一条数据
@@ -176,8 +156,6 @@ object PlaysProcessBySplitSession {
       Dic.colKeepSign,
       Dic.colTimeGapLeadSameVideo,
       Dic.colSessionSign)
-
-    printDf("df_play_processed", df_play_processed)
 
     df_play_processed
   }

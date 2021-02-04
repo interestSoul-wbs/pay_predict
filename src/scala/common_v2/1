@@ -1,19 +1,93 @@
-    video_id
-    ,video_title
-    ,video_one_level_classification
-    ,video_two_level_classification_list
-    ,video_tag_list
-    ,director_list
-    ,actor_list
-    ,country
-    ,language
-    ,release_date
-    ,storage_time
-    ,video_time
-    ,score
-    ,is_paid
-    ,package_id
-    ,is_single
-    ,is_trailers
-    ,supplier
-    ,introduction
+        user_id \
+        , order_status \
+        , active_days_last_30_days \
+        , total_time_last_30_days \
+        , days_from_last_active \
+        , days_since_first_active_in_timewindow \
+        , active_days_last_14_days \
+        , total_time_last_14_days \
+        , active_days_last_7_days \
+        , total_time_last_7_days \
+        , active_days_last_3_days \
+        , total_time_last_3_days \
+        , total_time_paid_videos_last_30_days \
+        , total_time_paid_videos_last_14_days \
+        , total_time_paid_videos_last_7_days \
+        , total_time_paid_videos_last_3_days \
+        , total_time_paid_videos_last_1_days \
+        , total_time_in_package_videos_last_30_days \
+        , var_time_in_package_videos_last_30_days \
+        , number_in_package_videos_last_30_days \
+        , total_time_in_package_videos_last_14_days \
+        , var_time_in_package_videos_last_14_days \
+        , number_in_package_videos_last_14_days \
+        , total_time_in_package_videos_last_7_days \
+        , var_time_in_package_videos_last_7_days \
+        , number_in_package_videos_last_7_days \
+        , total_time_in_package_videos_last_3_days \
+        , var_time_in_package_videos_last_3_days \
+        , number_in_package_videos_last_3_days \
+        , total_time_in_package_videos_last_1_days \
+        , var_time_in_package_videos_last_1_days \
+        , number_in_package_videos_last_1_days \
+        , total_time_children_videos_last_30_days \
+        , number_children_videos_last_30_days \
+        , total_time_children_videos_last_14_days \
+        , number_children_videos_last_14_days \
+        , total_time_children_videos_last_7_days \
+        , number_children_videos_last_7_days \
+        , total_time_children_videos_last_3_days \
+        , number_children_videos_last_3_days \
+        , total_time_children_videos_last_1_days \
+        , number_children_videos_last_1_days \
+        , total_time_movies_last_30_days \
+        , total_time_movies_last_14_days \
+        , total_time_movies_last_7_days \
+        , total_time_movies_last_3_days \
+        , total_time_movies_last_1_days \
+        , total_time_paid_movies_last_30_days \
+        , total_time_paid_movies_last_14_days \
+        , total_time_paid_movies_last_7_days \
+        , total_time_paid_movies_last_3_days \
+        , total_time_paid_movies_last_1_days \
+        , active_workdays_last_30_days \
+        , avg_workdaily_time_videos_last_30_days \
+        , active_restdays_last_30_days \
+        , avg_restdaily_time_videos_last_30_days \
+        , avg_workdaily_time_paid_videos_last_30_days \
+        , avg_restdaily_time_paid_videos_last_30_days \
+        , number_packages_purchased \
+        , total_money_packages_purchased \
+        , max_money_package_purchased \
+        , min_money_package_purchased \
+        , avg_money_package_purchased \
+        , var_money_package_purchased \
+        , number_singles_purchased \
+        , total_money_singles_purchased \
+        , total_money_consumption \
+        , number_packages_unpurchased \
+        , money_packages_unpurchased \
+        , number_singles_unpurchased \
+        , money_singles_unpurchased \
+        , days_since_last_purchase_package \
+        , days_since_last_click_package \
+        , number_orders_last_30_days \
+        , number_paid_orders_last_30_days \
+        , number_paid_package_last_30_days \
+        , number_paid_single_last_30_days \
+        , days_remaining_package \
+        , video_one_level_preference_1 \
+        , video_one_level_preference_2 \
+        , video_one_level_preference_3 \
+        , video_two_level_preference_1 \
+        , video_two_level_preference_2 \
+        , video_two_level_preference_3 \
+        , movie_two_level_preference_1 \
+        , movie_two_level_preference_2 \
+        , movie_two_level_preference_3 \
+        , single_two_level_preference_1 \
+        , single_two_level_preference_2 \
+        , single_two_level_preference_3 \
+        , in_package_video_two_level_preference_1 \
+        , in_package_video_two_level_preference_2 \
+        , in_package_video_two_level_preference_3 \

@@ -1,14 +1,11 @@
-package common_v2
+package app.december.common
 
 import mam.Dic
-import mam.GetSaveData._
-import mam.Utils._
-import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.StringType
-import rs.common.DateTimeTool._
+import mam.GetSaveData.{getUserInfoSample, saveSubIdAndShuntIdInfoDynamic}
+import mam.Utils.printDf
+import org.apache.spark.sql.functions.lit
+import rs.common.DateTimeTool.{getDaysAgoAfter, getRealSysDateTimeString}
 import rs.common.SparkSessionInit
-import rs.common.SparkSessionInit.spark
 
 /**
   * Konverse - 2020-11-30.

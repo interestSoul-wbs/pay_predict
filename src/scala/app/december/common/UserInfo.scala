@@ -1,12 +1,11 @@
-package common
+package app.december.common
 
 import mam.Dic
-import mam.GetSaveData._
-import mam.Utils._
-import org.apache.spark.sql.functions._
+import mam.GetSaveData.{getOrignalAllUserInfo, getOrignalSubId, saveSubIdAndShuntIdInfoDynamic}
+import mam.Utils.udfUidHash
+import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.types.StringType
-import org.apache.spark.sql.{DataFrame, SparkSession}
-import rs.common.DateTimeTool._
+import rs.common.DateTimeTool.{getDaysAgoAfter, getRealSysDateTimeString}
 import rs.common.SparkSessionInit
 
 /**
