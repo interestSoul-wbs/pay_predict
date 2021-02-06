@@ -9,8 +9,14 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 object GetSaveData {
 
   var tempTable = "temp_table"
-    val hdfsPath = ""
-  //val hdfsPath = "hdfs:///pay_predict/"
+//    val hdfsPath = ""
+  val hdfsPath = "hdfs:///pay_predict_4_Tencent/"
+  val delimiter = ","
+
+  def saveDataForXXK(df_data:DataFrame, state: String, fileName: String) = {
+    val path = hdfsPath + "data/" + state + "/xxkang/" + fileName
+    saveProcessedData(df_data, path)
+  }
 
 
   def getOrignalSubId(spark: SparkSession, partitiondate: String, license: String, vod_version: String) = {
@@ -256,32 +262,32 @@ object GetSaveData {
 
     // Konverse - 注意 df 的命名 - df_相关属性 - 不要 dfRawMedia
     val df_raw_media = spark.read
-      .option("delimiter", "\t")
-      .option("header", false)
+      .option("delimiter", "\\t")
+      .option("header", true)
       .schema(schema)
       .csv(mediasRawPath)
-      .select(
-        when(col(Dic.colVideoId) === "NULL", null).otherwise(col(Dic.colVideoId)).as(Dic.colVideoId),
-        when(col(Dic.colVideoTitle) === "NULL", null).otherwise(col(Dic.colVideoTitle)).as(Dic.colVideoTitle),
-        when(col(Dic.colVideoOneLevelClassification) === "NULL" or (col(Dic.colVideoOneLevelClassification) === ""), null)
-          .otherwise(col(Dic.colVideoOneLevelClassification)).as(Dic.colVideoOneLevelClassification),
-        from_json(col(Dic.colVideoTwoLevelClassificationList), ArrayType(StringType, containsNull = true)).as(Dic.colVideoTwoLevelClassificationList),
-        from_json(col(Dic.colVideoTagList), ArrayType(StringType, containsNull = true)).as(Dic.colVideoTagList),
-        from_json(col(Dic.colDirectorList), ArrayType(StringType, containsNull = true)).as(Dic.colDirectorList),
-        from_json(col(Dic.colActorList), ArrayType(StringType, containsNull = true)).as(Dic.colActorList),
-        when(col(Dic.colVideoOneLevelClassification).isNotNull, col(Dic.colVideoOneLevelClassification)), // Konverse - 这一步 相当于缺失值填充，被移动到了 process
-        when(col(Dic.colCountry) === "NULL", null).otherwise(col(Dic.colCountry)).as(Dic.colCountry),
-        when(col(Dic.colLanguage) === "NULL", null).otherwise(col(Dic.colLanguage)).as(Dic.colLanguage),
-        when(col(Dic.colReleaseDate) === "NULL", null).otherwise(col(Dic.colReleaseDate)).as(Dic.colReleaseDate),
-        when(col(Dic.colStorageTime) === "NULL", null).otherwise(col(Dic.colStorageTime)).as(Dic.colStorageTime), // Konverse - 这一步的udf被移动到了 process
-        when(col(Dic.colVideoTime) === "NULL", null).otherwise(col(Dic.colVideoTime) cast DoubleType).as(Dic.colVideoTime),
-        when(col(Dic.colScore) === "NULL", null).otherwise(col(Dic.colScore) cast DoubleType).as(Dic.colScore),
-        when(col(Dic.colIsPaid) === "NULL", null).otherwise(col(Dic.colIsPaid) cast DoubleType).as(Dic.colIsPaid),
-        when(col(Dic.colPackageId) === "NULL", null).otherwise(col(Dic.colPackageId)).as(Dic.colPackageId),
-        when(col(Dic.colIsSingle) === "NULL", null).otherwise(col(Dic.colIsSingle) cast DoubleType).as(Dic.colIsSingle),
-        when(col(Dic.colIsTrailers) === "NULL", null).otherwise(col(Dic.colIsTrailers) cast DoubleType).as(Dic.colIsTrailers),
-        when(col(Dic.colSupplier) === "NULL", null).otherwise(col(Dic.colSupplier)).as(Dic.colSupplier),
-        when(col(Dic.colIntroduction) === "NULL", null).otherwise(col(Dic.colIntroduction)).as(Dic.colIntroduction))
+//      .select(
+//        when(col(Dic.colVideoId) === "NULL", null).otherwise(col(Dic.colVideoId)).as(Dic.colVideoId),
+//        when(col(Dic.colVideoTitle) === "NULL", null).otherwise(col(Dic.colVideoTitle)).as(Dic.colVideoTitle),
+//        when(col(Dic.colVideoOneLevelClassification) === "NULL" or (col(Dic.colVideoOneLevelClassification) === ""), null)
+//          .otherwise(col(Dic.colVideoOneLevelClassification)).as(Dic.colVideoOneLevelClassification),
+//        from_json(col(Dic.colVideoTwoLevelClassificationList), ArrayType(StringType, containsNull = true)).as(Dic.colVideoTwoLevelClassificationList),
+//        from_json(col(Dic.colVideoTagList), ArrayType(StringType, containsNull = true)).as(Dic.colVideoTagList),
+//        from_json(col(Dic.colDirectorList), ArrayType(StringType, containsNull = true)).as(Dic.colDirectorList),
+//        from_json(col(Dic.colActorList), ArrayType(StringType, containsNull = true)).as(Dic.colActorList),
+//        when(col(Dic.colVideoOneLevelClassification).isNotNull, col(Dic.colVideoOneLevelClassification)), // Konverse - 这一步 相当于缺失值填充，被移动到了 process
+//        when(col(Dic.colCountry) === "NULL", null).otherwise(col(Dic.colCountry)).as(Dic.colCountry),
+//        when(col(Dic.colLanguage) === "NULL", null).otherwise(col(Dic.colLanguage)).as(Dic.colLanguage),
+//        when(col(Dic.colReleaseDate) === "NULL", null).otherwise(col(Dic.colReleaseDate)).as(Dic.colReleaseDate),
+//        when(col(Dic.colStorageTime) === "NULL", null).otherwise(col(Dic.colStorageTime)).as(Dic.colStorageTime), // Konverse - 这一步的udf被移动到了 process
+//        when(col(Dic.colVideoTime) === "NULL", null).otherwise(col(Dic.colVideoTime) cast DoubleType).as(Dic.colVideoTime),
+//        when(col(Dic.colScore) === "NULL", null).otherwise(col(Dic.colScore) cast DoubleType).as(Dic.colScore),
+//        when(col(Dic.colIsPaid) === "NULL", null).otherwise(col(Dic.colIsPaid) cast DoubleType).as(Dic.colIsPaid),
+//        when(col(Dic.colPackageId) === "NULL", null).otherwise(col(Dic.colPackageId)).as(Dic.colPackageId),
+//        when(col(Dic.colIsSingle) === "NULL", null).otherwise(col(Dic.colIsSingle) cast DoubleType).as(Dic.colIsSingle),
+//        when(col(Dic.colIsTrailers) === "NULL", null).otherwise(col(Dic.colIsTrailers) cast DoubleType).as(Dic.colIsTrailers),
+//        when(col(Dic.colSupplier) === "NULL", null).otherwise(col(Dic.colSupplier)).as(Dic.colSupplier),
+//        when(col(Dic.colIntroduction) === "NULL", null).otherwise(col(Dic.colIntroduction)).as(Dic.colIntroduction))
 
     df_raw_media
   }
@@ -2420,6 +2426,39 @@ object GetSaveData {
   }
 
 
+  def getRawOrders2(spark: SparkSession) : DataFrame = {
+
+    val orderRawPath = hdfsPath + "data/train/common/raw/orders/*"
+
+    val schema = StructType(
+      List(
+        StructField(Dic.colUserId, StringType),
+        StructField(Dic.colMoney, StringType),
+        StructField(Dic.colResourceId, StringType),
+        StructField(Dic.colResourceType, StringType),
+        StructField(Dic.colResourceTitle, StringType),
+        StructField(Dic.colDiscountDescription, StringType),
+        StructField(Dic.colCreationTime, StringType),
+        StructField(Dic.colOrderStatus, StringType),
+        StructField(Dic.colOrderStartTime, StringType),
+        StructField(Dic.colOrderEndTime, StringType),
+        StructField(Dic.colPartitionDate, StringType),
+        StructField(Dic.colLicense, StringType)
+      )
+    )
+
+    val df = spark.read
+      .option("delimiter", delimiter)
+      .option("header", true)
+      .schema(schema)
+      .csv(orderRawPath)
+
+    df
+
+  }
+
+
+
   def getRawOrders(spark: SparkSession) = {
 
     val orderRawPath = hdfsPath + "data/train/common/raw/orders/*"
@@ -2438,7 +2477,7 @@ object GetSaveData {
         StructField(Dic.colOrderEndTime, StringType)))
 
     val df = spark.read
-      .option("delimiter", "\t")
+      .option("delimiter", delimiter)
       .option("header", false)
       .schema(schema)
       .csv(orderRawPath)
@@ -2458,13 +2497,35 @@ object GetSaveData {
         StructField(Dic.colBroadcastTime, FloatType)))
 
     val df = spark.read
-      .option("delimiter", "\t")
-      .option("header", false)
+      .option("delimiter", delimiter)
+      .option("header", true)
       .schema(schema)
       .csv(playRawPath)
 
     df
   }
+
+  def getRawPlays2(spark: SparkSession) = {
+
+    val playRawPath = hdfsPath + "data/train/common/raw/plays/*"
+
+    val schema = StructType(
+      List(
+        StructField(Dic.colUserId, StringType),
+        StructField(Dic.colVideoId, StringType),
+        StructField(Dic.colPlayEndTime, StringType),
+        StructField(Dic.colBroadcastTime, FloatType)))
+
+    val df = spark.read
+      .option("delimiter", delimiter)
+      .option("header", true)
+      .schema(schema)
+      .csv(playRawPath)
+
+    df
+  }
+
+
 
   /**
    * Save processed media data to hive
@@ -2660,7 +2721,7 @@ object GetSaveData {
 
   def getProcessedPlay(sparkSession: SparkSession) = {
 
-    val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3"
+    val playsProcessedPath = hdfsPath + "data/train/common/processed/plays"
     sparkSession.read.format("parquet").load(playsProcessedPath)
 
   }
@@ -2676,6 +2737,12 @@ object GetSaveData {
 
     val allUsersPath = hdfsPath + "data/train/userpay/allUsers/user_id.txt"
     spark.read.format("csv").load(allUsersPath).toDF(Dic.colUserId)
+
+  }
+
+  def getAllUsersPlayAndOrder(spark: SparkSession) = {
+    val allUsersPath = hdfsPath + "data/train/userpay/allUsersFromPLayAndOrders"
+    getData(spark, allUsersPath)
 
   }
 
@@ -2788,5 +2855,92 @@ object GetSaveData {
     val Path = hdfsPath + "data/" + state + "/userpay/"+ state +"UserProfile" + now.split(" ")(0)
     saveProcessedData(df_data, Path)
   }
+    
+    
+    
+  def getRawMediaData2(spark: SparkSession) = {
 
+    //
+    val mediasRawPath = hdfsPath + "data/train/common/raw/medias/*"
+
+    val schema = StructType(
+      List(
+        StructField("media_id", StringType),
+        StructField("c_1", StringType),
+        StructField("type_name", StringType),
+        StructField("category_name_array", StringType),
+        StructField("tag_name_array", StringType),
+        StructField("director_name_array", StringType),
+        StructField("actor_name_array", StringType),
+        StructField(Dic.colCountry, StringType),
+        StructField(Dic.colLanguage, StringType),
+        StructField("pubdate", StringType),
+        StructField("created_time", StringType),
+        //视频时长
+        StructField("time_length", StringType),
+        StructField("rate", StringType),
+        StructField("fee", StringType),
+        StructField("vip_id", StringType),
+        StructField("is_single", StringType),
+        //是否片花
+        StructField("is_clip", StringType),
+        StructField("vender_name", StringType),
+        StructField("_c18", StringType)
+      )
+    )
+
+    // Konverse - 注意 df 的命名 - df_相关属性 - 不要 dfRawMedia
+    val df_raw_media = spark.read
+      .option("delimiter", "\\t")
+      .option("header", true)
+      .schema(schema)
+      .csv(mediasRawPath)
+      .withColumnRenamed("media_id", Dic.colVideoId)
+      .withColumnRenamed("c_1", Dic.colVideoTitle)
+      .withColumnRenamed("type_name", Dic.colVideoOneLevelClassification)
+      .withColumnRenamed("category_name_array", Dic.colVideoTwoLevelClassificationList)
+      .withColumnRenamed("tag_name_array", Dic.colVideoTagList)
+      .withColumnRenamed("director_name_array", Dic.colDirectorList)
+      .withColumnRenamed("actor_name_array", Dic.colActorList)
+      .withColumnRenamed("pubdate", Dic.colReleaseDate)
+      .withColumnRenamed("created_time", Dic.colStorageTime)
+      .withColumnRenamed("time_length", Dic.colVideoTime)
+      .withColumnRenamed("rate", Dic.colScore)
+      .withColumnRenamed("fee", Dic.colIsPaid)
+      .withColumnRenamed("vip_id", Dic.colPackageId)
+      .withColumnRenamed("is_single", Dic.colIsSingle)
+      .withColumnRenamed("is_clip", Dic.colIsTrailers)
+      .withColumnRenamed("vender_name", Dic.colSupplier)
+      .withColumnRenamed("_c18", Dic.colIntroduction)
+
+
+
+//   // Konverse - 注意 df 的命名 - df_相关属性 - 不要 dfRawMedia
+//    val df_medias = df_raw_media
+//      .select(
+//        when(col(Dic.colVideoId) === "NULL", null).otherwise(col(Dic.colVideoId)).as(Dic.colVideoId),
+//        when(col(Dic.colVideoTitle) === "NULL", null).otherwise(col(Dic.colVideoTitle)).as(Dic.colVideoTitle),
+//        when(col(Dic.colVideoOneLevelClassification) === "NULL" or (col(Dic.colVideoOneLevelClassification) === ""), null)
+//          .otherwise(col(Dic.colVideoOneLevelClassification)).as(Dic.colVideoOneLevelClassification),
+//        from_json(col(Dic.colVideoTwoLevelClassificationList), ArrayType(StringType, containsNull = true)).as(Dic.colVideoTwoLevelClassificationList),
+//        from_json(col(Dic.colVideoTagList), ArrayType(StringType, containsNull = true)).as(Dic.colVideoTagList),
+//        from_json(col(Dic.colDirectorList), ArrayType(StringType, containsNull = true)).as(Dic.colDirectorList),
+//        from_json(col(Dic.colActorList), ArrayType(StringType, containsNull = true)).as(Dic.colActorList),
+//        when(col(Dic.colVideoOneLevelClassification).isNotNull, col(Dic.colVideoOneLevelClassification)), // Konverse - 这一步 相当于缺失值填充，被移动到了 process
+//        when(col(Dic.colCountry) === "NULL", null).otherwise(col(Dic.colCountry)).as(Dic.colCountry),
+//        when(col(Dic.colLanguage) === "NULL", null).otherwise(col(Dic.colLanguage)).as(Dic.colLanguage),
+//        when(col(Dic.colReleaseDate) === "NULL", null).otherwise(col(Dic.colReleaseDate)).as(Dic.colReleaseDate),
+//        when(col(Dic.colStorageTime) === "NULL", null).otherwise(col(Dic.colStorageTime)).as(Dic.colStorageTime), // Konverse - 这一步的udf被移动到了 process
+//        when(col(Dic.colVideoTime) === "NULL", null).otherwise(col(Dic.colVideoTime) cast DoubleType).as(Dic.colVideoTime),
+//        when(col(Dic.colScore) === "NULL", null).otherwise(col(Dic.colScore) cast DoubleType).as(Dic.colScore),
+//        when(col(Dic.colIsPaid) === "NULL", null).otherwise(col(Dic.colIsPaid) cast DoubleType).as(Dic.colIsPaid),
+//        when(col(Dic.colPackageId) === "NULL", null).otherwise(col(Dic.colPackageId)).as(Dic.colPackageId),
+//        when(col(Dic.colIsSingle) === "NULL", null).otherwise(col(Dic.colIsSingle) cast DoubleType).as(Dic.colIsSingle),
+//        when(col(Dic.colIsTrailers) === "NULL", null).otherwise(col(Dic.colIsTrailers) cast DoubleType).as(Dic.colIsTrailers),
+//        when(col(Dic.colSupplier) === "NULL", null).otherwise(col(Dic.colSupplier)).as(Dic.colSupplier),
+//        when(col(Dic.colIntroduction) === "NULL", null).otherwise(col(Dic.colIntroduction)).as(Dic.colIntroduction))
+
+    df_raw_media
+      
+  }
 }
