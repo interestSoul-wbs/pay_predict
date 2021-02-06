@@ -1,7 +1,7 @@
 package predict.userpay
 
 import mam.{Dic, SparkSessionInit}
-import mam.GetSaveData.{getAllUsers, getProcessedOrder, savePredictUsers, saveProcessedData, saveTrainUsers}
+import mam.GetSaveData.{getAllUsers, getAllUsersPlayAndOrder, getProcessedOrder, savePredictUsers, saveProcessedData, saveTrainUsers}
 import mam.SparkSessionInit.spark
 import mam.Utils.{calDate, getData, printDf, sysParamSetting, udfGetErrorMoneySign}
 import org.apache.log4j.{Level, Logger}
@@ -31,7 +31,8 @@ object UserSplitForPredict {
     printDf("输入 df_orders", df_orders)
 
     //所有用户id的dataframe  Hisense data
-    val df_all_users = getAllUsers(spark)
+//    val df_all_users = getAllUsers(spark)
+    val df_all_users = getAllUsersPlayAndOrder(spark)
     printDf("输入 df_all_Users", df_all_users)
 
     // 3

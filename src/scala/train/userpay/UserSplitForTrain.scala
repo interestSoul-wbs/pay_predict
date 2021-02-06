@@ -3,7 +3,7 @@ package train.userpay
 
 import org.apache.spark.sql.functions._
 import mam.{Dic, SparkSessionInit}
-import mam.GetSaveData.{getAllUsers, getProcessedOrder, saveProcessedData, saveTrainUsers}
+import mam.GetSaveData.{getAllUsers, getAllUsersPlayAndOrder, getProcessedOrder, saveProcessedData, saveTrainUsers}
 import mam.SparkSessionInit.spark
 import mam.Utils.{calDate, getData, printDf, sysParamSetting, udfGetErrorMoneySign}
 import org.apache.spark.sql
@@ -29,7 +29,8 @@ object UserSplitForTrain {
     printDf("输入 df_orders", df_orders)
 
     //所有用户id的dataframe  Hisense data
-    val df_all_users = getAllUsers(spark)
+//    val df_all_users = getAllUsers(spark)
+    val df_all_users = getAllUsersPlayAndOrder(spark)
     printDf("输入 df_all_Users", df_all_users)
 
     // 3 训练集正负样本选取
