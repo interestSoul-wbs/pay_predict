@@ -29,6 +29,7 @@ object Dic {
   val colConvertTime = "convert_time"
   val colCreationGap = "creation_gap"
   val colPlayDate = "play_date"
+  val colUserPlayCount = "user_play_count"
 
   //还有一个video_id  colVideoId
 

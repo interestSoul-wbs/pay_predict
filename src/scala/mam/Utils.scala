@@ -397,6 +397,20 @@ object Utils {
 
   }
 
+  def udfBreakList = udf(breakList _)
+
+  def breakList(array: Object, index: Int) = {
+    /**
+     * @author wj
+     * @param [array, index]
+     * @return double
+     * @description 将一个vector拆分成多个列
+     */
+    val vectorString = array.toString
+    vectorString.substring(13, vectorString.length - 1).split(",")(index)
+
+  }
+
 
   def udfFillPreference = udf(fillPreference _)
 
@@ -480,9 +494,9 @@ object Utils {
     if (result.size >= topN) {
       result.take(topN).toVector //take(3)是选取前3个数据
     } else {
-      //      for (i <- result.size to topN - 1) {
-      //        result.append("0")
-      //      }
+            for (i <- result.size to topN - 1) {
+              result.append("0")
+            }
       result.toVector
     }
 
