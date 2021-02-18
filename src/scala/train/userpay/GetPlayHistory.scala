@@ -101,7 +101,11 @@ object GetPlayHistory {
 
     // 对videoId进行word2vec
 
-    val df_medias_w2v = w2vec(df_medias_part)
+    val df_medias_id = df_medias_part.agg(collect_list(col(Dic.colVideoId)).as(Dic.colVideoId + "_list"))
+
+    printDf("df_medias_id", df_medias_id)
+
+    val df_medias_w2v = w2vec(df_medias_id)
     printDf("df_medias_w2v", df_medias_w2v)
 
 //    saveDataForXXK(df_medias_w2v, "train", "medias_in_play_history_" + playsNum + "_train_w2vec")
@@ -170,7 +174,7 @@ object GetPlayHistory {
   def w2vec(df_medias:DataFrame) ={
 
     val w2vModel = new Word2Vec()
-      .setInputCol(Dic.colVideoId)
+      .setInputCol(Dic.colVideoId + "_list")
       .setOutputCol(Dic.colVector)
       .setVectorSize(vectorDimension)
       .setWindowSize(windowSize)
@@ -195,5 +199,6 @@ object GetPlayHistory {
 
 
   }
+
 
 }
