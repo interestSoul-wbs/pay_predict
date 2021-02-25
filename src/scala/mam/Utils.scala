@@ -1,15 +1,15 @@
 package mam
 
+import mam.GetSaveData.hdfsPath
+
 import java.text.SimpleDateFormat
 import java.util.Calendar
-
-
 import org.apache.log4j.{Level, Logger}
-
 
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
-import org.apache.spark.sql.functions.{udf}
+import org.apache.spark.sql.functions.udf
+
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
 
@@ -57,6 +57,8 @@ object Utils {
 
     spark.read.format("parquet").load(path)
   }
+
+
 
 
 

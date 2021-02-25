@@ -43,7 +43,8 @@ object GetPlayHistory {
     // 3 Get play history in a past period of time
 
     val df_train_play = getPlayHistory(df_plays, trainTime, df_train_ids, 40, df_medias)
-//    saveDataForXXK(df_train_play, "train", "train_userprofile_play_" + playsNum)
+
+    saveDataForXXK(df_train_play, "train", "train_userprofile_play_" + playsNum)
 
     printDf("输出 df_tran_play", df_train_play)
 
@@ -73,16 +74,16 @@ object GetPlayHistory {
       ).filter(
       col(Dic.colUserPlayCount) .< (playsNum)
     )
-//      .drop(Dic.colUserPlayCount)
 
 
     printDf("df_train_select", df_train_select)
 
 
-//    saveDataForXXK(df_train_select, "train", "train_play_history_40")
+    saveDataForXXK(df_train_select, "train", "train_play_history_" + playsNum)
 
     /**
      * 相应播放历史的媒资数据处理
+     * 处理之后的brief进行bert
      */
 
     val df_video_ids = df_train_select.select(Dic.colVideoId).dropDuplicates()
@@ -108,7 +109,7 @@ object GetPlayHistory {
     val df_medias_w2v = w2vec(df_medias_id)
     printDf("df_medias_w2v", df_medias_w2v)
 
-//    saveDataForXXK(df_medias_w2v, "train", "medias_in_play_history_" + playsNum + "_train_w2vec")
+    saveDataForXXK(df_medias_w2v, "train", "train_video_word2vec")
 
 
     val df_play_history = df_train_select

@@ -1,5 +1,6 @@
 package mam
 
+import breeze.linalg.DenseVector
 import mam.SparkSessionInit.spark
 import mam.Utils.getData
 import org.apache.spark.sql.functions._
@@ -9,8 +10,8 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 object GetSaveData {
 
   var tempTable = "temp_table"
-    val hdfsPath = ""
-//  val hdfsPath = "hdfs:///pay_predict_4_Tencent/"
+//    val hdfsPath = ""
+  val hdfsPath = "hdfs:///pay_predict_3/"
   val delimiter = ","
 
   def saveDataForXXK(df_data:DataFrame, state: String, fileName: String) = {
@@ -266,28 +267,6 @@ object GetSaveData {
       .option("header", true)
       .schema(schema)
       .csv(mediasRawPath)
-//      .select(
-//        when(col(Dic.colVideoId) === "NULL", null).otherwise(col(Dic.colVideoId)).as(Dic.colVideoId),
-//        when(col(Dic.colVideoTitle) === "NULL", null).otherwise(col(Dic.colVideoTitle)).as(Dic.colVideoTitle),
-//        when(col(Dic.colVideoOneLevelClassification) === "NULL" or (col(Dic.colVideoOneLevelClassification) === ""), null)
-//          .otherwise(col(Dic.colVideoOneLevelClassification)).as(Dic.colVideoOneLevelClassification),
-//        from_json(col(Dic.colVideoTwoLevelClassificationList), ArrayType(StringType, containsNull = true)).as(Dic.colVideoTwoLevelClassificationList),
-//        from_json(col(Dic.colVideoTagList), ArrayType(StringType, containsNull = true)).as(Dic.colVideoTagList),
-//        from_json(col(Dic.colDirectorList), ArrayType(StringType, containsNull = true)).as(Dic.colDirectorList),
-//        from_json(col(Dic.colActorList), ArrayType(StringType, containsNull = true)).as(Dic.colActorList),
-//        when(col(Dic.colVideoOneLevelClassification).isNotNull, col(Dic.colVideoOneLevelClassification)), // Konverse - 这一步 相当于缺失值填充，被移动到了 process
-//        when(col(Dic.colCountry) === "NULL", null).otherwise(col(Dic.colCountry)).as(Dic.colCountry),
-//        when(col(Dic.colLanguage) === "NULL", null).otherwise(col(Dic.colLanguage)).as(Dic.colLanguage),
-//        when(col(Dic.colReleaseDate) === "NULL", null).otherwise(col(Dic.colReleaseDate)).as(Dic.colReleaseDate),
-//        when(col(Dic.colStorageTime) === "NULL", null).otherwise(col(Dic.colStorageTime)).as(Dic.colStorageTime), // Konverse - 这一步的udf被移动到了 process
-//        when(col(Dic.colVideoTime) === "NULL", null).otherwise(col(Dic.colVideoTime) cast DoubleType).as(Dic.colVideoTime),
-//        when(col(Dic.colScore) === "NULL", null).otherwise(col(Dic.colScore) cast DoubleType).as(Dic.colScore),
-//        when(col(Dic.colIsPaid) === "NULL", null).otherwise(col(Dic.colIsPaid) cast DoubleType).as(Dic.colIsPaid),
-//        when(col(Dic.colPackageId) === "NULL", null).otherwise(col(Dic.colPackageId)).as(Dic.colPackageId),
-//        when(col(Dic.colIsSingle) === "NULL", null).otherwise(col(Dic.colIsSingle) cast DoubleType).as(Dic.colIsSingle),
-//        when(col(Dic.colIsTrailers) === "NULL", null).otherwise(col(Dic.colIsTrailers) cast DoubleType).as(Dic.colIsTrailers),
-//        when(col(Dic.colSupplier) === "NULL", null).otherwise(col(Dic.colSupplier)).as(Dic.colSupplier),
-//        when(col(Dic.colIntroduction) === "NULL", null).otherwise(col(Dic.colIntroduction)).as(Dic.colIntroduction))
 
     df_raw_media
   }
@@ -2855,7 +2834,28 @@ object GetSaveData {
     val Path = hdfsPath + "data/" + state + "/userpay/"+ state +"UserProfile" + now.split(" ")(0)
     saveProcessedData(df_data, Path)
   }
-    
+
+  def getBertVector(spark: SparkSession) = {
+
+    val path = hdfsPath + "data/train/xxkang/medias_bert_300_vec.txt"
+
+    val schema = StructType(
+      List(
+        StructField(Dic.colVideoId, StringType),
+        StructField(Dic.colBertVector, StringType)
+      )
+    )
+
+
+    val df_raw_vector = spark.read
+      .option("delimiter", ",")
+      .option("header", true)
+      .schema(schema)
+      .csv(path)
+
+    df_raw_vector
+
+  }
     
     
   def getRawMediaData2(spark: SparkSession) = {
