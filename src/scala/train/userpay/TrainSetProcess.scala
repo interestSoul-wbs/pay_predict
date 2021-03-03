@@ -1,11 +1,12 @@
 package train.userpay
 
 import mam.{Dic, SparkSessionInit}
-import mam.GetSaveData.{getTrainUser, getUserProfileOrderPart, getUserProfilePlayPart, getUserProfilePreferencePart, getVideoFirstCategory, getVideoLabel, getVideoSecondCategory, saveDataSet}
+import mam.GetSaveData.{getDataFromXXK, getTrainUser, getUserProfileOrderPart, getUserProfilePlayPart, getUserProfilePreferencePart, getVideoFirstCategory, getVideoLabel, getVideoSecondCategory, saveDataSet}
 import mam.SparkSessionInit.spark
 import mam.Utils.{printDf, sysParamSetting}
-import org.apache.spark.sql.{DataFrame}
+import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.{col, lit, udf}
+import train.userpay.GetMediasForBertAndPlayList.playsNum
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -43,12 +44,15 @@ object TrainSetProcess {
     printDf("输入 df_label", df_label)
 
     val df_train_user = getTrainUser(spark, trainTime)
-    printDf("df_train_user", df_train_user)
+    printDf("输入 df_train_user", df_train_user)
+
+    val df_play_vec = getDataFromXXK("train", "train_play_vector_" + playsNum)
+    printDf("输入 df_play_vec", df_play_vec)
 
 
     // 3 Train Set Process
     val df_train_set = trainSetProcess(df_user_profile_play, df_user_profile_pref, df_user_profile_order,
-      df_video_first_category, df_video_second_category, df_label, df_train_user)
+      df_video_first_category, df_video_second_category, df_label, df_train_user, df_play_vec)
 
     // 4 Save Train Users
     saveDataSet(trainTime, df_train_set, "train")
@@ -60,7 +64,8 @@ object TrainSetProcess {
 
 
   def trainSetProcess(df_user_profile_play: DataFrame, df_user_profile_pref: DataFrame, df_user_profile_order: DataFrame,
-                      df_video_first_category: DataFrame, df_video_second_category: DataFrame, df_label: DataFrame, df_train_user: DataFrame): DataFrame = {
+                      df_video_first_category: DataFrame, df_video_second_category: DataFrame, df_label: DataFrame,
+                      df_train_user: DataFrame, df_play_vec: DataFrame): DataFrame = {
 
 
     /**
@@ -196,11 +201,21 @@ object TrainSetProcess {
       }
     }
 
+    val df_train_user_profile = df_userProfile_split_pref3.select(columnList.map(df_userProfile_split_pref3.col(_)): _*)
+
+
     /**
      * 将添加用户的标签信息
      */
-    val df_train_user_profile = df_userProfile_split_pref3.select(columnList.map(df_userProfile_split_pref3.col(_)): _*)
-    val df_train_set = df_train_user.join(df_train_user_profile, joinKeysUserId, "left")
+    val df_train_profile = df_train_user.join(df_train_user_profile, joinKeysUserId, "left")
+
+
+    /**
+     * 添加用户播放向量
+     */
+
+
+    val df_train_set = df_train_profile.join(df_play_vec, joinKeysUserId, "left")
 
     df_train_set
 

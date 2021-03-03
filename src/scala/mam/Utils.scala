@@ -601,19 +601,6 @@ object Utils {
   }
 
 
-  def udfMapIdToVector = udf(mapIdToVector _)
-
-  def mapIdToVector(idList: mutable.WrappedArray[String], mediasMap: mutable.HashMap[String, String]) = {
-
-    val idVectorList = new ListBuffer[String]()
-    idList.foreach(item =>
-      if (mediasMap.contains(item))
-        idVectorList.append(mediasMap(item))
-      else
-        idVectorList.append("0")
-    )
-    idVectorList
-  }
 
   def mapIdToMediasVector(mediaMap: mutable.HashMap[String, String]) = udf((idList: mutable.WrappedArray[String]) =>
 

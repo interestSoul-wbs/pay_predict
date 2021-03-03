@@ -1,11 +1,12 @@
 package predict.userpay
 
 import mam.{Dic, SparkSessionInit}
-import mam.GetSaveData.{getPredictUser, getUserProfileOrderPart, getUserProfilePlayPart, getUserProfilePreferencePart, getVideoFirstCategory, getVideoLabel, getVideoSecondCategory, saveDataSet}
+import mam.GetSaveData.{getDataFromXXK, getPredictUser, getUserProfileOrderPart, getUserProfilePlayPart, getUserProfilePreferencePart, getVideoFirstCategory, getVideoLabel, getVideoSecondCategory, saveDataSet}
 import mam.SparkSessionInit.spark
 import mam.Utils.{printDf, sysParamSetting}
-import org.apache.spark.sql.{DataFrame}
+import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.{col, lit, udf}
+import predict.userpay.GetMediasForBertAndPlayList.playsNum
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -43,9 +44,15 @@ object PredictSetProcess {
     val df_predict_users = getPredictUser(spark, predictTime)
     printDf("df_predict_users", df_predict_users)
 
+    // play vector
+    val df_play_vec = getDataFromXXK("train", "train_play_vector_" + playsNum)
+    printDf("输入 df_play_vec", df_play_vec)
+
+
 
     // 3 Train Set Process
-    val df_predict_set = predictSetProcess(df_user_profile_play, df_user_profile_pref, df_user_profile_order, df_video_first_category, df_video_second_category, df_label, df_predict_users)
+    val df_predict_set = predictSetProcess(df_user_profile_play, df_user_profile_pref, df_user_profile_order,
+      df_video_first_category, df_video_second_category, df_label, df_predict_users, df_play_vec)
 
     // 4 Save Train Users
     saveDataSet(predictTime, df_predict_set, "predict")
@@ -54,7 +61,8 @@ object PredictSetProcess {
 
   }
     def predictSetProcess(df_user_profile_play: DataFrame, df_user_profile_pref: DataFrame, df_user_profile_order: DataFrame,
-                          df_video_first_category: DataFrame, df_video_second_category: DataFrame, df_label: DataFrame, df_predict_users: DataFrame): DataFrame = {
+                          df_video_first_category: DataFrame, df_video_second_category: DataFrame, df_label: DataFrame,
+                          df_predict_users: DataFrame, df_play_vec: DataFrame): DataFrame = {
 
 
       // Get All User Profile Data
@@ -186,6 +194,16 @@ object PredictSetProcess {
 
       val df_predict_user_profile = df_temp_df3.select(columnList.map(df_temp_df3.col(_)): _*)
 
-      df_predict_user_profile
+      /**
+       * 添加用户播放向量
+       */
+
+
+      val df_predict_set = df_predict_user_profile.join(df_play_vec, joinKeysUserId, "left")
+
+      df_predict_set
+
+
+
     }
 }

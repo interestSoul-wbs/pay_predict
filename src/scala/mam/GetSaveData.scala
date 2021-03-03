@@ -10,14 +10,9 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 object GetSaveData {
 
   var tempTable = "temp_table"
-//    val hdfsPath = ""
-  val hdfsPath = "hdfs:///pay_predict_3/"
+    val hdfsPath = ""
+//  val hdfsPath = "hdfs:///pay_predict_3/"
   val delimiter = ","
-
-  def saveDataForXXK(df_data:DataFrame, state: String, fileName: String) = {
-    val path = hdfsPath + "data/" + state + "/xxkang/" + fileName
-    saveProcessedData(df_data, path)
-  }
 
 
   def getOrignalSubId(spark: SparkSession, partitiondate: String, license: String, vod_version: String) = {
@@ -2835,9 +2830,9 @@ object GetSaveData {
     saveProcessedData(df_data, Path)
   }
 
-  def getBertVector(spark: SparkSession) = {
+  def getBertVector(state: String) = {
 
-    val path = hdfsPath + "data/train/xxkang/medias_bert_300_vec.txt"
+    val path = hdfsPath + "data/" + state + "/xxkang/" + state + "_medias_bert.csv"
 
     val schema = StructType(
       List(
@@ -2943,4 +2938,19 @@ object GetSaveData {
     df_raw_media
       
   }
+
+
+  def saveDataForXXK(df_data:DataFrame, state: String, fileName: String) = {
+    val path = hdfsPath + "data/" + state + "/xxkang/" + fileName
+    saveProcessedData(df_data, path)
+  }
+
+  def getDataFromXXK(state: String, fileName: String) = {
+    val path = hdfsPath + "data/" + state + "/xxkang/" + fileName
+    getData(spark, path)
+  }
+
+
+
+
 }
