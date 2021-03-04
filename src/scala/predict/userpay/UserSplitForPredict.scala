@@ -31,8 +31,8 @@ object UserSplitForPredict {
     printDf("输入 df_orders", df_orders)
 
     //所有用户id的dataframe  Hisense data
-//    val df_all_users = getAllUsers(spark)
-    val df_all_users = getAllUsersPlayAndOrder(spark)
+    val df_all_users = getAllUsers(spark)
+//    val df_all_users = getAllUsersPlayAndOrder(spark)
     printDf("输入 df_all_Users", df_all_users)
 
     // 3
@@ -50,7 +50,8 @@ object UserSplitForPredict {
 
   def getPredictSetUsers(df_all_users: DataFrame, df_orders: DataFrame, predictTime: String, timeLength: Int): DataFrame = {
 
-    val df_order = df_orders.withColumn(Dic.colIsMoneyError, udfGetErrorMoneySign(col(Dic.colResourceType), col(Dic.colMoney)))
+    val df_order = df_orders
+      .withColumn(Dic.colIsMoneyError, udfGetErrorMoneySign(col(Dic.colResourceType), col(Dic.colMoney)))
 
     //金额异常用户
     val df_illegal_users = df_order.filter(
@@ -76,13 +77,10 @@ object UserSplitForPredict {
       .withColumn(Dic.colOrderStatus, lit(1))
 
 
-    //负样本
-    val df_all_neg_users = df_all_users
+    //全部负样本
+    val df_predict_neg_users = df_all_users
       .except(df_predict_pos_users.select(Dic.colUserId))
       .except(df_illegal_users)
-
-    val df_predict_neg_users = df_all_neg_users
-      .sample(1).limit(10 * df_predict_pos_users.count().toInt)
       .withColumn(Dic.colOrderStatus, lit(0))
 
 

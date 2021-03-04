@@ -2,7 +2,7 @@ package mam
 
 import breeze.linalg.DenseVector
 import mam.SparkSessionInit.spark
-import mam.Utils.getData
+import mam.Utils.{getData, printDf}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
@@ -10,8 +10,8 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 object GetSaveData {
 
   var tempTable = "temp_table"
-    val hdfsPath = ""
-//  val hdfsPath = "hdfs:///pay_predict_3/"
+//    val hdfsPath = ""
+  val hdfsPath = "hdfs:///pay_predict_3/"
   val delimiter = ","
 
 
@@ -2715,8 +2715,15 @@ object GetSaveData {
   }
 
   def getAllUsersPlayAndOrder(spark: SparkSession) = {
-    val allUsersPath = hdfsPath + "data/train/userpay/allUsersFromPLayAndOrders"
-    getData(spark, allUsersPath)
+
+    val df_play = getProcessedPlay(spark)
+    val df_play_id = df_play.select(Dic.colUserId).dropDuplicates()
+
+    val df_order = getProcessedOrder(spark)
+    val df_order_id = df_order.select(Dic.colUserId).dropDuplicates()
+
+
+    df_order_id.union(df_play_id).dropDuplicates()
 
   }
 
