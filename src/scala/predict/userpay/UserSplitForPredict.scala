@@ -1,11 +1,8 @@
 package predict.userpay
 
-import mam.{Dic, SparkSessionInit}
 import mam.GetSaveData.{getAllUsers, getAllUsersPlayAndOrder, getProcessedOrder, savePredictUsers, saveProcessedData, saveTrainUsers}
 import mam.SparkSessionInit.spark
 import mam.Utils.{calDate, getData, printDf, sysParamSetting, udfGetErrorMoneySign}
-import org.apache.log4j.{Level, Logger}
-import org.apache.spark.sql
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import mam.{Dic, SparkSessionInit}
@@ -57,11 +54,13 @@ object UserSplitForPredict {
     val df_illegal_users = df_order.filter(
       col(Dic.colCreationTime) >= predictTime
         && col(Dic.colCreationTime) < calDate(predictTime, timeLength)
-        && (col(Dic.colResourceType) > 0
-        && col(Dic.colResourceType) < 4)
-        && (col(Dic.colResourceId).isin(predictResourceId: _*))
+        && col(Dic.colResourceType).>(0)
+        && col(Dic.colResourceType).<(4)
+        && col(Dic.colResourceId).isin(predictResourceId: _*)
         && (col(Dic.colIsMoneyError) === 1)
     ).select(Dic.colUserId).distinct()
+
+    printDf("df_illegal_users", df_illegal_users)
 
 
     //  正样本
@@ -70,12 +69,13 @@ object UserSplitForPredict {
         && col(Dic.colCreationTime) < calDate(predictTime, timeLength)
         && col(Dic.colResourceType).>(0)
         && col(Dic.colResourceType).<(4)
-        && (col(Dic.colResourceId).isin(predictResourceId: _*))
+        && col(Dic.colResourceId).isin(predictResourceId: _*)
         && col(Dic.colOrderStatus).>(1)
     ).select(Dic.colUserId).distinct()
       .except(df_illegal_users)
       .withColumn(Dic.colOrderStatus, lit(1))
 
+    printDf("df_predict_pos_users", df_predict_pos_users)
 
     //全部负样本
     val df_predict_neg_users = df_all_users
@@ -83,6 +83,7 @@ object UserSplitForPredict {
       .except(df_illegal_users)
       .withColumn(Dic.colOrderStatus, lit(0))
 
+    printDf("df_predict_neg_users", df_predict_neg_users)
 
     df_predict_pos_users.union(df_predict_neg_users).sample(1)
 

@@ -6,7 +6,7 @@ import mam.SparkSessionInit.spark
 import mam.Utils.{printDf, sysParamSetting}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.{col, lit, udf}
-import predict.userpay.GetMediasForBertAndPlayList.playsNum
+import train.userpay.GetMediasForBertAndPlayList.playsNum
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -45,7 +45,7 @@ object PredictSetProcess {
     printDf("df_predict_users", df_predict_users)
 
     // play vector
-    val df_play_vec = getDataFromXXK("train", "train_play_vector_" + playsNum)
+    val df_play_vec = getDataFromXXK("predict", "predict_play_vector_" + playsNum)
     printDf("输入 df_play_vec", df_play_vec)
 
 

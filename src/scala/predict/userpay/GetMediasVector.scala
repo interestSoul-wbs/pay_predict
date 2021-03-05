@@ -10,16 +10,12 @@ import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{ArrayType, StringType}
+import train.userpay.GetMediasVector.{pcaDimension, vectorDimension, windowSize}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 object GetMediasVector {
-
-  // word2vector参数
-  val vectorDimension = 256 // 向量维度
-  val windowSize = 10 //滑动窗口大小， 默认参数为5，这里尝试设置为10，在一定程度上，windowSize越大，训练越慢,但是向量表达更准确
-  val pcaDimension = 64  // 向量维度
 
 
   def main(args: Array[String]): Unit = {

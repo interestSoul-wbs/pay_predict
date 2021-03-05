@@ -73,7 +73,6 @@ object GetMediasVector {
 
     // For nan play history
 
-
     val df_fill = spark.createDataFrame(
       Seq(("0", Vectors.dense(Vectors.zeros(pcaDimension).toArray)))
     ).toDF(Dic.colVideoId, Dic.colConcatVec)

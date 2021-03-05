@@ -7,11 +7,11 @@ import mam.{Dic, SparkSessionInit}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
+import train.userpay.GetMediasForBertAndPlayList.playsNum
 
 object GetMediasForBertAndPlayList {
 
   val days = 60 // 当前时间前N天的播放记录
-  val playsNum = 60
 
   def main(args: Array[String]): Unit = {
 
@@ -86,7 +86,7 @@ object GetMediasForBertAndPlayList {
 
 
       // Save Medias for Bert
-      saveDataForXXK(df_medias_part, "predict", "predict_medias_" + playsNum)
+//      saveDataForXXK(df_medias_part, "predict", "predict_medias_" + playsNum)
 
 
       val df_play_history = df_predict_select

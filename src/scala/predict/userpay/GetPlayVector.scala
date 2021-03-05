@@ -2,14 +2,13 @@ package predict.userpay
 
 import mam.GetSaveData.{getDataFromXXK, getProcessedMedias, getProcessedPlay, saveDataForXXK}
 import mam.{Dic, SparkSessionInit}
-import mam.SparkSessionInit.spark
 import mam.Utils.{calDate, getData, mapIdToMediasVector, printArray, printDf, sysParamSetting, udfBreakList, udfGetTopNHistory, udfLpad}
 import org.apache.spark.ml.feature.{VectorAssembler, Word2Vec}
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.sql.{DataFrame, functions}
 import org.apache.spark.sql.functions.{col, collect_list, concat_ws, lead, lit, row_number, sort_array, udf, when}
-import predict.userpay.GetMediasForBertAndPlayList.playsNum
-import predict.userpay.GetMediasVector.pcaDimension
+import train.userpay.GetMediasForBertAndPlayList.playsNum
+import train.userpay.GetMediasVector.pcaDimension
 
 import scala.collection.mutable
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
