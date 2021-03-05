@@ -10,8 +10,8 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 object GetSaveData {
 
   var tempTable = "temp_table"
-//    val hdfsPath = ""
-  val hdfsPath = "hdfs:///pay_predict_3/"
+    val hdfsPath = ""
+//  val hdfsPath = "hdfs:///pay_predict_3/"
   val delimiter = ","
 
 
@@ -2721,7 +2721,6 @@ object GetSaveData {
 
     val df_order = getProcessedOrder(spark)
     val df_order_id = df_order.select(Dic.colUserId).dropDuplicates()
-
 
     df_order_id.union(df_play_id).dropDuplicates()
 
