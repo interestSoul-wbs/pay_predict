@@ -77,10 +77,15 @@ object UserSplitForPredict {
 
     printDf("df_predict_pos_users", df_predict_pos_users)
 
-    //全部负样本
-    val df_predict_neg_users = df_all_users
+    // 全部负样本
+    val df_all_neg_users = df_all_users
       .except(df_predict_pos_users.select(Dic.colUserId))
       .except(df_illegal_users)
+      .withColumn(Dic.colOrderStatus, lit(0))
+
+    // 10倍负样本
+    val df_predict_neg_users = df_all_neg_users
+      .sample(1).limit(10 * df_predict_pos_users.count().toInt)
       .withColumn(Dic.colOrderStatus, lit(0))
 
     printDf("df_predict_neg_users", df_predict_neg_users)
