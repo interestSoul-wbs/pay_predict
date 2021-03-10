@@ -2741,8 +2741,14 @@ object GetSaveData {
   }
 
   def getAllUsersPlayAndOrder(spark: SparkSession) = {
-    val allUsersPath = hdfsPath + "data/train/userpay/allUsersFromPLayAndOrders"
-    getData(spark, allUsersPath)
+    val df_play = getProcessedPlay(spark)
+    val df_play_id = df_play.select(Dic.colUserId).dropDuplicates()
+    val df_order = getProcessedOrder(spark)
+    val df_order_id = df_order.select(Dic.colUserId).dropDuplicates()
+    val df_all_id = df_order_id.union(df_play_id).dropDuplicates()
+
+    saveProcessedData(df_all_id, hdfsPath + "data/train/userpay/allUsersFromPLayAndOrders")
+    df_all_id
 
   }
 
