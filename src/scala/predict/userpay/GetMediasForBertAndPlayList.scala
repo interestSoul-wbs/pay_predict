@@ -7,7 +7,7 @@ import mam.{Dic, SparkSessionInit}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
-import train.userpay.GetMediasForBertAndPlayList.playsNum
+import train.userpay.GetMediasForBertAndPlayList.{playsNum, udfRemovePunctuation}
 
 object GetMediasForBertAndPlayList {
 
@@ -108,24 +108,6 @@ object GetMediasForBertAndPlayList {
       // Save Users' play list
       saveDataForXXK(df_play_list, "predict", "predict_play_free_paid_" + playsNum)
     }
-
-
-
-  // 去除medais的brief列中的标点符号
-  def udfRemovePunctuation = udf(removePunctuation _)
-
-  def removePunctuation(videoTitle: String, introduction: String) = {
-    val regex = "[\\p{P}+~$`^=|<>～｀＄＾＋＝｜＜＞￥×]".r
-    val brief = videoTitle + introduction
-    val new_brief = regex.replaceAllIn(brief, "")
-
-    if (new_brief.length < 126)
-      new_brief
-    else
-      new_brief.substring(0, 126)
-
-
-  }
 
 
 

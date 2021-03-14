@@ -70,6 +70,7 @@ object Dic {
   val colPlayPaidVec = "play_paid_vec"
   val colBertVector = "bert_vector"
   val colConcatVec = "concat_vector"
+  val colConcatTags = "concat_tags"
 
   /**
    * order中的属性

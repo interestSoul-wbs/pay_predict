@@ -143,13 +143,21 @@ object Utils {
     if (time == null) {
       null
     }
-    if (time.length < 10) {
+    if (time.length != 10) {
       null
     }
     else {
-      val time_long = time.toLong
-      val new_time: String = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(time_long * 1000)
-      new_time
+      try {
+        val time_long = time.toLong
+        val new_time: String = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(time_long * 1000)
+        new_time
+
+      } catch {
+        // 数据转换异常捕获
+        case ex: NumberFormatException => {
+          null
+        }
+      }
     }
   }
 
