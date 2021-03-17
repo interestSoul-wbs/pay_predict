@@ -48,7 +48,7 @@ object PredictSetProcess {
     val df_predict_set = predictSetProcess(df_user_profile_play, df_user_profile_pref, df_user_profile_order, df_video_first_category, df_video_second_category, df_label, df_predict_users)
 
     // 4 Save Train Users
-    saveDataSet(predictTime, df_predict_set, "predict")
+    saveDataSet(predictTime, df_predict_set, "predict_noPredictId")
     printDf("输出 df_predict_set", df_predict_set)
     println("Predict Set Process Done！")
 

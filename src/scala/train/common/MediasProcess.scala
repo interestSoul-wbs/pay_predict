@@ -22,7 +22,6 @@ object MediasProcess {
 
     // 2 數據讀取
     val df_raw_medias = getRawMediaData(spark)
-
     printDf("输入 df_raw_medias", df_raw_medias)
 
     // 3 对数据进行处理 及 存儲

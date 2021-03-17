@@ -1,7 +1,7 @@
 package train.common
 
 import mam.{Dic, SparkSessionInit}
-import mam.GetSaveData.{getProcessedMedias, getRawOrders, getRawPlays, saveProcessedData, saveProcessedOrder, saveProcessedPlay}
+import mam.GetSaveData.{getProcessedMedias, getRawOrders, getRawPlays, getRawPlays2, hdfsPath, saveProcessedData, saveProcessedOrder, saveProcessedPlay}
 import mam.SparkSessionInit.spark
 import mam.Utils.{getData, printDf, sysParamSetting, udfLongToDateTime}
 import org.apache.spark.sql
@@ -23,13 +23,16 @@ object PlaysProcessBySplitSession {
   val timeMinLimit = 30
   val timeGapMergeForSameVideo = 1800 //相同视频播放间隔半小时内合并
 
+
   def main(args: Array[String]): Unit = {
 
     // 1 SparkSession init
+    sysParamSetting
     SparkSessionInit.init()
 
     // 2 數據讀取
     val df_play_raw = getRawPlays(spark)
+//    val df_play_raw = getRawPlays2(spark)
     printDf("输入 df_play_raw", df_play_raw)
 
     val df_medias_processed = getProcessedMedias(spark)

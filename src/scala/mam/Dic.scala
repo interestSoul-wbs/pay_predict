@@ -213,7 +213,6 @@ object Dic {
 
   val colDaysRemainingPackage = "days_remaining_package"
 
-
   /**
    * 视频画像中的属性
    */

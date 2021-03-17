@@ -34,7 +34,7 @@ object UserSplitForTrain {
     printDf("输入 df_all_Users", df_all_users)
 
     // 3 训练集正负样本选取
-    val df_all_train_users = getTrainSetUsers(df_all_users, df_orders, trainTime, timeLength, predictResourceId)
+    val df_all_train_users = getTrainSetUsers(df_all_users, df_orders, trainTime, timeLength)
     printDf("输出 df_all_train_users", df_all_train_users)
 
     // 4 Save Train Users
@@ -42,7 +42,7 @@ object UserSplitForTrain {
     println("Train Users Save Done!")
   }
 
-  def getTrainSetUsers(df_allUsers: DataFrame, df_orders: DataFrame, trainTime: String, timeLength: Int, predictResourceId: Array[Int]): DataFrame = {
+  def getTrainSetUsers(df_allUsers: DataFrame, df_orders: DataFrame, trainTime: String, timeLength: Int): DataFrame = {
 
     /**
      * 训练集正负样本选取
@@ -56,6 +56,8 @@ object UserSplitForTrain {
     val df_order = df_orders
       .withColumn(Dic.colIsMoneyError, udfGetErrorMoneySign(col(Dic.colResourceType), col(Dic.colMoney)))
 
+    printDf("df_order", df_order)
+
     //金额异常用户
     val df_illegal_users = df_order
       .filter(
@@ -66,6 +68,8 @@ object UserSplitForTrain {
           && (col(Dic.colResourceId).isin(predictResourceId: _*))
           && (col(Dic.colIsMoneyError) === 1)
       ).select(Dic.colUserId).distinct()
+
+    printDf("df_illegal_users", df_illegal_users)
 
     //  正样本
     val df_train_pos_users = df_order
@@ -80,11 +84,16 @@ object UserSplitForTrain {
       .except(df_illegal_users)
       .withColumn(Dic.colOrderStatus, lit(1))
 
+    printDf("df_train_pos_users", df_train_pos_users)
+
     //负样本
     val df_all_neg_users = df_allUsers
       .except(df_train_pos_users.select(Dic.colUserId))
       .except(df_illegal_users) //except 保证column一致
 
+    printDf("df_all_neg_users", df_all_neg_users)
+
+    // 正负样本1:10选择训练样本
     val df_train_neg_users = df_all_neg_users
       .sample(1).limit(10 * df_train_pos_users.count().toInt)
       .withColumn(Dic.colOrderStatus, lit(0))

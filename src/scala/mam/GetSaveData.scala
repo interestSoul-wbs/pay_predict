@@ -10,13 +10,15 @@ object GetSaveData {
 
   var tempTable = "temp_table"
 //    val hdfsPath = ""
-  val hdfsPath = "hdfs:///pay_predict_4_Tencent/"
-  val delimiter = ","
+  val hdfsPath = "hdfs:///pay_predict_3/"
+  val delimiter = "\\t"
 
   def saveDataForXXK(df_data:DataFrame, state: String, fileName: String) = {
     val path = hdfsPath + "data/" + state + "/xxkang/" + fileName
     saveProcessedData(df_data, path)
   }
+
+
 
 
   def getOrignalSubId(spark: SparkSession, partitiondate: String, license: String, vod_version: String) = {
@@ -2448,7 +2450,7 @@ object GetSaveData {
     )
 
     val df = spark.read
-      .option("delimiter", delimiter)
+      .option("delimiter", ",")
       .option("header", true)
       .schema(schema)
       .csv(orderRawPath)
@@ -2498,6 +2500,7 @@ object GetSaveData {
 
     val df = spark.read
       .option("delimiter", delimiter)
+
       .option("header", true)
       .schema(schema)
       .csv(playRawPath)
@@ -2671,7 +2674,7 @@ object GetSaveData {
   def saveProcessedOrder(df_order_processed: DataFrame) = {
 
 
-    val orderProcessedPath = hdfsPath + "data/train/common/processed/orders3"
+    val orderProcessedPath = hdfsPath + "data/train/common/processed/orders"
     saveProcessedData(df_order_processed, orderProcessedPath)
   }
 
@@ -2714,7 +2717,7 @@ object GetSaveData {
    */
   def getProcessedOrder(spark: SparkSession) = {
 
-    val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders3"
+    val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders"
     spark.read.format("parquet").load(ordersProcessedPath)
 
   }
@@ -2747,7 +2750,6 @@ object GetSaveData {
     val df_order_id = df_order.select(Dic.colUserId).dropDuplicates()
     val df_all_id = df_order_id.union(df_play_id).dropDuplicates()
 
-    saveProcessedData(df_all_id, hdfsPath + "data/train/userpay/allUsersFromPLayAndOrders")
     df_all_id
 
   }
@@ -2861,6 +2863,13 @@ object GetSaveData {
     val Path = hdfsPath + "data/" + state + "/userpay/"+ state +"UserProfile" + now.split(" ")(0)
     saveProcessedData(df_data, Path)
   }
+
+  def getDataSet(now:String, state: String) = {
+    val Path = hdfsPath + "data/" + state + "/userpay/"+ state +"UserProfile" + now.split(" ")(0)
+    getData(spark, Path)
+
+  }
+
     
     
     

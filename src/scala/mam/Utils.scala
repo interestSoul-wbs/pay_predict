@@ -126,11 +126,9 @@ object Utils {
   }
 
   /**
-    * @author wj
-    * @param [time]
-    * @return java.lang.String
-    * @describe 将long类型的时间戳，转化为yyyy-MM-dd HH:mm:ss的字符串
-    */
+   * 将long类型的时间戳，转化为yyyy-MM-dd HH:mm:ss的字符串
+   * @return java.lang.String
+   */
   def udfLongToTimestampV2 = udf(longToTimestampV2 _)
 
   def longToTimestampV2(time: String) = {
@@ -141,15 +139,24 @@ object Utils {
     if (time == null) {
       null
     }
-    if (time.length < 10) {
+    if (time.length != 10) {
       null
     }
     else {
-      val time_long = time.toLong
-      val new_time: String = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(time_long * 1000)
-      new_time
+      try {
+        val time_long = time.toLong
+        val new_time: String = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(time_long * 1000)
+        new_time
+
+      } catch {
+        // 数据转换异常捕获
+        case ex: NumberFormatException => {
+          null
+        }
+      }
     }
   }
+
 
   def udfGetString = udf(getString _)
 

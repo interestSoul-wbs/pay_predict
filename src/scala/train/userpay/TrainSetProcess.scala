@@ -51,7 +51,7 @@ object TrainSetProcess {
       df_video_first_category, df_video_second_category, df_label, df_train_user)
 
     // 4 Save Train Users
-    saveDataSet(trainTime, df_train_set, "train")
+    saveDataSet(trainTime, df_train_set, "train_noPredictId")
     printDf("输出 df_train_set", df_train_set)
     println("Train Set Process Done！")
 
