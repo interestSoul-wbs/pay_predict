@@ -54,7 +54,6 @@ object Utils {
     * @description 读取数据
     */
   def getData(spark: SparkSession, path: String) = {
-
     spark.read.format("parquet").load(path)
   }
 

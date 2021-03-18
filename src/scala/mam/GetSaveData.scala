@@ -1,6 +1,5 @@
 package mam
 
-import breeze.linalg.DenseVector
 import mam.SparkSessionInit.spark
 import mam.Utils.{getData, printDf}
 import org.apache.spark.sql.functions._
@@ -12,7 +11,21 @@ object GetSaveData {
   var tempTable = "temp_table"
 //    val hdfsPath = ""
   val hdfsPath = "hdfs:///pay_predict_3/"
-  val delimiter = ","
+  val delimiter = "\\t"
+
+  def saveDataForXXK(df_data:DataFrame, state: String, fileName: String) = {
+    val path = hdfsPath + "data/" + state + "/xxkang/" + fileName
+    saveProcessedData(df_data, path)
+  }
+
+  def getDataFromXXK(state: String, fileName: String): DataFrame = {
+
+    val path = hdfsPath + "data/" + state + "/xxkang/" + fileName
+    getData(spark, path)
+
+  }
+
+
 
 
   def getOrignalSubId(spark: SparkSession, partitiondate: String, license: String, vod_version: String) = {
@@ -262,6 +275,28 @@ object GetSaveData {
       .option("header", true)
       .schema(schema)
       .csv(mediasRawPath)
+//      .select(
+//        when(col(Dic.colVideoId) === "NULL", null).otherwise(col(Dic.colVideoId)).as(Dic.colVideoId),
+//        when(col(Dic.colVideoTitle) === "NULL", null).otherwise(col(Dic.colVideoTitle)).as(Dic.colVideoTitle),
+//        when(col(Dic.colVideoOneLevelClassification) === "NULL" or (col(Dic.colVideoOneLevelClassification) === ""), null)
+//          .otherwise(col(Dic.colVideoOneLevelClassification)).as(Dic.colVideoOneLevelClassification),
+//        from_json(col(Dic.colVideoTwoLevelClassificationList), ArrayType(StringType, containsNull = true)).as(Dic.colVideoTwoLevelClassificationList),
+//        from_json(col(Dic.colVideoTagList), ArrayType(StringType, containsNull = true)).as(Dic.colVideoTagList),
+//        from_json(col(Dic.colDirectorList), ArrayType(StringType, containsNull = true)).as(Dic.colDirectorList),
+//        from_json(col(Dic.colActorList), ArrayType(StringType, containsNull = true)).as(Dic.colActorList),
+//        when(col(Dic.colVideoOneLevelClassification).isNotNull, col(Dic.colVideoOneLevelClassification)), // Konverse - 这一步 相当于缺失值填充，被移动到了 process
+//        when(col(Dic.colCountry) === "NULL", null).otherwise(col(Dic.colCountry)).as(Dic.colCountry),
+//        when(col(Dic.colLanguage) === "NULL", null).otherwise(col(Dic.colLanguage)).as(Dic.colLanguage),
+//        when(col(Dic.colReleaseDate) === "NULL", null).otherwise(col(Dic.colReleaseDate)).as(Dic.colReleaseDate),
+//        when(col(Dic.colStorageTime) === "NULL", null).otherwise(col(Dic.colStorageTime)).as(Dic.colStorageTime), // Konverse - 这一步的udf被移动到了 process
+//        when(col(Dic.colVideoTime) === "NULL", null).otherwise(col(Dic.colVideoTime) cast DoubleType).as(Dic.colVideoTime),
+//        when(col(Dic.colScore) === "NULL", null).otherwise(col(Dic.colScore) cast DoubleType).as(Dic.colScore),
+//        when(col(Dic.colIsPaid) === "NULL", null).otherwise(col(Dic.colIsPaid) cast DoubleType).as(Dic.colIsPaid),
+//        when(col(Dic.colPackageId) === "NULL", null).otherwise(col(Dic.colPackageId)).as(Dic.colPackageId),
+//        when(col(Dic.colIsSingle) === "NULL", null).otherwise(col(Dic.colIsSingle) cast DoubleType).as(Dic.colIsSingle),
+//        when(col(Dic.colIsTrailers) === "NULL", null).otherwise(col(Dic.colIsTrailers) cast DoubleType).as(Dic.colIsTrailers),
+//        when(col(Dic.colSupplier) === "NULL", null).otherwise(col(Dic.colSupplier)).as(Dic.colSupplier),
+//        when(col(Dic.colIntroduction) === "NULL", null).otherwise(col(Dic.colIntroduction)).as(Dic.colIntroduction))
 
     df_raw_media
   }
@@ -2422,7 +2457,7 @@ object GetSaveData {
     )
 
     val df = spark.read
-      .option("delimiter", delimiter)
+      .option("delimiter", ",")
       .option("header", true)
       .schema(schema)
       .csv(orderRawPath)
@@ -2472,6 +2507,7 @@ object GetSaveData {
 
     val df = spark.read
       .option("delimiter", delimiter)
+
       .option("header", true)
       .schema(schema)
       .csv(playRawPath)
@@ -2499,6 +2535,50 @@ object GetSaveData {
     df
   }
 
+  def  getRawClickData(spark:SparkSession)={
+
+    val clicksRawPath = hdfsPath + "data/train/common/raw/clicks/*"
+
+    val schema = StructType(
+      List(
+        StructField(Dic.colUserId, StringType),
+        StructField(Dic.colDeviceMsg, StringType),
+        StructField(Dic.colFeatureCode, StringType),
+        StructField(Dic.colBigVersion, StringType),
+        StructField(Dic.colProvince, StringType),
+        StructField(Dic.colCity, StringType),
+        StructField(Dic.colCityLevel, StringType),
+        StructField(Dic.colAreaId, StringType),
+        StructField(Dic.colTime, StringType),
+        StructField(Dic.colItemType, StringType),
+        StructField(Dic.colItemId, StringType)
+        //        StructField(Dic.colPartitionDate, StringType)
+      )
+    )
+
+    val df_raw_click = spark.read
+      .option("delimiter", "\t")
+      .option("header", false)
+      .schema(schema)
+      .csv(clicksRawPath)
+      .select(
+        when(col(Dic.colUserId) === "NULL", null).otherwise(col(Dic.colUserId)).as(Dic.colUserId),
+        when(col(Dic.colDeviceMsg) === "NULL", null).otherwise(col(Dic.colDeviceMsg)).as(Dic.colDeviceMsg),
+        when(col(Dic.colFeatureCode) === "NULL", null).otherwise(col(Dic.colFeatureCode)).as(Dic.colFeatureCode),
+        when(col(Dic.colBigVersion) === "NULL", null).otherwise(col(Dic.colBigVersion)).as(Dic.colBigVersion),
+        when(col(Dic.colProvince) === "NULL", null).otherwise(col(Dic.colProvince)).as(Dic.colProvince),
+        when(col(Dic.colCity) === "NULL", null).otherwise(col(Dic.colCity)).as(Dic.colCity),
+        when(col(Dic.colCityLevel) === "NULL", null).otherwise(col(Dic.colCityLevel)).as(Dic.colCityLevel),
+        when(col(Dic.colAreaId) === "NULL", null).otherwise(col(Dic.colAreaId)).as(Dic.colAreaId)
+
+      ).filter(
+      col(Dic.colUserId).isNotNull
+    ).dropDuplicates()
+      .na.fill(-1)
+
+    df_raw_click
+
+  }
 
 
   /**
@@ -2645,7 +2725,7 @@ object GetSaveData {
   def saveProcessedOrder(df_order_processed: DataFrame) = {
 
 
-    val orderProcessedPath = hdfsPath + "data/train/common/processed/orders3"
+    val orderProcessedPath = hdfsPath + "data/train/common/processed/orders"
     saveProcessedData(df_order_processed, orderProcessedPath)
   }
 
@@ -2688,14 +2768,14 @@ object GetSaveData {
    */
   def getProcessedOrder(spark: SparkSession) = {
 
-    val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders3"
+    val ordersProcessedPath = hdfsPath + "data/train/common/processed/orders"
     spark.read.format("parquet").load(ordersProcessedPath)
 
   }
 
   def getProcessedPlay(sparkSession: SparkSession) = {
 
-    val playsProcessedPath = hdfsPath + "data/train/common/processed/userpay/plays_new3"
+    val playsProcessedPath = hdfsPath + "data/train/common/processed/plays"
     sparkSession.read.format("parquet").load(playsProcessedPath)
 
   }
@@ -2715,14 +2795,13 @@ object GetSaveData {
   }
 
   def getAllUsersPlayAndOrder(spark: SparkSession) = {
-
     val df_play = getProcessedPlay(spark)
     val df_play_id = df_play.select(Dic.colUserId).dropDuplicates()
-
     val df_order = getProcessedOrder(spark)
     val df_order_id = df_order.select(Dic.colUserId).dropDuplicates()
+    val df_all_id = df_order_id.union(df_play_id).dropDuplicates()
 
-    df_order_id.union(df_play_id).dropDuplicates()
+    df_all_id
 
   }
 
@@ -2836,27 +2915,13 @@ object GetSaveData {
     saveProcessedData(df_data, Path)
   }
 
-  def getBertVector(state: String) = {
-
-    val path = hdfsPath + "data/" + state + "/xxkang/" + state + "_medias_bert.csv"
-
-    val schema = StructType(
-      List(
-        StructField(Dic.colVideoId, StringType),
-        StructField(Dic.colBertVector, StringType)
-      )
-    )
-
-
-    val df_raw_vector = spark.read
-      .option("delimiter", ",")
-      .option("header", true)
-      .schema(schema)
-      .csv(path)
-
-    df_raw_vector
+  def getDataSet(now:String, state: String) = {
+    val Path = hdfsPath + "data/" + state + "/userpay/"+ state +"UserProfile" + now.split(" ")(0)
+    getData(spark, Path)
 
   }
+
+    
     
     
   def getRawMediaData2(spark: SparkSession) = {
@@ -2945,17 +3010,21 @@ object GetSaveData {
       
   }
 
+  //  Save user info get from click data
+  def saveProcessedUserMeta(df_data: DataFrame) = {
 
-  def saveDataForXXK(df_data:DataFrame, state: String, fileName: String) = {
-    val path = hdfsPath + "data/" + state + "/xxkang/" + fileName
+    val path = hdfsPath + "data/train/common/processed/clickMetaData"
     saveProcessedData(df_data, path)
+
   }
 
-  def getDataFromXXK(state: String, fileName: String) = {
-    val path = hdfsPath + "data/" + state + "/xxkang/" + fileName
+
+  //  Save user info get from click data
+  def getProcessedUserMeta() = {
+
+    val path = hdfsPath + "data/train/common/processed/clickMetaData"
     getData(spark, path)
   }
-
 
 
 

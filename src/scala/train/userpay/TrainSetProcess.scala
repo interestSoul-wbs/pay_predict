@@ -1,7 +1,7 @@
 package train.userpay
 
 import mam.{Dic, SparkSessionInit}
-import mam.GetSaveData.{getDataFromXXK, getTrainUser, getUserProfileOrderPart, getUserProfilePlayPart, getUserProfilePreferencePart, getVideoFirstCategory, getVideoLabel, getVideoSecondCategory, saveDataSet}
+import mam.GetSaveData.{getDataFromXXK, getProcessedUserMeta, getTrainUser, getUserProfileOrderPart, getUserProfilePlayPart, getUserProfilePreferencePart, getVideoFirstCategory, getVideoLabel, getVideoSecondCategory, saveDataSet}
 import mam.SparkSessionInit.spark
 import mam.Utils.{printDf, sysParamSetting}
 import org.apache.spark.sql.DataFrame
@@ -49,10 +49,12 @@ object TrainSetProcess {
     val df_play_vec = getDataFromXXK("train", "train_play_vector_" + playsNum)
     printDf("输入 df_play_vec", df_play_vec)
 
+    val df_click_Meta = getProcessedUserMeta()
+    printDf("df_click_Meta", df_click_Meta)
 
     // 3 Train Set Process
     val df_train_set = trainSetProcess(df_user_profile_play, df_user_profile_pref, df_user_profile_order,
-      df_video_first_category, df_video_second_category, df_label, df_train_user, df_play_vec)
+      df_video_first_category, df_video_second_category, df_label, df_train_user, df_play_vec, df_click_Meta)
 
     // 4 Save Train Users
     saveDataSet(trainTime, df_train_set, "train")
@@ -65,7 +67,7 @@ object TrainSetProcess {
 
   def trainSetProcess(df_user_profile_play: DataFrame, df_user_profile_pref: DataFrame, df_user_profile_order: DataFrame,
                       df_video_first_category: DataFrame, df_video_second_category: DataFrame, df_label: DataFrame,
-                      df_train_user: DataFrame, df_play_vec: DataFrame): DataFrame = {
+                      df_train_user: DataFrame, df_play_vec: DataFrame, df_click_meta: DataFrame): DataFrame = {
 
 
     /**
@@ -207,7 +209,15 @@ object TrainSetProcess {
     /**
      * 将添加用户的标签信息
      */
-    val df_train_profile = df_train_user.join(df_train_user_profile, joinKeysUserId, "left")
+    val df_train_user_prof = df_userProfile_split_pref3.select(columnList.map(df_userProfile_split_pref3.col(_)): _*)
+
+    /**
+     * 添加用户的点击类提取特征
+     */
+
+    val df_train_click = df_train_user_prof.join(df_click_meta, joinKeysUserId, "left")
+      .na.fill(-1)
+
 
 
     /**
@@ -215,7 +225,7 @@ object TrainSetProcess {
      */
 
 
-    val df_train_set = df_train_profile.join(df_play_vec, joinKeysUserId, "left")
+    val df_train_set = df_train_user.join(df_train_click, joinKeysUserId, "left")
 
     df_train_set
 
