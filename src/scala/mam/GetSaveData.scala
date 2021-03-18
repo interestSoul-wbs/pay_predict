@@ -10,7 +10,7 @@ object GetSaveData {
 
   var tempTable = "temp_table"
 //    val hdfsPath = ""
-  val hdfsPath = "hdfs:///pay_predict_3/"
+  val hdfsPath = "hdfs:///pay_predict_2/"
   val delimiter = "\\t"
 
   def saveDataForXXK(df_data:DataFrame, state: String, fileName: String) = {
@@ -2528,6 +2528,48 @@ object GetSaveData {
     df
   }
 
+  def  getRawClickData(spark:SparkSession)={
+    val clicksRawPath = hdfsPath + "data/train/common/raw/clicks/*"
+
+    val schema = StructType(
+      List(
+        StructField(Dic.colUserId, StringType),
+        StructField(Dic.colDeviceMsg, StringType),
+        StructField(Dic.colFeatureCode, StringType),
+        StructField(Dic.colBigVersion, StringType),
+        StructField(Dic.colProvince, StringType),
+        StructField(Dic.colCity, StringType),
+        StructField(Dic.colCityLevel, StringType),
+        StructField(Dic.colAreaId, StringType),
+        StructField(Dic.colTime, StringType),
+        StructField(Dic.colItemType, StringType),
+        StructField(Dic.colItemId, StringType)
+        //        StructField(Dic.colPartitionDate, StringType)
+      )
+    )
+
+    val df_raw_click = spark.read
+      .option("delimiter", "\t")
+      .option("header", false)
+      .schema(schema)
+      .csv(clicksRawPath)
+      .select(
+        when(col(Dic.colUserId) === "NULL", null).otherwise(col(Dic.colUserId)).as(Dic.colUserId),
+        when(col(Dic.colDeviceMsg) === "NULL", null).otherwise(col(Dic.colDeviceMsg)).as(Dic.colDeviceMsg),
+        when(col(Dic.colFeatureCode) === "NULL", null).otherwise(col(Dic.colFeatureCode)).as(Dic.colFeatureCode),
+        when(col(Dic.colBigVersion) === "NULL", null).otherwise(col(Dic.colBigVersion)).as(Dic.colBigVersion),
+        when(col(Dic.colProvince) === "NULL", null).otherwise(col(Dic.colProvince)).as(Dic.colProvince),
+        when(col(Dic.colCity) === "NULL", null).otherwise(col(Dic.colCity)).as(Dic.colCity),
+        when(col(Dic.colCityLevel) === "NULL", null).otherwise(col(Dic.colCityLevel)).as(Dic.colCityLevel),
+        when(col(Dic.colAreaId) === "NULL", null).otherwise(col(Dic.colAreaId)).as(Dic.colAreaId)
+
+      ).filter(
+      col(Dic.colUserId).isNotNull
+    ).dropDuplicates()
+
+    df_raw_click
+
+  }
 
 
   /**
@@ -2958,4 +3000,22 @@ object GetSaveData {
     df_raw_media
       
   }
+
+  //  Save user info get from click data
+  def saveProcessedUserMeta(df_data: DataFrame) = {
+
+    val path = hdfsPath + "data/train/common/processed/clickMetaData"
+    saveProcessedData(df_data, path)
+
+  }
+
+
+  //  Save user info get from click data
+  def getProcessedUserMeta() = {
+
+    val path = hdfsPath + "data/train/common/processed/clickMetaData"
+    getData(spark, path)
+
+  }
+
 }
