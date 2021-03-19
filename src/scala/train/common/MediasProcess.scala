@@ -35,21 +35,21 @@ object MediasProcess {
     // 3-2
     val df_label_one = getSingleStrColLabel(df_medias_processed, Dic.colVideoOneLevelClassification)
 
-    saveLabel(df_label_one, "videofirstcategorytemp.txt")
+    saveLabel(df_label_one, "videofirstcategorytemp")
 
     printDf("输出 df_label_one", df_label_one)
 
     // 3-3
     val df_label_two = getArrayStrColLabel(df_medias_processed, Dic.colVideoTwoLevelClassificationList)
 
-    saveLabel(df_label_two, "videosecondcategorytemp.txt")
+    saveLabel(df_label_two, "videosecondcategorytemp")
 
     printDf("输出 df_label_two", df_label_two)
 
     // 3-4
     val df_label_tags = getArrayStrColLabel(df_medias_processed, Dic.colVideoTagList)
 
-    saveLabel(df_label_tags, "labeltemp.txt")
+    saveLabel(df_label_tags, "labeltemp")
 
     printDf("输出 df_label_tags", df_label_tags)
 
@@ -76,7 +76,7 @@ object MediasProcess {
         when(col(Dic.colReleaseDate) === "NULL", null).otherwise(col(Dic.colReleaseDate)).as(Dic.colReleaseDate),
         when(col(Dic.colStorageTime) === "NULL", null).otherwise(udfLongToTimestampV2(col(Dic.colStorageTime))).as(Dic.colStorageTime),
         when(col(Dic.colVideoTime) === "NULL", null).otherwise(col(Dic.colVideoTime).cast(DoubleType)).as(Dic.colVideoTime),
-        when(col(Dic.colScore) === "NULL", null).otherwise(col(Dic.colScore).cast(DoubleType)).as(Dic.colScore),
+        when((col(Dic.colScore) === "NULL")||(col(Dic.colScore) === 0), null).otherwise(col(Dic.colScore).cast(DoubleType)).as(Dic.colScore),
         when(col(Dic.colIsPaid) === "NULL", null).otherwise(col(Dic.colIsPaid).cast(DoubleType)).as(Dic.colIsPaid),
         when(col(Dic.colPackageId) === "NULL", null).otherwise(col(Dic.colPackageId)).as(Dic.colPackageId),
         when(col(Dic.colIsSingle) === "NULL", null).otherwise(col(Dic.colIsSingle).cast(DoubleType)).as(Dic.colIsSingle),
@@ -88,6 +88,7 @@ object MediasProcess {
       //是否单点 是否付费 是否先导片 一级分类空值
       .na.fill(
       Map(
+        (Dic.colPackageId, 0),
         (Dic.colIsSingle, 0),
         (Dic.colIsPaid, 0),
         (Dic.colIsTrailers, 0),
@@ -135,9 +136,7 @@ object MediasProcess {
         explode(
           col(colName)).as(colName))
       .dropDuplicates()
-      .withColumn(Dic.colRank, row_number().over(Window.orderBy(col(colName))) - 1)
-      .select(
-        concat_ws("\t", col(Dic.colRank), col(colName)).cast(StringType).as(Dic.colContent))
+      .withColumn(Dic.colIndex, row_number().over(Window.orderBy(col(colName))) - 1)
 
     df_label
   }
@@ -148,9 +147,7 @@ object MediasProcess {
       .select(col(colName))
       .dropDuplicates()
       .filter(!col(colName).cast("String").contains("]"))
-      .withColumn(Dic.colRank, row_number().over(Window.orderBy(col(colName))) - 1)
-      .select(
-        concat_ws("\t", col(Dic.colRank), col(colName)).as(Dic.colContent))
+      .withColumn(Dic.colIndex, row_number().over(Window.orderBy(col(colName))) - 1)
 
     df_label
   }
