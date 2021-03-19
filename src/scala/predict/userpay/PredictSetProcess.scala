@@ -7,6 +7,7 @@ import mam.Utils.{printDf, sysParamSetting}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.{col, lit, udf}
 
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 object PredictSetProcess {
@@ -85,33 +86,29 @@ object PredictSetProcess {
       val df_predict_set_not_null = df_tempPredictSet.na.fill(0, numColList)
 
       /**
-       * Split Pref Data
+       * 偏好部分标签处理
        */
-      var videoFirstCategoryMap: Map[String, Int] = Map()
-      var videoSecondCategoryMap: Map[String, Int] = Map()
-      var labelMap: Map[String, Int] = Map()
+
+      // 一级标签
+      val videoFirstCategoryMap = df_video_first_category.rdd //Dataframe转化为RDD
+        .map(row => row.getAs(Dic.colVideoOneLevelClassification).toString -> row.getAs(Dic.colIndex).toString)
+        .collectAsMap() //将key-value对类型的RDD转化成Map
+        .asInstanceOf[mutable.HashMap[String, Int]]
 
 
-      var conList = df_video_first_category.collect()
-      for (elem <- conList) {
-        var s = elem.toString()
-        videoFirstCategoryMap += (s.substring(1, s.length - 1).split("\t")(1) -> s.substring(1, s.length - 1).split("\t")(0).toInt)
+      // 二级标签
+      val videoSecondCategoryMap = df_video_second_category.rdd //Dataframe转化为RDD
+        .map(row => row.getAs(Dic.colVideoTwoLevelClassificationList).toString -> row.getAs(Dic.colIndex).toString)
+        .collectAsMap() //将key-value对类型的RDD转化成Map
+        .asInstanceOf[mutable.HashMap[String, Int]]
 
-      }
 
-      conList = df_video_second_category.collect()
-      for (elem <- conList) {
-        var s = elem.toString()
-        videoSecondCategoryMap += (s.substring(1, s.length - 1).split("\t")(1) -> s.substring(1, s.length - 1).split("\t")(0).toInt)
+      // 类别型标签
+      val labelMap = df_label.rdd //Dataframe转化为RDD
+        .map(row => row.getAs(Dic.colVideoTagList).toString -> row.getAs(Dic.colIndex).toString)
+        .collectAsMap() //将key-value对类型的RDD转化成Map
+        .asInstanceOf[mutable.HashMap[String, Int]]
 
-      }
-
-      conList = df_label.collect()
-      for (elem <- conList) {
-        var s = elem.toString()
-        labelMap += (s.substring(1, s.length - 1).split("\t")(1) -> s.substring(1, s.length - 1).split("\t")(0).toInt)
-
-      }
 
 
       val prefColumns = List(Dic.colVideoOneLevelPreference, Dic.colVideoTwoLevelPreference,
