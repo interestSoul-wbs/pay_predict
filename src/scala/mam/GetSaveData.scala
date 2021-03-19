@@ -9,8 +9,8 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 object GetSaveData {
 
   var tempTable = "temp_table"
-//    val hdfsPath = ""
-  val hdfsPath = "hdfs:///pay_predict_3/"
+    val hdfsPath = ""
+//  val hdfsPath = "hdfs:///pay_predict_2/"
   val delimiter = "\\t"
 
   def saveDataForXXK(df_data:DataFrame, state: String, fileName: String) = {
@@ -22,6 +22,13 @@ object GetSaveData {
 
     val path = hdfsPath + "data/" + state + "/xxkang/" + fileName
     getData(spark, path)
+
+  }
+
+  def getBertVector(state: String) = {
+    val path = hdfsPath + "data/"+ state + "/xxkang/" + state + "_medias_bert.csv"
+
+    spark.read. option("header", true).format("csv").load(path).withColumnRenamed("brief_bert", Dic.colBertVector)
 
   }
 
@@ -2660,7 +2667,8 @@ object GetSaveData {
 
   def saveLabel(df_label: DataFrame, fileName: String) = {
     val path = hdfsPath + "data/train/common/processed/"
-    df_label.coalesce(1).write.mode(SaveMode.Overwrite).option("header", "false").csv(path + fileName)
+//    df_label.coalesce(1).write.mode(SaveMode.Overwrite).option("header", "true").csv(path + fileName)
+    df_label.write.mode(SaveMode.Overwrite).format("parquet").save(path + fileName)
   }
 
 
@@ -2890,21 +2898,28 @@ object GetSaveData {
    */
 
   def getVideoFirstCategory() = {
-    val videoFirstCategoryTempPath = hdfsPath + "data/train/common/processed/videofirstcategorytemp.txt"
-    spark.read.format("csv").load(videoFirstCategoryTempPath)
+    val videoFirstCategoryTempPath = hdfsPath + "data/train/common/processed/videofirstcategorytemp"
+//    spark.read.option("header", true).format("csv").load(videoFirstCategoryTempPath)
+    spark.read.format("parquet").load(videoFirstCategoryTempPath)
+
   }
 
   def getVideoSecondCategory() = {
 
-    val videoSecondCategoryTempPath = hdfsPath + "data/train/common/processed/videosecondcategorytemp.txt"
-    spark.read.format("csv").load(videoSecondCategoryTempPath)
+    val videoSecondCategoryTempPath = hdfsPath + "data/train/common/processed/videosecondcategorytemp"
+//    spark.read.option("header", true).format("csv").load(videoSecondCategoryTempPath)
+    spark.read.format("parquet").load(videoSecondCategoryTempPath)
+
+
   }
 
 
   def getVideoLabel() = {
 
-    val labelTempPath = hdfsPath + "data/train/common/processed/labeltemp.txt"
-    spark.read.format("csv").load(labelTempPath)
+    val labelTempPath = hdfsPath + "data/train/common/processed/labeltemp"
+//    spark.read.option("header", true).format("csv").load(labelTempPath)
+    spark.read.format("parquet").load(labelTempPath)
+
   }
 
   /**

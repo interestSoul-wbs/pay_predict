@@ -229,24 +229,28 @@ object Utils {
     if (date == null) {
       -1
     } else {
-      val sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:SS")
-      val d1 = sdf.parse(now)
-      var d2 = sdf.parse(now)
-      if (date.length < 19) {
-        d2 = sdf.parse(date + " 00:00:00")
-      } else {
-        d2 = sdf.parse(date)
+      try {
+        val sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:SS")
+        val d1 = sdf.parse(now)
+        var d2 = sdf.parse(now)
+        if (date.length < 19) {
+          d2 = sdf.parse(date + " 00:00:00")
+        } else {
+          d2 = sdf.parse(date)
+        }
+        var daysBetween = 0
+        if (now > date) {
+          daysBetween = ((d1.getTime() - d2.getTime() + 1000000) / (60 * 60 * 24 * 1000)).toInt
+        } else {
+          daysBetween = ((d2.getTime() - d1.getTime() + 1000000) / (60 * 60 * 24 * 1000)).toInt
+        }
+        daysBetween
+      } catch {
+        case e: Exception => {
+          -1
+        }
       }
-      var daysBetween = 0
-      if (now > date) {
-        daysBetween = ((d1.getTime() - d2.getTime() + 1000000) / (60 * 60 * 24 * 1000)).toInt
-      } else {
-        daysBetween = ((d2.getTime() - d1.getTime() + 1000000) / (60 * 60 * 24 * 1000)).toInt
-      }
-      daysBetween
-
     }
-
   }
 
   //根据 time_validity 和 resource_type 填充order中 discount_description 为 null的数值

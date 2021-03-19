@@ -1,22 +1,20 @@
 package predict.userpay
 
 import mam.Dic.colVector
-import mam.GetSaveData.{getBertVector, saveDataForXXK}
+import mam.GetSaveData.{getBertVector, getDataFromXXK, saveDataForXXK}
 import mam.SparkSessionInit.spark
 import mam.Utils.{printDf, sysParamSetting}
 import mam.{Dic, SparkSessionInit}
-import org.apache.spark.ml.feature.{PCA, Word2Vec}
+import org.apache.spark.ml.feature.{PCA, VectorAssembler, Word2Vec}
 import org.apache.spark.ml.linalg.Vectors
-import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{ArrayType, StringType}
-import train.userpay.GetMediasVector.{pcaDimension, vectorDimension, windowSize}
+import train.userpay.GetMediasVector.{GetPCA, pcaDimension, udfConcatVector, vectorDimension, w2vec, windowSize}
 
-import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
 
 object GetMediasVector {
 
+  val trainPredictTimeGap = 15
 
   def main(args: Array[String]): Unit = {
 
@@ -26,6 +24,28 @@ object GetMediasVector {
 
 
     // 2 Get data
+    // 2-1 获得媒资的数值型类别型特征
+
+    val df_medias_feat = getDataFromXXK("common", "medias_digital_category_feature")
+
+    val df_medias_feature = df_medias_feat.withColumn(Dic.colStorageTimeGap, col(Dic.colStorageTime) + trainPredictTimeGap)
+    printDf("输入 df_medias_feature", df_medias_feature)
+
+    // 数值和类别型特征进行组合
+    val assembler = new VectorAssembler()
+      .setInputCols(df_medias_feature.columns.drop(1)) // drop video id
+      .setOutputCol(Dic.colDigitalCategoryVec)
+
+    val df_medias_vector = assembler.transform(df_medias_feature)
+      .select(Dic.colVideoId, Dic.colDigitalCategoryVec)
+      .withColumn(Dic.colDigitalCategoryVec, col(Dic.colDigitalCategoryVec).cast(StringType))
+
+    printDf("df_medias_vector", df_medias_vector)
+
+
+
+
+
     // Get bert vector data
     val df_medias_bert_raw = getBertVector("predict")
     printDf("输入 df_medias_bert_raw", df_medias_bert_raw)
@@ -56,9 +76,11 @@ object GetMediasVector {
 
     printDf("df_medias_vec", df_medias_vec)
 
-    val df_medias_concat = df_medias_vec.withColumn(Dic.colConcatVec, udfConcatVector(col(Dic.colBertVector), col(Dic.colVector)))
+    val df_medias_concat = df_medias_vec.withColumn(Dic.colConcatVec,
+      udfConcatVector(col(Dic.colBertVector), col(Dic.colVector), col(Dic.colDigitalCategoryVec)))
 
     printDf("df_medias_concat: concat bert and w2v", df_medias_concat)
+
 
 
     //4 PCA De-dimensional
@@ -84,58 +106,6 @@ object GetMediasVector {
 
   }
 
-  // word2vec
-  def w2vec(df_medias:DataFrame) ={
 
-    val w2vModel = new Word2Vec()
-      .setInputCol(Dic.colVideoId + "_list")
-      .setOutputCol(Dic.colVector)
-      .setVectorSize(vectorDimension)
-      .setWindowSize(windowSize)
-      .setMinCount(0)
-    val model = w2vModel.fit(df_medias)
-
-    model.getVectors
-      .withColumnRenamed("word", Dic.colVideoId)
-  }
-
-
-  // concat Bert vector and word2Vec
-  def udfConcatVector = udf(concatVector _)
-
-  def concatVector(bert_vector: mutable.WrappedArray[String], w2vector: String) = {
-
-    var vectorArray = new ArrayBuffer[Double]()
-
-    bert_vector.foreach(str =>
-      vectorArray.append(str.toDouble)
-    )
-
-    w2vector.substring(1, w2vector.length - 1).split(",").foreach(
-    item =>
-      vectorArray.append(item.toDouble)
-
-    )
-
-    val v = Vectors.dense(vectorArray.toArray)
-    v
-
-  }
-
-
-
-  def GetPCA(df: DataFrame) = {
-    val pca = new PCA()
-      .setInputCol(Dic.colConcatVec)
-      .setOutputCol(Dic.colConcatVec + "PCA")
-      .setK(pcaDimension)
-      .fit(df)
-
-
-    pca.transform(df)
-      .select(Dic.colVideoId, Dic.colConcatVec + "PCA")
-      .withColumnRenamed(Dic.colConcatVec + "PCA", Dic.colConcatVec)
-
-  }
 
 }

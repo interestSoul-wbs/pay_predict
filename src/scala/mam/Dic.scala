@@ -60,6 +60,7 @@ object Dic {
   //在处理medias过程中构造的属性
   val colRank = "rank"
   val colContent = "content"
+  val colReleaseDateGap = "release_date_gap"
   val colStorageTimeGap = "storage_time_gap"
   val colPlayTimes = "play_times"  // video played times by users
   val colBrief = "brief"
@@ -71,7 +72,8 @@ object Dic {
   val colBertVector = "bert_vector"
   val colConcatVec = "concat_vector"
   val colConcatTags = "concat_tags"
-
+  val colIndex = "index"
+  val colDigitalCategoryVec = "digital_category_vector"
   /**
    * order中的属性
    */

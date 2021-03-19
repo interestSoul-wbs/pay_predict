@@ -87,6 +87,9 @@ object GetMediasVector {
     printDf("df_package_code", df_package_code)
 
 
+    saveDataForXXK(df_package_code, "common", "medias_digital_category_feature")
+
+
     // 数值和类别型特征进行组合
     val assembler = new VectorAssembler()
       .setInputCols(df_package_code.columns.drop(1)) // drop video id
@@ -97,7 +100,6 @@ object GetMediasVector {
       .withColumn(Dic.colDigitalCategoryVec, col(Dic.colDigitalCategoryVec).cast(StringType))
 
     printDf("df_medias_feature", df_medias_feature)
-
 
 
     // 2-2 Get bert vector data
