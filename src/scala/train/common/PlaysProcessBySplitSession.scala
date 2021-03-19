@@ -26,6 +26,7 @@ object PlaysProcessBySplitSession {
   def main(args: Array[String]): Unit = {
 
     // 1 SparkSession init
+    sysParamSetting()
     SparkSessionInit.init()
 
     // 2 數據讀取
