@@ -309,4 +309,13 @@ object Dic {
   val colTmp: String = "tmp"
   val colCustomerid: String = "customerid"
   val colDeviceid: String = "deviceid"
+
+
+  val colIsMemberCurrent="is_member_current"
+  val colIsMember7Days="is_member_7_days"
+  val colIsMember14Days="is_member_14_days"
+  val colOrderHour="order_hour"
+  val colMeanGap="mean_gap"
+
+
 }
