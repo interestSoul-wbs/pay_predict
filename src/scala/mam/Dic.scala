@@ -74,6 +74,8 @@ object Dic {
   val colConcatTags = "concat_tags"
   val colIndex = "index"
   val colDigitalCategoryVec = "digital_category_vector"
+  val colDigitalCategoryScalaVec = "digital_category_scala_vector"
+
   /**
    * order中的属性
    */

@@ -65,6 +65,8 @@ object UserProfileGeneratePlayPartForUserpay {
     /**
      * 用户画像play part 时间类相关信息
      * 时长类转换成分钟
+     *
+     * 最近活跃时间
      */
     val df_play_part_1 = df_train_plays
       .filter(

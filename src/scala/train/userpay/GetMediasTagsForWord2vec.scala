@@ -7,13 +7,13 @@ import mam.Utils.{calDate, printDf, sysParamSetting, udfBreakList, udfGetTopNHis
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{col, collect_list, concat_ws, lit, row_number, sort_array, udf, when}
+import train.userpay.GetMediasForBertAndPlayList.playsNum
 
 import scala.collection.mutable
 
 object GetMediasTagsForWord2vec {
 
   val days = 60 // 当前时间前N天的播放记录
-  val playsNum = 60
 
   def main(args: Array[String]): Unit = {
 
@@ -26,12 +26,12 @@ object GetMediasTagsForWord2vec {
     val df_medias = getProcessedMedias(spark)
     printDf("Input df_medias", df_medias)
 
-    val df_train_medias_bert = getDataFromXXK("train", "train_medias_60")
+    val df_train_medias_bert = getDataFromXXK("train", "train_medias_" + playsNum)
     val df_train_id = df_train_medias_bert.select(Dic.colVideoId)
 
     printDf("Input df_train_medias_bert", df_train_medias_bert)
 
-    val df_predict_medias_bert = getDataFromXXK("predict", "predict_medias_60")
+    val df_predict_medias_bert = getDataFromXXK("predict", "predict_medias_" + playsNum)
     val df_predict_id = df_predict_medias_bert.select(Dic.colVideoId)
 
     printDf("Input df_predict_medias_bert", df_medias)

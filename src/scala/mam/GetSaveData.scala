@@ -10,7 +10,7 @@ object GetSaveData {
 
   var tempTable = "temp_table"
     val hdfsPath = ""
-//  val hdfsPath = "hdfs:///pay_predict_2/"
+//  val hdfsPath = "hdfs:///pay_predict_3/"
   val delimiter = "\\t"
 
   def saveDataForXXK(df_data:DataFrame, state: String, fileName: String) = {
@@ -2578,9 +2578,7 @@ object GetSaveData {
         when(col(Dic.colCityLevel) === "NULL", null).otherwise(col(Dic.colCityLevel)).as(Dic.colCityLevel),
         when(col(Dic.colAreaId) === "NULL", null).otherwise(col(Dic.colAreaId)).as(Dic.colAreaId)
 
-      ).filter(
-      col(Dic.colUserId).isNotNull
-    ).dropDuplicates()
+      ).dropDuplicates()
       .na.fill(-1)
 
     df_raw_click

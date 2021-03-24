@@ -27,7 +27,6 @@ object ClicksProcess {
 
     // 2 數據讀取
     val df_raw_clicks = getRawClickData(spark)
-
     printDf("输入 df_raw_clicks", df_raw_clicks)
 
     //     3 对数据进行处理及存儲

@@ -35,13 +35,13 @@ object GetMediasForBertAndPlayList {
     val df_predict_ids = df_predict_users.select(Dic.colUserId)
 
 
-    val df_play_list = getMediasForBertAndPlayList(df_plays, df_medias, df_predict_ids, playsNum, predictTime)
+    val df_play_list = getMediasForBertAndPlayList(df_plays, df_medias, df_predict_ids, predictTime)
     saveDataForXXK(df_play_list, "predict", "predict_play_free_paid_" + playsNum)
 
 
   }
 
-  def getMediasForBertAndPlayList(df_play: DataFrame, df_medias: DataFrame, df_train_ids: DataFrame, playsNum: Int, trainTime: String) = {
+  def getMediasForBertAndPlayList(df_play: DataFrame, df_medias: DataFrame, df_train_ids: DataFrame, trainTime: String) = {
 
     // 一段时间的播放历史
     val df_plays_part = df_play.filter(
