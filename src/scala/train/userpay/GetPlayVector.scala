@@ -24,7 +24,7 @@ object GetPlayVector {
 
     // 2 Get Data
 
-    val df_medias_vector = getDataFromXXK("train", "train_medias_bert_w2v")
+    val df_medias_vector = getDataFromXXK("train", "train_medias_bert_w2v_vec")
     printDf("Input: df_medias_vector", df_medias_vector)
 
     // 3 Get play history in a past period of time
