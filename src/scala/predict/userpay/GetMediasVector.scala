@@ -1,18 +1,20 @@
 package predict.userpay
 
-import mam.GetSaveData.{getBertVector, getProcessedMedias, getVideoFirstCategory, getVideoLabel, hdfsPath, saveDataForXXK}
-import mam.{Dic, SparkSessionInit}
+import mam.Dic.colVector
+import mam.GetSaveData.{getBertVector, getDataFromXXK, saveDataForXXK}
 import mam.SparkSessionInit.spark
-import mam.Utils.{getData, printDf, sysParamSetting, udfGetDays}
+import mam.Utils.{printDf, sysParamSetting}
+import mam.{Dic, SparkSessionInit}
 import org.apache.spark.ml.feature.{PCA, StandardScaler, VectorAssembler, Word2Vec}
 import org.apache.spark.ml.linalg.Vectors
-import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.functions.{col, collect_list, explode, from_json, lit, row_number, udf, when}
-import org.apache.spark.sql.types.{ArrayType, DoubleType, IntegerType, StringType}
-import train.userpay.GetMediasVector.{GetPCA, pcaDimension, udfArrayToVec, udfEncodeLabel, vectorDimension, w2vec, windowSize}
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.{ArrayType, StringType}
+import train.userpay.GetMediasVector.{GetPCA, pcaDimension, udfArrayToVec, w2vec}
+
 
 object GetMediasVector {
 
+  val predictPredictTimeGap = 15
 
   def main(args: Array[String]): Unit = {
 
@@ -20,71 +22,22 @@ object GetMediasVector {
     sysParamSetting
     SparkSessionInit.init()
 
-    val predictTime = args(0) + " " + args(1)
-    println("predictTime", predictTime)
 
     // 2 Get data
-    // Medias数据
-    val df_medias_processed = getProcessedMedias(spark)
-    printDf("输入 df_medias_processed", df_medias_processed)
+    // 2-1 获得媒资的数值型类别型特征
 
-    val df_video_one = getVideoFirstCategory()
-    printDf("输入 df_video_one", df_video_one)
+    val df_medias_digi = getDataFromXXK("common", "medias_digital_category_feature")
 
-    //2-1 添加数值型特征 , 添加类别型特征
-
-    val df_medias_part = df_medias_processed
-      .select(
-        Dic.colVideoId, Dic.colScore, Dic.colReleaseDate, Dic.colStorageTime, Dic.colVideoTime,
-        Dic.colVideoOneLevelClassification, Dic.colIsPaid, Dic.colPackageId, Dic.colIsSingle, Dic.colIsTrailers
-      ).na.fill(Map((Dic.colPackageId, -1)))
-
-    // 2-1-1 数值型特征处理
-    val df_medias_dig = df_medias_part
-      .withColumn(Dic.colReleaseDateGap, udfGetDays(col(Dic.colReleaseDate), lit(predictTime)))
-      .withColumn(Dic.colStorageTimeGap, udfGetDays(col(Dic.colStorageTime), lit(predictTime)))
-
-    // 2-1-2 类别型特征编码 一级分类编码
-    import scala.collection.mutable
-    val videoOneMap = df_video_one.rdd //Dataframe转化为RDD
-      .map(row => row.getAs(Dic.colVideoOneLevelClassification).toString -> row.getAs(Dic.colIndex).toString)
-      .collectAsMap() //将key-value对类型的RDD转化成Map
-      .asInstanceOf[mutable.HashMap[String, String]]
-
-    val df_label_code = df_medias_dig
-      .withColumn(Dic.colVideoOneLevelClassification, (udfEncodeLabel(videoOneMap)(col(Dic.colVideoOneLevelClassification))).cast(IntegerType))
-      .drop(Dic.colReleaseDate, Dic.colStorageTime)
-
-    printDf("df_label_code", df_label_code)
-
-
-    // 2-1-3 编码套餐id
-
-    val df_package = df_label_code
-      .select(col(Dic.colPackageId))
-      .dropDuplicates()
-      .withColumn(Dic.colIndex, row_number().over(Window.orderBy(col(Dic.colPackageId))) - 1)
-
-    val packageMap = df_package.rdd //Dataframe转化为RDD
-      .map(row => row.getAs(Dic.colPackageId).toString -> row.getAs(Dic.colIndex).toString)
-      .collectAsMap() //将key-value对类型的RDD转化成Map
-      .asInstanceOf[mutable.HashMap[String, String]]
-
-    val df_package_code = df_label_code
-      .withColumn(Dic.colPackageId, (udfEncodeLabel(packageMap)(col(Dic.colPackageId))).cast(IntegerType))
-
-    printDf("df_package_code", df_package_code)
-
-
-    saveDataForXXK(df_package_code, "common", "medias_digital_category_feature")
+    val df_medias_feat = df_medias_digi.withColumn(Dic.colStorageTimeGap, col(Dic.colStorageTimeGap) + predictPredictTimeGap)
+    printDf("输入 df_medias_feat", df_medias_feat)
 
 
     // 数值和类别型特征进行组合
     val assembler = new VectorAssembler()
-      .setInputCols(df_package_code.columns.drop(1)) // drop video id
+      .setInputCols(df_medias_feat.columns.drop(1)) // drop video id
       .setOutputCol(Dic.colDigitalCategoryVec)
 
-    val df_medias_feature = assembler.transform(df_package_code)
+    val df_medias_feature = assembler.transform(df_medias_feat)
       .select(Dic.colVideoId, Dic.colDigitalCategoryVec)
 
     printDf("df_medias_feature", df_medias_feature)
@@ -166,6 +119,9 @@ object GetMediasVector {
     printDf("df_medias_pca_all: PCA De-dimensional concat vector", df_medias_pca_all)
 
 
+
   }
+
+
 
 }
