@@ -5,7 +5,7 @@ import mam.GetSaveData.{getBertVector, getProcessedMedias, getVideoFirstCategory
 import mam.{Dic, SparkSessionInit}
 import mam.SparkSessionInit.spark
 import mam.Utils.{getData, printDf, sysParamSetting, udfGetDays}
-import org.apache.spark.ml.feature.{PCA, VectorAssembler, Word2Vec}
+import org.apache.spark.ml.feature.{PCA, StandardScaler, VectorAssembler, Word2Vec}
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.{Column, DataFrame}
@@ -21,8 +21,6 @@ object GetMediasVector {
   val vectorDimension = 256 // 向量维度
   val windowSize = 10 //滑动窗口大小， 默认参数为5，这里尝试设置为10，在一定程度上，windowSize越大，训练越慢,但是向量表达更准确
   val pcaDimension = 64 // 向量维度
-
-
 
 
   def main(args: Array[String]): Unit = {
@@ -48,7 +46,7 @@ object GetMediasVector {
       .select(
         Dic.colVideoId, Dic.colScore, Dic.colReleaseDate, Dic.colStorageTime, Dic.colVideoTime,
         Dic.colVideoOneLevelClassification, Dic.colIsPaid, Dic.colPackageId, Dic.colIsSingle, Dic.colIsTrailers
-      )
+      ).na.fill(Map((Dic.colPackageId, -1)))
 
     // 2-1-1 数值型特征处理
     val df_medias_dig = df_medias_part
@@ -66,7 +64,7 @@ object GetMediasVector {
       .withColumn(Dic.colVideoOneLevelClassification, (udfEncodeLabel(videoOneMap)(col(Dic.colVideoOneLevelClassification))).cast(IntegerType))
       .drop(Dic.colReleaseDate, Dic.colStorageTime)
 
-    printDf("df_label_code" , df_label_code)
+    printDf("df_label_code", df_label_code)
 
 
     // 2-1-3 编码套餐id
@@ -97,9 +95,22 @@ object GetMediasVector {
 
     val df_medias_feature = assembler.transform(df_package_code)
       .select(Dic.colVideoId, Dic.colDigitalCategoryVec)
-      .withColumn(Dic.colDigitalCategoryVec, col(Dic.colDigitalCategoryVec).cast(StringType))
 
     printDf("df_medias_feature", df_medias_feature)
+
+
+    // 标准化
+    val scaler = new StandardScaler()
+      .setInputCol(Dic.colDigitalCategoryVec)
+      .setOutputCol(Dic.colDigitalCategoryScalaVec)
+      .setWithStd(true) //将数据标准化到单位标准差。
+      .setWithMean(true) //是否变换为0均值。
+    val df_medias_scalar = scaler
+      .fit(df_medias_feature)
+      .transform(df_medias_feature)
+      .select(Dic.colVideoId, Dic.colDigitalCategoryScalaVec)
+
+    printDf("df_medias_scalar", df_medias_scalar)
 
 
     // 2-2 Get bert vector data
@@ -123,21 +134,27 @@ object GetMediasVector {
     val df_medias_w2v = w2vec(df_medias_id)
     printDf("df_medias_w2v", df_medias_w2v)
 
-    val df_medias_ver = df_medias_w2v.withColumn(colVector, col(Dic.colVector).cast(StringType))
 
     // 4 Bert vector concat word2vector and medias raw digital cat features
 
     val df_medias_vec = df_medias_bert
-      .join(df_medias_ver, Seq(Dic.colVideoId), "left")
-      .join(df_medias_feature, Seq(Dic.colVideoId), "left")
+      .join(df_medias_w2v, Seq(Dic.colVideoId), "left")
+      .join(df_medias_scalar, Seq(Dic.colVideoId), "left")
+      .withColumn(Dic.colBertVector, udfArrayToVec(col(Dic.colBertVector)))
 
 
     printDf("df_medias_vec", df_medias_vec)
 
-    val df_medias_concat = df_medias_vec.withColumn(Dic.colConcatVec,
-      udfConcatVector(col(Dic.colBertVector), col(Dic.colVector), col(Dic.colDigitalCategoryVec)))
 
-    printDf("df_medias_concat: concat bert,videoId w2v and medias raw feature", df_medias_concat)
+    val assemblerVideo = new VectorAssembler()
+      .setInputCols(Array(Dic.colBertVector, Dic.colVector, Dic.colDigitalCategoryScalaVec))
+      .setOutputCol(Dic.colConcatVec)
+      .setHandleInvalid("skip")  // Null
+
+    val df_medias_concat = assemblerVideo.transform(df_medias_vec)
+      .select(Dic.colVideoId, Dic.colConcatVec)
+
+    printDf("df_medias_concat", df_medias_concat)
 
 
     //4 PCA De-dimensional
@@ -153,7 +170,7 @@ object GetMediasVector {
     val df_medias_pca_all = df_fill.union(df_medias_pca)
 
     // 5 Save processed data
-    saveDataForXXK(df_medias_pca_all, "train", "train_medias_bert_w2v")
+    saveDataForXXK(df_medias_pca_all, "train", "train_medias_bert_w2v_vec")
 
     printDf("df_medias_pca_all: PCA De-dimensional concat vector", df_medias_pca_all)
 
@@ -173,6 +190,20 @@ object GetMediasVector {
 
     model.getVectors
       .withColumnRenamed("word", Dic.colVideoId)
+  }
+
+  def udfArrayToVec = udf(arrayToVec _)
+  def arrayToVec(bert_vector: mutable.WrappedArray[String] ) = {
+
+    val vectorArray = new ArrayBuffer[Double]()
+
+    bert_vector.foreach(str =>
+      vectorArray.append(str.toDouble)
+    )
+
+    val v = Vectors.dense(vectorArray.toArray)
+    v
+
   }
 
 
