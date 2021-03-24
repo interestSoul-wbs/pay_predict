@@ -34,8 +34,10 @@ object ClicksProcess {
     //     3-1
     val df_usermeta_processed = clicksProcess(df_raw_clicks)
 
-    println("带有元信息的用户有："+df_usermeta_processed.count())
-    saveProcessedUserMeta(df_usermeta_processed)
+    val df_user_click = df_usermeta_processed.dropDuplicates(Dic.colUserId)
+    printDf("df_user_click", df_user_click)
+
+    saveProcessedUserMeta(df_user_click)
     printDf("输出 df_medias_processed", df_usermeta_processed)
 
 
