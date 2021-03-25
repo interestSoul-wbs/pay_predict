@@ -2568,18 +2568,7 @@ object GetSaveData {
       .option("header", false)
       .schema(schema)
       .csv(clicksRawPath)
-      .select(
-        when(col(Dic.colUserId) === "NULL", null).otherwise(col(Dic.colUserId)).as(Dic.colUserId),
-        when(col(Dic.colDeviceMsg) === "NULL", null).otherwise(col(Dic.colDeviceMsg)).as(Dic.colDeviceMsg),
-        when(col(Dic.colFeatureCode) === "NULL", null).otherwise(col(Dic.colFeatureCode)).as(Dic.colFeatureCode),
-        when(col(Dic.colBigVersion) === "NULL", null).otherwise(col(Dic.colBigVersion)).as(Dic.colBigVersion),
-        when(col(Dic.colProvince) === "NULL", null).otherwise(col(Dic.colProvince)).as(Dic.colProvince),
-        when(col(Dic.colCity) === "NULL", null).otherwise(col(Dic.colCity)).as(Dic.colCity),
-        when(col(Dic.colCityLevel) === "NULL", null).otherwise(col(Dic.colCityLevel)).as(Dic.colCityLevel),
-        when(col(Dic.colAreaId) === "NULL", null).otherwise(col(Dic.colAreaId)).as(Dic.colAreaId)
 
-      ).dropDuplicates()
-      .na.fill(-1)
 
     df_raw_click
 

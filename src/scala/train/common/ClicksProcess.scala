@@ -6,6 +6,7 @@ import mam.SparkSessionInit.spark
 import mam.Utils.{printDf, sysParamSetting}
 import org.apache.spark.ml.feature.{StringIndexer, StringIndexerModel}
 import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.functions.{col, when}
 import train.common.MediasProcess.{getArrayStrColLabel, getSingleStrColLabel, mediasProcess}
 
 import scala.collection.mutable
@@ -33,10 +34,8 @@ object ClicksProcess {
     //     3-1
     val df_usermeta_processed = clicksProcess(df_raw_clicks)
 
-    val df_user_click = df_usermeta_processed.dropDuplicates(Dic.colUserId)
-    printDf("df_user_click", df_user_click)
 
-    saveProcessedUserMeta(df_user_click)
+    saveProcessedUserMeta(df_usermeta_processed)
     printDf("输出 df_medias_processed", df_usermeta_processed)
 
 
@@ -45,27 +44,44 @@ object ClicksProcess {
   }
 
 
-  def  clicksProcess(df_raw_click:DataFrame)={
-    var df_raw_click_index=df_raw_click
-    var indexModel:StringIndexerModel=null
-    val cols=mutable.ListBuffer[String]()
+  def clicksProcess(df_click: DataFrame) = {
+
+
+    val df_raw_click = df_click.select(
+      when(col(Dic.colUserId) === "NULL", null).otherwise(col(Dic.colUserId)).as(Dic.colUserId),
+      when(col(Dic.colDeviceMsg) === "NULL", null).otherwise(col(Dic.colDeviceMsg)).as(Dic.colDeviceMsg),
+      when(col(Dic.colFeatureCode) === "NULL", null).otherwise(col(Dic.colFeatureCode)).as(Dic.colFeatureCode),
+      when(col(Dic.colBigVersion) === "NULL", null).otherwise(col(Dic.colBigVersion)).as(Dic.colBigVersion),
+      when(col(Dic.colProvince) === "NULL", null).otherwise(col(Dic.colProvince)).as(Dic.colProvince),
+      when(col(Dic.colCity) === "NULL", null).otherwise(col(Dic.colCity)).as(Dic.colCity),
+      when(col(Dic.colCityLevel) === "NULL", null).otherwise(col(Dic.colCityLevel)).as(Dic.colCityLevel),
+      when(col(Dic.colAreaId) === "NULL", null).otherwise(col(Dic.colAreaId)).as(Dic.colAreaId)
+    )
+      .dropDuplicates(Dic.colUserId)
+      .na.fill(-1)
+
+    printDf("去重后", df_raw_click)
+
+
+    var df_raw_click_index = df_raw_click
+    var indexModel: StringIndexerModel = null
+    val cols = mutable.ListBuffer[String]()
     cols.append(Dic.colUserId)
-    for(col<-df_raw_click.columns){
-      if(!col.equals(Dic.colUserId)) {
-        cols.append(col+"_index")
-        indexModel=new StringIndexer()
+    for (col <- df_raw_click.columns) {
+      if (!col.equals(Dic.colUserId)) {
+        cols.append(col + "_index")
+        indexModel = new StringIndexer()
           .setInputCol(col)
-          .setOutputCol(col+"_index")
+          .setOutputCol(col + "_index")
           .setHandleInvalid("keep")
           .fit(df_raw_click_index)
 
-        df_raw_click_index=indexModel.transform(df_raw_click_index)
+        df_raw_click_index = indexModel.transform(df_raw_click_index)
       }
     }
 
-    df_raw_click_index.select(cols.head,cols.tail:_*)
+    df_raw_click_index.select(cols.head, cols.tail: _*)
   }
-
 
 
 }
