@@ -1,7 +1,7 @@
 package train.userpay
 
 import mam.Dic.{colPackageId, colVector}
-import mam.GetSaveData.{getBertVector, getProcessedMedias, getVideoFirstCategory, getVideoLabel, hdfsPath, saveDataForXXK}
+import mam.GetSaveData.{getAllBertVector, getDataFromXXK, getProcessedMedias, getVideoFirstCategory, getVideoLabel, hdfsPath, saveDataForXXK}
 import mam.{Dic, SparkSessionInit}
 import mam.SparkSessionInit.spark
 import mam.Utils.{getData, printDf, sysParamSetting, udfGetDays}
@@ -114,7 +114,7 @@ object GetMediasVector {
 
 
     // 2-2 Get bert vector data
-    val df_medias_bert_raw = getBertVector("train")
+    val df_medias_bert_raw = getAllBertVector()
     printDf("输入 df_medias_bert_raw", df_medias_bert_raw)
 
     val df_medias_bert = df_medias_bert_raw
@@ -125,21 +125,19 @@ object GetMediasVector {
 
     printDf("df_medias_bert", df_medias_bert)
 
-    // 3 word2Vector video id
-    // 对videoId进行word2vec
-    val df_medias_id = df_medias_bert.agg(collect_list(col(Dic.colVideoId)).as(Dic.colVideoId + "_list"))
+    // 3 word2Vector vector
 
-    printDf("df_medias_id", df_medias_id)
-
-    val df_medias_w2v = w2vec(df_medias_id)
+    val df_medias_w2v = getDataFromXXK("train", "train_videoId_w2v")
     printDf("df_medias_w2v", df_medias_w2v)
 
 
     // 4 Bert vector concat word2vector and medias raw digital cat features
 
-    val df_medias_vec = df_medias_bert
+    val df_medias_vec = df_medias_w2v.select(Dic.colVideoId).dropDuplicates()
+      .join(df_medias_bert, Seq(Dic.colVideoId), "left")
       .join(df_medias_w2v, Seq(Dic.colVideoId), "left")
       .join(df_medias_scalar, Seq(Dic.colVideoId), "left")
+      .na.drop("any")
       .withColumn(Dic.colBertVector, udfArrayToVec(col(Dic.colBertVector)))
 
 
@@ -157,11 +155,11 @@ object GetMediasVector {
     printDf("df_medias_concat", df_medias_concat)
 
 
-    //4 PCA De-dimensional
+    //5 PCA De-dimensional
 
     val df_medias_pca = GetPCA(df_medias_concat)
 
-    // For nan play history
+    //6 For nan play history
 
     val df_fill = spark.createDataFrame(
       Seq(("0", Vectors.dense(Vectors.zeros(pcaDimension).toArray)))
@@ -169,27 +167,12 @@ object GetMediasVector {
 
     val df_medias_pca_all = df_fill.union(df_medias_pca)
 
-    // 5 Save processed data
+    // 7 Save processed data
     saveDataForXXK(df_medias_pca_all, "train", "train_medias_bert_w2v_vec")
 
     printDf("df_medias_pca_all: PCA De-dimensional concat vector", df_medias_pca_all)
 
 
-  }
-
-  // word2vec
-  def w2vec(df_medias: DataFrame) = {
-
-    val w2vModel = new Word2Vec()
-      .setInputCol(Dic.colVideoId + "_list")
-      .setOutputCol(Dic.colVector)
-      .setVectorSize(vectorDimension)
-      .setWindowSize(windowSize)
-      .setMinCount(0)
-    val model = w2vModel.fit(df_medias)
-
-    model.getVectors
-      .withColumnRenamed("word", Dic.colVideoId)
   }
 
   def udfArrayToVec = udf(arrayToVec _)
@@ -205,35 +188,6 @@ object GetMediasVector {
     v
 
   }
-
-
-  // concat Bert vector and word2Vec
-  def udfConcatVector = udf(concatVector _)
-
-  def concatVector(bert_vector: mutable.WrappedArray[String], w2vector: String, rawMediasFeature: String) = {
-
-    var vectorArray = new ArrayBuffer[Double]()
-
-    bert_vector.foreach(str =>
-      vectorArray.append(str.toDouble)
-    )
-
-    w2vector.substring(1, w2vector.length - 1).split(",").foreach(
-      item =>
-        vectorArray.append(item.toDouble)
-
-    )
-
-    rawMediasFeature.substring(1, w2vector.length - 1).split(",").foreach(
-      item =>
-        vectorArray.append(item.toDouble)
-    )
-
-    val v = Vectors.dense(vectorArray.toArray)
-    v
-
-  }
-
 
   def GetPCA(df: DataFrame) = {
     val pca = new PCA()

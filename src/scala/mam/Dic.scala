@@ -30,7 +30,8 @@ object Dic {
   val colCreationGap = "creation_gap"
   val colPlayDate = "play_date"
   val colUserPlayCount = "user_play_count"
-
+  val colPlayList = "play_list"
+  val colUserList = "user_list"
   //还有一个video_id  colVideoId
 
   /**
@@ -71,7 +72,7 @@ object Dic {
   val colPlayPaidVec = "play_paid_vec"
   val colBertVector = "bert_vector"
   val colConcatVec = "concat_vector"
-  val colConcatTags = "concat_tags"
+  val colConcatText = "concat_text"
   val colIndex = "index"
   val colDigitalCategoryVec = "digital_category_vector"
   val colDigitalCategoryScalaVec = "digital_category_scala_vector"

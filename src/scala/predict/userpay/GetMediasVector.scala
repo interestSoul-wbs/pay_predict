@@ -1,7 +1,7 @@
 package predict.userpay
 
 import mam.Dic.colVector
-import mam.GetSaveData.{getBertVector, getDataFromXXK, saveDataForXXK}
+import mam.GetSaveData.{getAllBertVector, getDataFromXXK, saveDataForXXK}
 import mam.SparkSessionInit.spark
 import mam.Utils.{printDf, sysParamSetting}
 import mam.{Dic, SparkSessionInit}
@@ -9,7 +9,7 @@ import org.apache.spark.ml.feature.{PCA, StandardScaler, VectorAssembler, Word2V
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{ArrayType, StringType}
-import train.userpay.GetMediasVector.{GetPCA, pcaDimension, udfArrayToVec, w2vec}
+import train.userpay.GetMediasVector.{GetPCA, pcaDimension, udfArrayToVec}
 
 
 object GetMediasVector {
@@ -58,7 +58,7 @@ object GetMediasVector {
 
 
     // 2-2 Get bert vector data
-    val df_medias_bert_raw = getBertVector("predict")
+    val df_medias_bert_raw = getAllBertVector()
     printDf("输入 df_medias_bert_raw", df_medias_bert_raw)
 
     val df_medias_bert = df_medias_bert_raw
@@ -70,20 +70,20 @@ object GetMediasVector {
     printDf("df_medias_bert", df_medias_bert)
 
     // 3 word2Vector video id
-    // 对videoId进行word2vec
-    val df_medias_id = df_medias_bert.agg(collect_list(col(Dic.colVideoId)).as(Dic.colVideoId + "_list"))
+    // 3 word2Vector vector
 
-    printDf("df_medias_id", df_medias_id)
-
-    val df_medias_w2v = w2vec(df_medias_id)
+    val df_medias_w2v = getDataFromXXK("predict", "predict_videoId_w2v")
     printDf("df_medias_w2v", df_medias_w2v)
+
 
 
     // 4 Bert vector concat word2vector and medias raw digital cat features
 
-    val df_medias_vec = df_medias_bert
+    val df_medias_vec = df_medias_w2v.select(Dic.colVideoId).dropDuplicates()
+      .join(df_medias_bert, Seq(Dic.colVideoId), "left")
       .join(df_medias_w2v, Seq(Dic.colVideoId), "left")
       .join(df_medias_scalar, Seq(Dic.colVideoId), "left")
+      .na.drop("any")
       .withColumn(Dic.colBertVector, udfArrayToVec(col(Dic.colBertVector)))
 
 
