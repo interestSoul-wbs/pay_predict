@@ -42,18 +42,47 @@ object GetMediasVector {
 
     //2-1 添加数值型特征 , 添加类别型特征
 
+    val df_package_code = processMediasDigiCatFeature(df_medias_processed, df_video_one, trainTime)
+    saveDataForXXK(df_package_code, "common", "medias_digital_category_feature")
+
+    // 获得媒资特征
+   val df_medias_scalar = getMediasDigiCatFeature(df_package_code)
+
+    // 2-2 Get bert vector data
+    val df_medias_bert = getAllBertVector()
+    printDf("输入 df_medias_bert", df_medias_bert)
+
+    // 3 word2Vector vector
+    val df_medias_w2v = getDataFromXXK("train", "train_videoId_w2v")
+    printDf("df_medias_w2v", df_medias_w2v)
+
+
+    // 4 Bert vector concat word2vector and medias raw digital cat features
+    val df_medias_vec = assemblerMediasVector(df_medias_w2v, df_medias_bert, df_medias_scalar)
+
+
+    saveDataForXXK(df_medias_vec, "train", "train_medias_bert_w2v_vec")
+    printDf("df_medias_vec: PCA De-dimensional concat vector", df_medias_vec)
+
+
+  }
+
+
+  def processMediasDigiCatFeature(df_medias_processed: DataFrame, df_video_one: DataFrame, trainTime: String) = {
+
+
     val df_medias_part = df_medias_processed
       .select(
         Dic.colVideoId, Dic.colScore, Dic.colReleaseDate, Dic.colStorageTime, Dic.colVideoTime,
         Dic.colVideoOneLevelClassification, Dic.colIsPaid, Dic.colPackageId, Dic.colIsSingle, Dic.colIsTrailers
       ).na.fill(Map((Dic.colPackageId, -1)))
 
-    // 2-1-1 数值型特征处理
+    // 数值型特征处理
     val df_medias_dig = df_medias_part
       .withColumn(Dic.colReleaseDateGap, udfGetDays(col(Dic.colReleaseDate), lit(trainTime)))
       .withColumn(Dic.colStorageTimeGap, udfGetDays(col(Dic.colStorageTime), lit(trainTime)))
 
-    // 2-1-2 类别型特征编码 一级分类编码
+    // 类别型特征编码 一级分类编码
     import scala.collection.mutable
     val videoOneMap = df_video_one.rdd //Dataframe转化为RDD
       .map(row => row.getAs(Dic.colVideoOneLevelClassification).toString -> row.getAs(Dic.colIndex).toString)
@@ -67,8 +96,7 @@ object GetMediasVector {
     printDf("df_label_code", df_label_code)
 
 
-    // 2-1-3 编码套餐id
-
+    //  编码套餐id
     val df_package = df_label_code
       .select(col(Dic.colPackageId))
       .dropDuplicates()
@@ -84,9 +112,15 @@ object GetMediasVector {
 
     printDf("df_package_code", df_package_code)
 
+    df_package_code
 
-    saveDataForXXK(df_package_code, "common", "medias_digital_category_feature")
+  }
 
+
+  def getMediasDigiCatFeature(df_package_code: DataFrame) = {
+    /**
+     * 对媒资原始数值和类别特征进行处理
+     */
 
     // 数值和类别型特征进行组合
     val assembler = new VectorAssembler()
@@ -112,26 +146,19 @@ object GetMediasVector {
 
     printDf("df_medias_scalar", df_medias_scalar)
 
+    df_medias_scalar
 
-    // 2-2 Get bert vector data
-    val df_medias_bert_raw = getAllBertVector()
-    printDf("输入 df_medias_bert_raw", df_medias_bert_raw)
-
-    val df_medias_bert = df_medias_bert_raw
-      .select(
-        when(col(Dic.colVideoId) === "NULL", null).otherwise(col(Dic.colVideoId)).as(Dic.colVideoId),
-        from_json(col(Dic.colBertVector), ArrayType(StringType, containsNull = true)).as(Dic.colBertVector)
-      )
-
-    printDf("df_medias_bert", df_medias_bert)
-
-    // 3 word2Vector vector
-
-    val df_medias_w2v = getDataFromXXK("train", "train_videoId_w2v")
-    printDf("df_medias_w2v", df_medias_w2v)
+  }
 
 
-    // 4 Bert vector concat word2vector and medias raw digital cat features
+
+  def assemblerMediasVector(df_medias_w2v: DataFrame, df_medias_bert: DataFrame, df_medias_scalar: DataFrame) = {
+
+    /**
+     * df_medias_w2v: 视频共现特征
+     * df_medias_bert: 视频文本特征
+     * df_medias_scalar: 媒资原始类别和数值型特征
+     */
 
     val df_medias_vec = df_medias_w2v.select(Dic.colVideoId).dropDuplicates()
       .join(df_medias_bert, Seq(Dic.colVideoId), "left")
@@ -147,7 +174,7 @@ object GetMediasVector {
     val assemblerVideo = new VectorAssembler()
       .setInputCols(Array(Dic.colBertVector, Dic.colVector, Dic.colDigitalCategoryScalaVec))
       .setOutputCol(Dic.colConcatVec)
-      .setHandleInvalid("skip")  // Null
+      .setHandleInvalid("skip") // Null
 
     val df_medias_concat = assemblerVideo.transform(df_medias_vec)
       .select(Dic.colVideoId, Dic.colConcatVec)
@@ -167,16 +194,13 @@ object GetMediasVector {
 
     val df_medias_pca_all = df_fill.union(df_medias_pca)
 
-    // 7 Save processed data
-    saveDataForXXK(df_medias_pca_all, "train", "train_medias_bert_w2v_vec")
-
-    printDf("df_medias_pca_all: PCA De-dimensional concat vector", df_medias_pca_all)
-
-
+    df_medias_pca_all
   }
 
+
   def udfArrayToVec = udf(arrayToVec _)
-  def arrayToVec(bert_vector: mutable.WrappedArray[String] ) = {
+
+  def arrayToVec(bert_vector: mutable.WrappedArray[String]) = {
 
     val vectorArray = new ArrayBuffer[Double]()
 

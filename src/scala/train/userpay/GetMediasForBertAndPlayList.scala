@@ -44,17 +44,17 @@ object GetMediasForBertAndPlayList {
     val df_train_select = getUserPartTimeTopNPlay(df_plays, df_train_ids, trainTime, days)
 
 
-//    val df_videoId2Vec = getPlayW2V(df_train_select)
-//    saveDataForXXK(df_videoId2Vec, "train", "train_videoId_w2v" )
+    val df_videoId2Vec = getPlayW2V(df_train_select)
+    saveDataForXXK(df_videoId2Vec, "train", "train_videoId_w2v" )
 
 
     // Medias text info Bert
     val df_medias_part = getPartMediasForBert(df_train_select, df_medias)
-//    saveDataForXXK(df_medias_part.select(Dic.colVideoId, Dic.colConcatText), "train", "train_medias_text_" + playsNum )
+    saveDataForXXK(df_medias_part.select(Dic.colVideoId, Dic.colConcatText), "train", "train_medias_text_" + playsNum )
 
-//    //Users' play list
-//    val df_play_list = getUserFreePaidPlayList(df_train_select, df_medias_part, df_train_ids)
-//    saveDataForXXK(df_play_list, "train", "train_play_free_paid_" + playsNum )
+    //Users' play list
+    val df_play_list = getUserFreePaidPlayList(df_train_select, df_medias_part, df_train_ids)
+    saveDataForXXK(df_play_list, "train", "train_play_free_paid_" + playsNum )
 
 
   }
