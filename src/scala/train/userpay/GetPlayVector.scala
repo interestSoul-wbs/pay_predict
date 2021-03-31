@@ -37,9 +37,13 @@ object GetPlayVector {
 
     val df_play_vector = mapId2Vec(df_medias_vector, df_train_play)
 
-    saveDataForXXK(df_play_vector, "train", "train_play_vector_" + playsNum)
+    val df_play_vec = df_play_vector
+      .withColumn(Dic.colPlayFreeVec, col(Dic.colPlayFreeVec).cast("String"))
+      .withColumn(Dic.colPlayPaidVec, col(Dic.colPlayPaidVec).cast("String"))
 
-    printDf("df_play_vector", df_play_vector)
+    saveDataForXXK(df_play_vec, "train", "train_play_vector_" + playsNum)
+
+    printDf("df_play_vec", df_play_vec)
 
 
 

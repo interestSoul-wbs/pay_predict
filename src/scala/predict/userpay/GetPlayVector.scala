@@ -9,6 +9,7 @@ import org.apache.spark.sql.{DataFrame, functions}
 import org.apache.spark.sql.functions.{col, collect_list, concat_ws, lead, lit, row_number, sort_array, udf, when}
 import train.userpay.GetMediasForBertAndPlayList.playsNum
 import train.userpay.GetMediasVector.pcaDimension
+import train.userpay.GetPlayVector.mapId2Vec
 
 import scala.collection.mutable
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
@@ -37,9 +38,13 @@ object GetPlayVector {
 
     val df_play_vector = mapId2Vec(df_medias_vector, df_predict_play)
 
-    printDf("df_play_vector", df_play_vector)
+    val df_play_vec = df_play_vector
+      .withColumn(Dic.colPlayFreeVec, col(Dic.colPlayFreeVec).cast("String"))
+      .withColumn(Dic.colPlayPaidVec, col(Dic.colPlayPaidVec).cast("String"))
 
-    saveDataForXXK(df_play_vector, "predict", "predict_play_vector_" + playsNum)
+    saveDataForXXK(df_play_vec, "predict", "predict_play_vector_" + playsNum)
+
+    printDf("df_play_vec", df_play_vec)
 
 
   }
