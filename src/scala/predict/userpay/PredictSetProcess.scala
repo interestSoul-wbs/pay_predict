@@ -6,6 +6,7 @@ import mam.SparkSessionInit.spark
 import mam.Utils.{printDf, sysParamSetting}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.{col, lit, udf}
+import train.userpay.TrainSetProcess.clicksEncoder
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -190,11 +191,27 @@ object PredictSetProcess {
 
 
       /**
-       * Click
+       * 添加用户的点击类提取特征
        */
-      val df_train_set = df_predict_user_profile.join(df_click_meta, joinKeysUserId, "left")
+
+      val df_predict_click = df_predict_user_profile.join(df_click_meta, joinKeysUserId, "left")
         .na.fill(-1)
 
-      df_train_set
+
+      val click_cols = df_click_meta.columns
+
+      val df_predict_click_encode = clicksEncoder(click_cols, df_predict_click)
+
+      val df_user_click = df_predict_click_encode
+        .drop(
+          Dic.colDeviceMsg, Dic.colFeatureCode, Dic.colBigVersion,
+          Dic.colProvince, Dic.colCity, Dic.colCityLevel, Dic.colAreaId
+        )
+
+      printDf("df_user_click", df_user_click)
+
+      df_user_click
+
+
     }
 }

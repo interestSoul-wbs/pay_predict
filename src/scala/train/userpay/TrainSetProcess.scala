@@ -4,9 +4,9 @@ import mam.{Dic, SparkSessionInit}
 import mam.GetSaveData.{getDataFromXXK, getProcessedUserMeta, getTrainUser, getUserProfileOrderPart, getUserProfilePlayPart, getUserProfilePreferencePart, getVideoFirstCategory, getVideoLabel, getVideoSecondCategory, saveDataSet}
 import mam.SparkSessionInit.spark
 import mam.Utils.{printDf, sysParamSetting}
+import org.apache.spark.ml.feature.{StringIndexer, StringIndexerModel}
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.functions.{col, lit, udf}
-import train.userpay.GetMediasForBertAndPlayList.playsNum
+import org.apache.spark.sql.functions.{col, lit, udf, when}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -47,8 +47,8 @@ object TrainSetProcess {
     val df_train_user = getTrainUser(spark, trainTime)
     printDf("输入 df_train_user", df_train_user)
 
-//    val df_play_vec = getDataFromXXK("train", "train_play_vector_" + playsNum)
-//    printDf("输入 df_play_vec", df_play_vec)
+    //    val df_play_vec = getDataFromXXK("train", "train_play_vector_" + playsNum)
+    //    printDf("输入 df_play_vec", df_play_vec)
 
     val df_click_Meta = getProcessedUserMeta()
     printDf("df_click_Meta", df_click_Meta)
@@ -68,7 +68,7 @@ object TrainSetProcess {
 
   def trainSetProcess(df_user_profile_play: DataFrame, df_user_profile_pref: DataFrame, df_user_profile_order: DataFrame,
                       df_video_first_category: DataFrame, df_video_second_category: DataFrame, df_label: DataFrame,
-                      df_train_user: DataFrame,  df_click_meta: DataFrame): DataFrame = {
+                      df_train_user: DataFrame, df_click_meta: DataFrame): DataFrame = {
 
 
     /**
@@ -226,7 +226,6 @@ object TrainSetProcess {
     }
 
 
-
     /**
      * 将添加用户的标签信息
      */
@@ -237,20 +236,57 @@ object TrainSetProcess {
      * 添加用户的点击类提取特征
      */
 
+
     val df_train_click = df_train_user_prof.join(df_click_meta, joinKeysUserId, "left")
       .na.fill(-1)
 
 
+    val click_cols = df_click_meta.columns
+
+    val df_train_click_encode = clicksEncoder(click_cols, df_train_click)
+
+    val df_user_click = df_train_click_encode
+      .drop(
+        Dic.colDeviceMsg, Dic.colFeatureCode, Dic.colBigVersion,
+        Dic.colProvince, Dic.colCity, Dic.colCityLevel, Dic.colAreaId
+      )
+
+    printDf("df_user_click", df_user_click)
+
+
     /**
-     * 添加用户播放向量
+     * 添加用户标签
      */
 
-
-    val df_train_set = df_train_user.join(df_train_click, joinKeysUserId, "left")
-
+    val df_train_set = df_train_user.join(df_user_click, joinKeysUserId, "left")
     df_train_set
 
 
+  }
+
+
+  def clicksEncoder(click_col: Array[String], df_data_set: DataFrame) = {
+
+
+    var df_raw_click_index = df_data_set
+    var indexModel: StringIndexerModel = null
+
+    for (col <- click_col) {
+      if (!col.equals(Dic.colUserId)) {
+        indexModel = new StringIndexer()
+          .setInputCol(col)
+          .setOutputCol(col + "_index")
+          .setHandleInvalid("keep")
+          .fit(df_raw_click_index)
+
+        df_raw_click_index = indexModel.transform(df_raw_click_index)
+      }
+    }
+
+    printDf("df_raw_click_index", df_raw_click_index)
+
+
+    df_raw_click_index
 
   }
 

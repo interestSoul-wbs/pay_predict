@@ -11,12 +11,7 @@ import train.common.MediasProcess.{getArrayStrColLabel, getSingleStrColLabel, me
 
 import scala.collection.mutable
 
-/**
- * @author wj
- * @date 2021/3/17 ${Time}
- * @version 0.1
- * @describe
- */
+
 object ClicksProcess {
   //将字符串属性转化为
 
@@ -58,29 +53,35 @@ object ClicksProcess {
       when(col(Dic.colAreaId) === "NULL", null).otherwise(col(Dic.colAreaId)).as(Dic.colAreaId)
     )
       .dropDuplicates(Dic.colUserId)
-      .na.fill(-1)
+      .na.fill(0)
 
     printDf("去重后", df_raw_click)
 
+    df_raw_click
+//
+//    var df_raw_click_index = df_raw_click
+//    var indexModel: StringIndexerModel = null
+//    val cols = mutable.ListBuffer[String]()
+//    cols.append(Dic.colUserId)
+//
+//    for (col <- df_raw_click.columns) {
+//      if (!col.equals(Dic.colUserId)) {
+//        cols.append(col + "_index")
+//        indexModel = new StringIndexer()
+//          .setInputCol(col)
+//          .setOutputCol(col + "_index")
+//          .setHandleInvalid("keep")
+//          .fit(df_raw_click_index)
+//
+//        df_raw_click_index = indexModel.transform(df_raw_click_index)
+//      }
+//    }
+//
+//    val df_click_index = df_raw_click_index.select(cols.head, cols.tail: _*)
+//
+//    df_click_index
 
-    var df_raw_click_index = df_raw_click
-    var indexModel: StringIndexerModel = null
-    val cols = mutable.ListBuffer[String]()
-    cols.append(Dic.colUserId)
-    for (col <- df_raw_click.columns) {
-      if (!col.equals(Dic.colUserId)) {
-        cols.append(col + "_index")
-        indexModel = new StringIndexer()
-          .setInputCol(col)
-          .setOutputCol(col + "_index")
-          .setHandleInvalid("keep")
-          .fit(df_raw_click_index)
 
-        df_raw_click_index = indexModel.transform(df_raw_click_index)
-      }
-    }
-
-    df_raw_click_index.select(cols.head, cols.tail: _*)
   }
 
 
