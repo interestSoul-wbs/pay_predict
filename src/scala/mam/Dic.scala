@@ -81,6 +81,11 @@ object Dic {
   val colCreationTimeGap = "creation_time_gap"
   val colOrderHistory = "order_history"
 
+
+
+   //
+  val colNumberOfPaid="number_of_paid"
+  val colNumberOfUnpaid="number_of_unpaid"
   /**
    * 用户画像中的属性
    */

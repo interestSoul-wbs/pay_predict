@@ -10,7 +10,7 @@ object GetSaveData {
 
   var tempTable = "temp_table"
 //    val hdfsPath = ""
-  val hdfsPath = "hdfs:///pay_predict_2/"
+  val hdfsPath = "hdfs:///pay_predict_3/"
   val delimiter = "\\t"
 
   def saveDataForXXK(df_data:DataFrame, state: String, fileName: String) = {
