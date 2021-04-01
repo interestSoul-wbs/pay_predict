@@ -3,9 +3,10 @@ package predict.userpay
 import mam.{Dic, SparkSessionInit}
 import mam.GetSaveData.{getPredictUser, getProcessedOrder, saveProcessedData, saveUserProfileOrderPart}
 import mam.SparkSessionInit.spark
-import mam.Utils.{calDate, getData, printDf, sysParamSetting, udfGetDays}
+import mam.Utils.{calDate, getData, printDf, sysParamSetting, udfGetDays, udfGetHour, udfIsMemberCurrent}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql
+import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 object UserProfileGenerateOrderPartForUserpay {
@@ -177,6 +178,77 @@ object UserProfileGenerateOrderPartForUserpay {
       )
 
 
+    //用户当前是否是会员
+        val df_order_part_13=df_predict_order
+          .filter(
+            col(Dic.colResourceType).>(0)
+              && col(Dic.colOrderStatus).>(1)
+          )
+          .groupBy(col(Dic.colUserId))
+          .agg(
+            udfIsMemberCurrent(max(col(Dic.colOrderEndTime)),lit(now)).as(Dic.colIsMemberCurrent)
+          )
+        //用户在未来一周内会员是否过期
+        val df_order_part_14=df_predict_order
+          .filter(
+            col(Dic.colResourceType).>(0)
+              && col(Dic.colOrderStatus).>(1)
+          )
+          .groupBy(col(Dic.colUserId))
+          .agg(
+            udfIsMemberCurrent(max(col(Dic.colOrderEndTime)),lit(calDate(now,7))).as(Dic.colIsMember7Days)
+          )
+        //用户在未来两周内会员是否过期
+        val df_order_part_15=df_predict_order
+          .filter(
+            col(Dic.colResourceType).>(0)
+              && col(Dic.colOrderStatus).>(1)
+          )
+          .groupBy(col(Dic.colUserId))
+          .agg(
+            udfIsMemberCurrent(max(col(Dic.colOrderEndTime)),lit(calDate(now,14))).as(Dic.colIsMember14Days)
+          )
+
+
+
+
+
+
+        //用户经常在哪个时段下单
+        val df_order_part_16=df_predict_order
+          .filter(
+            col(Dic.colResourceType).>(0)
+              && col(Dic.colOrderStatus).>(1)
+          )
+          .withColumn(Dic.colOrderHour,udfGetHour(col(Dic.colCreationTime)))
+          .groupBy(col(Dic.colUserId))
+          .agg(
+            mean(col(Dic.colOrderHour)).as(Dic.colOrderHour)
+          )
+        //用户经常周几下单
+
+
+        //用户创建套餐订单的间隔
+        val win1 = Window.partitionBy(Dic.colUserId).orderBy(Dic.colCreationTime)
+        val order_part_temp = df_predict_order
+          .filter(
+            col(Dic.colResourceType).>(0)
+              && col(Dic.colOrderStatus).>(1)
+          )
+          .withColumn("second_order_time", lead(Dic.colCreationTime, 1).over(win1)) //下一个start_time
+          .withColumn("time_gap",udfGetDays(col(Dic.colCreationTime),col("second_order_time")))
+
+        order_part_temp.show()
+
+        val df_order_part_17=order_part_temp
+          .groupBy(col(Dic.colUserId))
+          .agg(
+            sum(col("time_gap")).divide(count(col(Dic.colCreationTime))-1).as(Dic.colMeanGap)
+          )
+
+
+
+
     val df_user_profile_order = df_predict_id.join(df_order_part_1, joinKeysUserId, "left")
       .join(df_order_part_2, joinKeysUserId, "left")
       .join(df_order_part_3, joinKeysUserId, "left")
@@ -189,6 +261,11 @@ object UserProfileGenerateOrderPartForUserpay {
       .join(df_order_part_10, joinKeysUserId, "left")
       .join(df_order_part_11, joinKeysUserId, "left")
       .join(df_order_part_12, joinKeysUserId, "left")
+//          .join(df_order_part_13,joinKeysUserId, "left")
+//          .join(df_order_part_14,joinKeysUserId, "left")
+//          .join(df_order_part_15,joinKeysUserId, "left")
+//          .join(df_order_part_16,joinKeysUserId, "left")
+//          .join(df_order_part_17,joinKeysUserId, "left")
 
 
 

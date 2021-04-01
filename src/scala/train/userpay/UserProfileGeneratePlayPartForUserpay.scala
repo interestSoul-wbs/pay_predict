@@ -179,11 +179,39 @@ object UserProfileGeneratePlayPartForUserpay {
       )
       .withColumn(Dic.colTotalTimePaidVideosLast1Days, round(col(Dic.colTotalTimePaidVideosLast1Days) / 60, 0))
 
+   //新添加的属性，观看非付费视频的次数
+    val df_play_medias_part_16=df_train_medias
+      .filter(
+        col(Dic.colPlayStartTime).<(now)
+        && col(Dic.colPlayStartTime).>=(pre_30)
+        && col(Dic.colIsPaid).===(0)
+      ).groupBy(col(Dic.colUserId))
+      .agg(
+        count(col(Dic.colUserId)).as(Dic.colNumberOfUnpaid)
+      )
+    //新添加的属性，观看付费视频的次数
+    val df_play_medias_part_17=df_train_medias
+      .filter(
+        col(Dic.colPlayStartTime).<(now)
+          && col(Dic.colPlayStartTime).>=(pre_30)
+          && col(Dic.colIsPaid).===(1)
+      ).groupBy(col(Dic.colUserId))
+      .agg(
+        count(col(Dic.colUserId)).as(Dic.colNumberOfPaid)
+      )
+
+
+
+
+
     val df_play_medias = df_play_time.join(df_play_medias_part_11, joinKeysUserId, "left")
       .join(df_play_medias_part_12, joinKeysUserId, "left")
       .join(df_play_medias_part_13, joinKeysUserId, "left")
       .join(df_play_medias_part_14, joinKeysUserId, "left")
       .join(df_play_medias_part_15, joinKeysUserId, "left")
+      //新添加的两个属性
+//      .join(df_play_medias_part_16, joinKeysUserId, "left")
+//      .join(df_play_medias_part_17, joinKeysUserId, "left")
 
     /**
      * 套餐内

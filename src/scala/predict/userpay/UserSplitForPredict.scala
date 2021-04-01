@@ -82,15 +82,15 @@ object UserSplitForPredict {
       .except(df_illegal_users)
 
     // 正负样本1:10预测
-//    val df_predict_neg_users = df_all_neg_users
-//      .sample(1).limit(10 * df_predict_pos_users.count().toInt)
-//      .withColumn(Dic.colOrderStatus, lit(0))
+    val df_predict_neg_users = df_all_neg_users
+      .sample(1).limit(10 * df_predict_pos_users.count().toInt)
+      .withColumn(Dic.colOrderStatus, lit(0))
 
     // 全量预测用户
-    val df_predict_neg_users = df_all_users.select(Dic.colUserId)
-      .except(df_predict_pos_users.select(Dic.colUserId))  //正样本用户
-      .except(df_illegal_users.select(Dic.colUserId)) //金额异常用户
-      .withColumn(Dic.colOrderStatus, lit(0))
+//    val df_predict_neg_users = df_all_users.select(Dic.colUserId)
+//      .except(df_predict_pos_users.select(Dic.colUserId))  //正样本用户
+//      .except(df_illegal_users.select(Dic.colUserId)) //金额异常用户
+//      .withColumn(Dic.colOrderStatus, lit(0))
 
 
     df_predict_pos_users.union(df_predict_neg_users).sample(1)

@@ -218,7 +218,7 @@ object UserProfileGenerateOrderPartForUserpay {
 //      .join(df_order_part_11, joinKeysUserId, "left")
 //      .join(df_order_part_12, joinKeysUserId, "left")
 
-    //用户当前是否是会员
+   // 用户当前是否是会员
     val df_order_part_13=df_train_order
       .filter(
         col(Dic.colResourceType).>(0)
@@ -304,11 +304,11 @@ object UserProfileGenerateOrderPartForUserpay {
       .join(df_order_part_10,joinKeysUserId, "left")
       .join(df_order_part_11,joinKeysUserId, "left")
       .join(df_order_part_12,joinKeysUserId, "left")
-      .join(df_order_part_13,joinKeysUserId, "left")
-      .join(df_order_part_14,joinKeysUserId, "left")
-      .join(df_order_part_15,joinKeysUserId, "left")
-      .join(df_order_part_16,joinKeysUserId, "left")
-      .join(df_order_part_17,joinKeysUserId, "left")
+//      .join(df_order_part_13,joinKeysUserId, "left")
+//      .join(df_order_part_14,joinKeysUserId, "left")
+//      .join(df_order_part_15,joinKeysUserId, "left")
+//      .join(df_order_part_16,joinKeysUserId, "left")
+//      .join(df_order_part_17,joinKeysUserId, "left")
 
     df_user_profile_order
   }

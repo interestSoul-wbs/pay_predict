@@ -55,7 +55,7 @@ object TrainSetProcess {
       df_video_first_category, df_video_second_category, df_label, df_train_user, df_click_meta)
 
     // 4 Save Train Users
-    saveDataSet(trainTime, df_train_set, "train_noPredictId")
+    saveDataSet(trainTime, df_train_set, "train")
     printDf("输出 df_train_set", df_train_set)
     println("Train Set Process Done！")
 
@@ -214,14 +214,18 @@ object TrainSetProcess {
 
     val df_train_click = df_train_user_prof.join(df_click_meta, joinKeysUserId, "left")
       .na.fill(-1)
-
-
-    /**
-     * 将添加用户的标签信息
-     */
+//
+//
+//    /**
+//     * 将添加用户的标签信息
+//     */
     val df_train_set = df_train_user.join(df_train_click, joinKeysUserId, "left")
 
     df_train_set
+
+//    df_train_user_prof
+
+
 
 
   }

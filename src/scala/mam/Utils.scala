@@ -213,6 +213,30 @@ object Utils {
     return reStr
   }
 
+  //计算一个用户当前是否是会员用户
+  def udfIsMemberCurrent=udf(isMemberCurrent _)
+  def isMemberCurrent(date:String,now:String)={
+    if(date==null || date<now){
+      0
+    }else{
+      1
+    }
+  }
+
+
+
+
+
+  //计算产生订单的是哪个时段
+
+  def udfGetHour=udf(getHour _)
+  def   getHour(date:String)={
+    val sdf=new SimpleDateFormat("yyyy-MM-dd HH:mm:SS")
+    val d1=sdf.parse(date)
+    d1.getHours()
+
+  }
+
 
   //计算日期相差的天数
   def udfGetDays = udf(getDays _)
@@ -226,7 +250,11 @@ object Utils {
      */
     if (date == null) {
       -1
-    } else {
+    }
+    else if(now==null)
+    {
+      0
+    } else{
       val sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:SS")
       val d1 = sdf.parse(now)
       var d2 = sdf.parse(now)
