@@ -34,6 +34,9 @@ object Dic {
   val colUserList = "user_list"
   //还有一个video_id  colVideoId
 
+  val colUserIdIndex = "user_id_index"
+  val colVideoIdIndex = "video_id_index"
+
   /**
    * medias数据集中的属性
    */
@@ -63,7 +66,7 @@ object Dic {
   val colContent = "content"
   val colReleaseDateGap = "release_date_gap"
   val colStorageTimeGap = "storage_time_gap"
-  val colPlayTimes = "play_times"  // video played times by users
+  val colPlayTimes = "play_times" // video played times by users
   val colBrief = "brief"
   val colFreeList = "free_list"
   val colPaidList = "paid_list"
@@ -98,6 +101,9 @@ object Dic {
   /**
    * 用户画像中的属性
    */
+
+
+  val colUserVector = "user_vector"
   //最近30天的活跃天数
   val colActiveDaysLast30Days = "active_days_last_30_days"
   //最近30天的总的观看时间
@@ -309,7 +315,7 @@ object Dic {
   val colIsOnlyNumberVideoTime: String = "is_only_number_video_time"
   val colIsOnlyNumberResourceId: String = "is_only_number_resource_id"
   val colIsForMattedTimeReleaseDate: String = "is_formatted_time_release_date"
-  val colIsForMattedTimeStorageTime : String = "is_formatted_time_storage_time"
+  val colIsForMattedTimeStorageTime: String = "is_formatted_time_storage_time"
   val colIsLongtypeTimeStorageTime: String = "is_longtype_time_storage_time"
   val colIsLongtypeTimeCreationTime: String = "is_longtype_time_creation_time"
   val colIsFormattedTimePlayEndTime: String = "is_formatted_time_play_end_time"

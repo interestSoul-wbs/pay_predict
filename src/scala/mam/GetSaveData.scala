@@ -9,8 +9,8 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 object GetSaveData {
 
   var tempTable = "temp_table"
-  //    val hdfsPath = ""
-  val hdfsPath = "hdfs:///pay_predict_3/"
+//      val hdfsPath = ""
+  val hdfsPath = "hdfs:///pay_predict_4_Wasu/"
   val delimiter = "\\t"
 
   def saveDataForXXK(df_data: DataFrame, state: String, fileName: String) = {
@@ -2558,7 +2558,7 @@ object GetSaveData {
 
   def getRawClickData(spark: SparkSession) = {
 
-    val clicksRawPath = hdfsPath + "data/train/common/raw/clicks/*"
+    val clicksRawPath = hdfsPath + "data/train/common/raw/click/"
 
     val schema = StructType(
       List(
@@ -2573,7 +2573,6 @@ object GetSaveData {
         StructField(Dic.colTime, StringType),
         StructField(Dic.colItemType, StringType),
         StructField(Dic.colItemId, StringType)
-        //        StructField(Dic.colPartitionDate, StringType)
       )
     )
 
@@ -2763,7 +2762,7 @@ object GetSaveData {
    */
   def getProcessedMedias(sparkSession: SparkSession) = {
 
-    val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp"
+    val mediasProcessedPath = hdfsPath + "data/train/common/processed/mediastemp/*"
     sparkSession.read.format("parquet").load(mediasProcessedPath)
 
   }
@@ -3027,7 +3026,7 @@ object GetSaveData {
   //  Save user info get from click data
   def saveProcessedUserMeta(df_data: DataFrame) = {
 
-    val path = hdfsPath + "data/train/common/processed/clickMetaData"
+    val path = hdfsPath + "data/common/xxkang/clickMetaData"
     saveProcessedData(df_data, path)
 
   }
@@ -3036,8 +3035,12 @@ object GetSaveData {
   //  Save user info get from click data
   def getProcessedUserMeta() = {
 
-    val path = hdfsPath + "data/train/common/processed/clickMetaData"
+    val path = hdfsPath + "data/common/xxkang/clickMetaData"
     getData(spark, path)
+  }
+
+  def saveCSVFile(df: DataFrame, path: String) = {
+    df.coalesce(1).write.mode(SaveMode.Overwrite).option("header", "true").csv(path)
   }
 
 
