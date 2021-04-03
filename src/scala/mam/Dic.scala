@@ -37,6 +37,9 @@ object Dic {
   val colUserIdIndex = "user_id_index"
   val colVideoIdIndex = "video_id_index"
 
+  val colUserIdLeft = "user_id_left"
+  val colUserIdRight = "user_id_right"
+
   /**
    * medias数据集中的属性
    */
