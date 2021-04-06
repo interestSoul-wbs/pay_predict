@@ -9,9 +9,9 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 object GetSaveData {
 
   var tempTable = "temp_table"
-//      val hdfsPath = ""
-  val hdfsPath = "hdfs:///pay_predict_4_Wasu/"
-  val delimiter = "\\t"
+//    val hdfsPath = ""
+  val hdfsPath = "/pay_predict_3/"
+  val delimiter = ","
 
   def saveDataForXXK(df_data: DataFrame, state: String, fileName: String) = {
     val path = hdfsPath + "data/" + state + "/xxkang/" + fileName
@@ -263,7 +263,7 @@ object GetSaveData {
   def getRawMediaData(spark: SparkSession) = {
 
     //
-    val mediasRawPath = hdfsPath + "data/train/common/raw/medias/*"
+    val mediasRawPath = hdfsPath + "data/train/common/raw/medias/"
 
     val schema = StructType(
       List(
@@ -2548,7 +2548,7 @@ object GetSaveData {
         StructField(Dic.colBroadcastTime, FloatType)))
 
     val df = spark.read
-      .option("delimiter", delimiter)
+      .option("delimiter", ",")
       .option("header", true)
       .schema(schema)
       .csv(playRawPath)
@@ -2940,7 +2940,7 @@ object GetSaveData {
   def getRawMediaData2(spark: SparkSession) = {
 
     //
-    val mediasRawPath = hdfsPath + "data/train/common/raw/medias/*"
+    val mediasRawPath = hdfsPath + "data/train/common/raw/medias/"
 
     val schema = StructType(
       List(
@@ -2992,33 +2992,6 @@ object GetSaveData {
       .withColumnRenamed("vender_name", Dic.colSupplier)
       .withColumnRenamed("_c18", Dic.colIntroduction)
 
-
-
-    //   // Konverse - 注意 df 的命名 - df_相关属性 - 不要 dfRawMedia
-    //    val df_medias = df_raw_media
-    //      .select(
-    //        when(col(Dic.colVideoId) === "NULL", null).otherwise(col(Dic.colVideoId)).as(Dic.colVideoId),
-    //        when(col(Dic.colVideoTitle) === "NULL", null).otherwise(col(Dic.colVideoTitle)).as(Dic.colVideoTitle),
-    //        when(col(Dic.colVideoOneLevelClassification) === "NULL" or (col(Dic.colVideoOneLevelClassification) === ""), null)
-    //          .otherwise(col(Dic.colVideoOneLevelClassification)).as(Dic.colVideoOneLevelClassification),
-    //        from_json(col(Dic.colVideoTwoLevelClassificationList), ArrayType(StringType, containsNull = true)).as(Dic.colVideoTwoLevelClassificationList),
-    //        from_json(col(Dic.colVideoTagList), ArrayType(StringType, containsNull = true)).as(Dic.colVideoTagList),
-    //        from_json(col(Dic.colDirectorList), ArrayType(StringType, containsNull = true)).as(Dic.colDirectorList),
-    //        from_json(col(Dic.colActorList), ArrayType(StringType, containsNull = true)).as(Dic.colActorList),
-    //        when(col(Dic.colVideoOneLevelClassification).isNotNull, col(Dic.colVideoOneLevelClassification)), // Konverse - 这一步 相当于缺失值填充，被移动到了 process
-    //        when(col(Dic.colCountry) === "NULL", null).otherwise(col(Dic.colCountry)).as(Dic.colCountry),
-    //        when(col(Dic.colLanguage) === "NULL", null).otherwise(col(Dic.colLanguage)).as(Dic.colLanguage),
-    //        when(col(Dic.colReleaseDate) === "NULL", null).otherwise(col(Dic.colReleaseDate)).as(Dic.colReleaseDate),
-    //        when(col(Dic.colStorageTime) === "NULL", null).otherwise(col(Dic.colStorageTime)).as(Dic.colStorageTime), // Konverse - 这一步的udf被移动到了 process
-    //        when(col(Dic.colVideoTime) === "NULL", null).otherwise(col(Dic.colVideoTime) cast DoubleType).as(Dic.colVideoTime),
-    //        when(col(Dic.colScore) === "NULL", null).otherwise(col(Dic.colScore) cast DoubleType).as(Dic.colScore),
-    //        when(col(Dic.colIsPaid) === "NULL", null).otherwise(col(Dic.colIsPaid) cast DoubleType).as(Dic.colIsPaid),
-    //        when(col(Dic.colPackageId) === "NULL", null).otherwise(col(Dic.colPackageId)).as(Dic.colPackageId),
-    //        when(col(Dic.colIsSingle) === "NULL", null).otherwise(col(Dic.colIsSingle) cast DoubleType).as(Dic.colIsSingle),
-    //        when(col(Dic.colIsTrailers) === "NULL", null).otherwise(col(Dic.colIsTrailers) cast DoubleType).as(Dic.colIsTrailers),
-    //        when(col(Dic.colSupplier) === "NULL", null).otherwise(col(Dic.colSupplier)).as(Dic.colSupplier),
-    //        when(col(Dic.colIntroduction) === "NULL", null).otherwise(col(Dic.colIntroduction)).as(Dic.colIntroduction))
-
     df_raw_media
 
   }
@@ -3040,7 +3013,13 @@ object GetSaveData {
   }
 
   def saveCSVFile(df: DataFrame, path: String) = {
+
     df.coalesce(1).write.mode(SaveMode.Overwrite).option("header", "true").csv(path)
+  }
+
+  def saveCSVXXK(df: DataFrame, state: String, fileName : String) ={
+    val path = hdfsPath + "data/" + state + "/xxkang/"+ fileName
+    saveCSVFile(df, path)
   }
 
 
