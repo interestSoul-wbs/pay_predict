@@ -31,7 +31,7 @@ object ClicksProcess {
 
 
     saveProcessedUserMeta(df_usermeta_processed)
-    printDf("输出 df_medias_processed", df_usermeta_processed)
+    printDf("输出 df_usermeta_processed", df_usermeta_processed)
 
 
     println("ClicksProcess over~~~~~~~~~~~")
@@ -57,29 +57,37 @@ object ClicksProcess {
 
     printDf("去重后", df_raw_click)
 
-    df_raw_click
-//
-//    var df_raw_click_index = df_raw_click
-//    var indexModel: StringIndexerModel = null
-//    val cols = mutable.ListBuffer[String]()
-//    cols.append(Dic.colUserId)
-//
-//    for (col <- df_raw_click.columns) {
-//      if (!col.equals(Dic.colUserId)) {
-//        cols.append(col + "_index")
-//        indexModel = new StringIndexer()
-//          .setInputCol(col)
-//          .setOutputCol(col + "_index")
-//          .setHandleInvalid("keep")
-//          .fit(df_raw_click_index)
-//
-//        df_raw_click_index = indexModel.transform(df_raw_click_index)
-//      }
-//    }
-//
-//    val df_click_index = df_raw_click_index.select(cols.head, cols.tail: _*)
-//
-//    df_click_index
+
+    var df_raw_click_index = df_raw_click
+    var indexModel: StringIndexerModel = null
+    val cols = mutable.ListBuffer[String]()
+    cols.append(Dic.colUserId)
+
+    for (col <- df_raw_click.columns) {
+      if (!col.equals(Dic.colUserId)) {
+        cols.append(col + "_index")
+        indexModel = new StringIndexer()
+          .setInputCol(col)
+          .setOutputCol(col + "_index")
+          .setHandleInvalid("keep")
+          .fit(df_raw_click_index)
+
+        df_raw_click_index = indexModel.transform(df_raw_click_index)
+
+      }
+    }
+
+    val df_click_res = df_raw_click_index.select(cols.head, cols.tail: _*)
+
+    df_click_res
+      .withColumn(Dic.colDeviceMsg, col(Dic.colDeviceMsg + "_index") + 1)
+      .withColumn(Dic.colFeatureCode, col(Dic.colFeatureCode + "_index") + 1)
+      .withColumn(Dic.colBigVersion, col(Dic.colBigVersion + "_index") + 1)
+      .withColumn(Dic.colProvince, col(Dic.colProvince + "_index") + 1)
+      .withColumn(Dic.colCity, col(Dic.colCity + "_index") + 1)
+      .withColumn(Dic.colCityLevel, col(Dic.colCityLevel + "_index") + 1)
+      .withColumn(Dic.colAreaId, col(Dic.colAreaId + "_index") + 1)
+      .select(df_raw_click.columns.head, df_raw_click.columns.tail: _*)
 
 
   }

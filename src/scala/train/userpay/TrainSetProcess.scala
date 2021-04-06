@@ -237,21 +237,8 @@ object TrainSetProcess {
      */
 
 
-    val df_train_click = df_train_user_prof.join(df_click_meta, joinKeysUserId, "left")
-      .na.fill(-1)
-
-
-    val click_cols = df_click_meta.columns
-
-    val df_train_click_encode = clicksEncoder(click_cols, df_train_click)
-
-    val df_user_click = df_train_click_encode
-      .drop(
-        Dic.colDeviceMsg, Dic.colFeatureCode, Dic.colBigVersion,
-        Dic.colProvince, Dic.colCity, Dic.colCityLevel, Dic.colAreaId
-      )
-
-    printDf("df_user_click", df_user_click)
+    val df_user_click = df_train_user_prof.join(df_click_meta, joinKeysUserId, "left")
+      .na.fill(0)
 
 
     /**
@@ -261,32 +248,6 @@ object TrainSetProcess {
     val df_train_set = df_train_user.join(df_user_click, joinKeysUserId, "left")
     df_train_set
 
-
-  }
-
-
-  def clicksEncoder(click_col: Array[String], df_data_set: DataFrame) = {
-
-
-    var df_raw_click_index = df_data_set
-    var indexModel: StringIndexerModel = null
-
-    for (col <- click_col) {
-      if (!col.equals(Dic.colUserId)) {
-        indexModel = new StringIndexer()
-          .setInputCol(col)
-          .setOutputCol(col + "_index")
-          .setHandleInvalid("keep")
-          .fit(df_raw_click_index)
-
-        df_raw_click_index = indexModel.transform(df_raw_click_index)
-      }
-    }
-
-    printDf("df_raw_click_index", df_raw_click_index)
-
-
-    df_raw_click_index
 
   }
 
