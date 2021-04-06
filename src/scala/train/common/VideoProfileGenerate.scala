@@ -1,4 +1,4 @@
-package train.userpay
+package train.common
 
 import mam.GetSaveData._
 import mam.SparkSessionInit.spark
