@@ -1,9 +1,9 @@
 package train.userpay
 
-import mam.GetSaveData.{getProcessedMedias, getProcessedOrder, getProcessedPlay, getVideoFirstCategory, getVideoLabel, getVideoSecondCategory, hdfsPath, saveCSVFile, saveProcessedData, saveUserProfileOrderPart, saveUserProfilePlayPart, saveUserProfilePreferencePart}
+import mam.GetSaveData.{getProcessedMedias, getProcessedOrder, getProcessedPlay, getUserProfileOrderPart, getUserProfilePlayPart, getUserProfilePreferencePart, getVideoFirstCategory, getVideoLabel, getVideoSecondCategory, hdfsPath, saveCSVFile, saveProcessedData, saveUserProfileOrderPart, saveUserProfilePlayPart, saveUserProfilePreferencePart}
 import mam.{Dic, SparkSessionInit}
 import mam.SparkSessionInit.spark
-import mam.Utils.{getData, printDf, sysParamSetting}
+import mam.Utils.{calDate, getData, printDf, sysParamSetting, udfGetDays}
 import org.apache.spark.ml.feature.{StringIndexer, StringIndexerModel}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.{col, lit, udf}
@@ -37,40 +37,37 @@ object hzy {
     // play
 
     val train_user_path = hdfsPath + "data/hzy/train/trainplayusers.txt"
-    val df_train_play_users = spark.read.format("csv").load(train_user_path).as(Dic.colUserId)
+    val df_train_play_users = spark.read.format("csv").load(train_user_path).withColumnRenamed("_c0", Dic.colUserId)
     printDf("df_train_play_users", df_train_play_users)
-
-
-    val test_user_path = hdfsPath + "data/hzy/predict/testplayusers.txt"
-    val df_test_play_users = spark.read.format("csv").load(test_user_path).as(Dic.colUserId)
-    printDf("df_test_play_users", df_test_play_users)
 
 
     val df_train_play = df_play
       .join(df_train_play_users, Seq(Dic.colUserId), "inner")
       .filter(
-        col(Dic.colPlayStartTime) >= playMin
-          && col(Dic.colPlayStartTime) < playMax
+        col(Dic.colPlayStartTime) <= playMin
+          && col(Dic.colPlayStartTime) > calDate(playMin, -30)
       )
 
+    val train_play_path = hdfsPath + "data/hzy/train/trainPlayUsersPlay.csv"
+    saveCSVFile(df_train_play, train_play_path)
     printDf("输出 df_train_play", df_train_play)
 
-    val train_play_path = "data/hzy/train/trainPlayUsersPlay.csv"
-    saveCSVFile(df_train_play, train_play_path)
+
+    val test_user_path = hdfsPath + "data/hzy/predict/testplayusers.txt"
+    val df_test_play_users = spark.read.format("csv").load(test_user_path).withColumnRenamed("_c0", Dic.colUserId)
+    printDf("df_test_play_users", df_test_play_users)
 
 
     val df_test_play = df_play
       .join(df_test_play_users, Seq(Dic.colUserId), "inner")
       .filter(
-        col(Dic.colPlayStartTime) >= playMin
-          && col(Dic.colPlayStartTime) < playMax
+        col(Dic.colPlayStartTime) <= playMin
+          && col(Dic.colPlayStartTime) > calDate(playMin, -30)
       )
     printDf("输出 df_test_play", df_test_play)
 
     val test_play_path = hdfsPath + "data/hzy/predict/predictPlayUsersPlay.csv"
     saveCSVFile(df_test_play, test_play_path)
-
-
 
 
     // UserProfile
@@ -99,14 +96,15 @@ object hzy {
     val df_train_set = getDataSetForHzy(df_train_users, trainTime, df_medias, df_play, df_orders,
       df_video_first_category, df_video_second_category, df_label)
 
-    saveCSVFile(df_train_set, hdfsPath + "data/hzy/train/trainDataSet.csv")
+
+    saveProcessedData(df_train_set, hdfsPath + "data/hzy/train/trainDataSet.csv")
     printDf("输出 df_train_set", df_train_set)
 
 
     val df_predict_set = getDataSetForHzy(df_predict_users, predictTime, df_medias, df_play, df_orders,
       df_video_first_category, df_video_second_category, df_label)
 
-    saveCSVFile(df_predict_set, hdfsPath + "data/hzy/predict/predictDataSet.csv")
+    saveProcessedData(df_predict_set, hdfsPath + "data/hzy/predict/predictDataSet.csv")
 
     printDf("输出 df_predict_set", df_predict_set)
 
@@ -114,56 +112,54 @@ object hzy {
   }
 
 
-
-
-
-
   def getTrainUserForHzy() = {
     val path = hdfsPath + "data/hzy/train/trainusers.txt"
-    spark.read.format("csv").load(path).as(Dic.colUserId)
+    spark.read.format("csv").load(path).withColumnRenamed("_c0", Dic.colUserId)
 
   }
 
   def getPredictUserForHzy() = {
-    val path = hdfsPath + "data/hzy/train/trainusers.txt"
-    spark.read.format("csv").load(path).as(Dic.colUserId)
+    val path = hdfsPath + "data/hzy/predict/testusers.txt"
+    spark.read.format("csv").load(path).withColumnRenamed("_c0", Dic.colUserId)
   }
 
   def getDataSetForHzy(df_user: DataFrame, now: String, df_medias: DataFrame, df_plays: DataFrame, df_orders: DataFrame,
                        df_video_first_category: DataFrame, df_video_second_category: DataFrame, df_label: DataFrame) = {
 
 
-
     // order
     val df_user_profile_order = userProfileGenerateOrderPart(spark, now, df_orders, df_user)
 
     // 4 Save Data
-    saveUserProfileOrderPart(now, df_user_profile_order,"hzy")
+    saveUserProfileOrderPart(now, df_user_profile_order, "hzy")
     printDf("输出  df_user_profile_order", df_user_profile_order)
 
     println("用户画像订单部分生成完毕。")
+    //
+    //    val df_user_profile_order = getUserProfileOrderPart(spark, now, "hzy")
+    //    printDf("  df_user_profile_order", df_user_profile_order)
 
 
     // pref
 
     val df_user_profile_pref = userProfileGeneratePreferencePart(now, df_plays, df_user, df_medias)
-
-    // 4 Save Data
     saveUserProfilePreferencePart(now, df_user_profile_pref, "hzy")
-    printDf("输出 df_user_profile_pref", df_user_profile_pref)
-
     println("用户画像Preference部分生成完毕。")
+
+    //    val df_user_profile_pref = getUserProfilePreferencePart(spark, now, "hzy")
+    //    printDf("df_user_profile_pref", df_user_profile_pref)
 
 
     // play
 
     val df_user_profile_play = userProfileGeneratePlayPart(now, df_plays, df_user, df_medias)
-
-    // 4 Save Data
     saveUserProfilePlayPart(now, df_user_profile_play, "hzy")
-    printDf("输出 df_user_profile_play", df_user_profile_play)
-
     println("用户画像play部分生成完毕。")
+
+
+    //    val df_user_profile_play = getUserProfilePlayPart(spark, now, "hzy")
+    //    printDf("输出 df_user_profile_play", df_user_profile_play)
+
 
     // dataSet
     val df_dataSet = dataSetProcess(df_user_profile_play, df_user_profile_pref, df_user_profile_order,
@@ -176,8 +172,8 @@ object hzy {
 
 
   def dataSetProcess(df_user_profile_play: DataFrame, df_user_profile_pref: DataFrame, df_user_profile_order: DataFrame,
-                      df_video_first_category: DataFrame, df_video_second_category: DataFrame, df_label: DataFrame,
-                      df_train_user: DataFrame): DataFrame = {
+                     df_video_first_category: DataFrame, df_video_second_category: DataFrame, df_label: DataFrame,
+                     df_train_user: DataFrame): DataFrame = {
 
 
     /**
@@ -231,35 +227,6 @@ object hzy {
       .map(row => row.getAs(Dic.colVideoTagList).toString -> row.getAs(Dic.colIndex).toString)
       .collectAsMap() //将key-value对类型的RDD转化成Map
       .asInstanceOf[mutable.HashMap[String, Int]]
-
-
-
-    //    var videoFirstCategoryMap: Map[String, Int] = Map()
-    //    var videoSecondCategoryMap: Map[String, Int] = Map()
-    //    var labelMap: Map[String, Int] = Map()
-
-    //    // 一级分类
-    //    var conList = df_video_first_category.collect()
-    //    for (elem <- conList) {
-    //      val s = elem.toString()
-    //      videoFirstCategoryMap += (s.substring(1, s.length - 1).split("\t")(1) -> s.substring(1, s.length - 1).split("\t")(0).toInt)
-    //
-    //    }
-    //    //二级分类
-    //    conList = df_video_second_category.collect()
-    //    for (elem <- conList) {
-    //      val s = elem.toString()
-    //      videoSecondCategoryMap += (s.substring(1, s.length - 1).split("\t")(1) -> s.substring(1, s.length - 1).split("\t")(0).toInt)
-    //
-    //    }
-    //
-    //    //标签
-    //    conList = df_label.collect()
-    //    for (elem <- conList) {
-    //      val s = elem.toString()
-    //      labelMap += (s.substring(1, s.length - 1).split("\t")(1) -> s.substring(1, s.length - 1).split("\t")(0).toInt)
-    //
-    //    }
 
 
     val prefColumns = List(Dic.colVideoOneLevelPreference, Dic.colVideoTwoLevelPreference,
@@ -335,7 +302,6 @@ object hzy {
     }
 
 
-
     val df_train_user_prof = df_userProfile_split_pref3.select(columnList.map(df_userProfile_split_pref3.col(_)): _*)
 
 
@@ -348,8 +314,6 @@ object hzy {
 
 
   }
-
-
 
 
 }
