@@ -7,6 +7,7 @@ import mam.SparkSessionInit.spark
 import mam.Utils.{printDf, sysParamSetting}
 import org.apache.spark.ml.feature.{StringIndexer, StringIndexerModel}
 import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.functions.col
 import train.common.MediasProcess.{getArrayStrColLabel, getSingleStrColLabel, mediasProcess}
 
 import scala.collection.mutable
@@ -71,7 +72,19 @@ object ClicksProcess {
       }
     }
 
-    df_raw_click_index.select(cols.head,cols.tail:_*)
+//    df_raw_click_index.select(cols.head,cols.tail:_*)
+val df_click_res = df_raw_click_index.select(cols.head, cols.tail: _*)
+
+    df_click_res
+      .withColumn(Dic.colDeviceMsg, col(Dic.colDeviceMsg + "_index") + 1)
+      .withColumn(Dic.colFeatureCode, col(Dic.colFeatureCode + "_index") + 1)
+      .withColumn(Dic.colBigVersion, col(Dic.colBigVersion + "_index") + 1)
+      .withColumn(Dic.colProvince, col(Dic.colProvince + "_index") + 1)
+      .withColumn(Dic.colCity, col(Dic.colCity + "_index") + 1)
+      .withColumn(Dic.colCityLevel, col(Dic.colCityLevel + "_index") + 1)
+      .withColumn(Dic.colAreaId, col(Dic.colAreaId + "_index") + 1)
+      .select(df_raw_click.columns.head, df_raw_click.columns.tail: _*)
+
   }
 
 

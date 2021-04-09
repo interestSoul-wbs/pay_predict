@@ -19,7 +19,7 @@ object OrdersProcess {
 
 
     // 2 數據讀取
-    val df_order_raw = getRawOrders(spark)
+    val df_order_raw = getRawOrders2(spark)
 //    val df_order_raw = getRawOrders2(spark)
     printDf("输入 df_order_raw", df_order_raw)
 

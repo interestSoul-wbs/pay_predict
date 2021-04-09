@@ -323,4 +323,7 @@ object Dic {
   val colMeanGap="mean_gap"
 
 
+
+  val colIndex="index"
+
 }

@@ -31,7 +31,7 @@ object PlaysProcessBySplitSession {
     SparkSessionInit.init()
 
     // 2 數據讀取
-    val df_play_raw = getRawPlays(spark)
+    val df_play_raw = getRawPlays2(spark)
 //    val df_play_raw = getRawPlays2(spark)
     printDf("输入 df_play_raw", df_play_raw)
 

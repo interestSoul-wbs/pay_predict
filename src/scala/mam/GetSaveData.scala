@@ -10,7 +10,7 @@ object GetSaveData {
 
   var tempTable = "temp_table"
 //    val hdfsPath = ""
-  val hdfsPath = "hdfs:///pay_predict_3/"
+  val hdfsPath = "hdfs:///pay_predict_4_Wasu/"
   val delimiter = "\\t"
 
   def saveDataForXXK(df_data:DataFrame, state: String, fileName: String) = {
@@ -2520,7 +2520,7 @@ object GetSaveData {
         StructField(Dic.colBroadcastTime, FloatType)))
 
     val df = spark.read
-      .option("delimiter", delimiter)
+      .option("delimiter", ",")
       .option("header", true)
       .schema(schema)
       .csv(playRawPath)
@@ -3016,6 +3016,18 @@ object GetSaveData {
     val path = hdfsPath + "data/train/common/processed/clickMetaData"
     getData(spark, path)
 
+  }
+
+
+  def saveVideoProfile(now:String,df_video_profile:DataFrame,state:String): Unit ={
+    val videoProfilePath = hdfsPath + "data/" + state + "/common/processed/videoprofile" + now.split(" ")(0)
+    saveProcessedData(df_video_profile, videoProfilePath)
+
+  }
+
+  def getVideoProfile(sparkSession: SparkSession, now: String, state: String)={
+    val videoProfilePath = hdfsPath + "data/" + state + "/common/processed/videoprofile" + now.split(" ")(0)
+    getData(sparkSession, videoProfilePath)
   }
 
 }

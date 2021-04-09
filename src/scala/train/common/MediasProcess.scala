@@ -21,7 +21,7 @@ object MediasProcess {
     SparkSessionInit.init()
 
     // 2 數據讀取
-    val df_raw_medias = getRawMediaData(spark)
+    val df_raw_medias = getRawMediaData2(spark)
     printDf("输入 df_raw_medias", df_raw_medias)
 
     // 3 对数据进行处理 及 存儲
@@ -127,6 +127,33 @@ object MediasProcess {
   }
 
 
+//  def getArrayStrColLabel(dfMedias: DataFrame, colName: String) = {
+//
+//    val df_label = dfMedias
+//      .select(
+//        explode(
+//          col(colName)).as(colName))
+//      .dropDuplicates()
+//      .withColumn(Dic.colRank, row_number().over(Window.orderBy(col(colName))) - 1)
+//      .select(
+//        concat_ws("\t", col(Dic.colRank), col(colName)).cast(StringType).as(Dic.colContent))
+//
+//    df_label
+//  }
+//
+//  def getSingleStrColLabel(df_medias: DataFrame, colName: String) = {
+//
+//    val df_label = df_medias
+//      .select(col(colName))
+//      .dropDuplicates()
+//      .filter(!col(colName).cast("String").contains("]"))
+//      .withColumn(Dic.colRank, row_number().over(Window.orderBy(col(colName))) - 1)
+//      .select(
+//        concat_ws("\t", col(Dic.colRank), col(colName)).as(Dic.colContent))
+//
+//    df_label
+//  }
+
   def getArrayStrColLabel(dfMedias: DataFrame, colName: String) = {
 
     val df_label = dfMedias
@@ -134,9 +161,7 @@ object MediasProcess {
         explode(
           col(colName)).as(colName))
       .dropDuplicates()
-      .withColumn(Dic.colRank, row_number().over(Window.orderBy(col(colName))) - 1)
-      .select(
-        concat_ws("\t", col(Dic.colRank), col(colName)).cast(StringType).as(Dic.colContent))
+      .withColumn(Dic.colIndex, row_number().over(Window.orderBy(col(colName))) - 1)
 
     df_label
   }
@@ -147,11 +172,8 @@ object MediasProcess {
       .select(col(colName))
       .dropDuplicates()
       .filter(!col(colName).cast("String").contains("]"))
-      .withColumn(Dic.colRank, row_number().over(Window.orderBy(col(colName))) - 1)
-      .select(
-        concat_ws("\t", col(Dic.colRank), col(colName)).as(Dic.colContent))
+      .withColumn(Dic.colIndex, row_number().over(Window.orderBy(col(colName))) - 1)
 
     df_label
   }
-
 }

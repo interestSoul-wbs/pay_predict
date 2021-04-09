@@ -7,6 +7,7 @@ import mam.Utils.{printDf, sysParamSetting}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.{col, lit, udf}
 
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 object TrainSetProcess {
@@ -97,36 +98,50 @@ object TrainSetProcess {
       Dic.colDaysFromLastActive, Dic.colDaysSinceFirstActiveInTimewindow))
       .na.fill(0, numColList)
 
+
     /**
      * 偏好部分标签处理
      */
-    var videoFirstCategoryMap: Map[String, Int] = Map()
-    var videoSecondCategoryMap: Map[String, Int] = Map()
-    var labelMap: Map[String, Int] = Map()
 
+    // 一级标签
+    val videoFirstCategoryMap = df_video_first_category.rdd //Dataframe转化为RDD
+      .map(row => row.getAs(Dic.colVideoOneLevelClassification).toString -> row.getAs(Dic.colIndex).toString)
+      .collectAsMap() //将key-value对类型的RDD转化成Map
+      .asInstanceOf[mutable.HashMap[String, Int]]
 
-    // 一级分类
-    var conList = df_video_first_category.collect()
-    for (elem <- conList) {
-      val s = elem.toString()
-      videoFirstCategoryMap += (s.substring(1, s.length - 1).split("\t")(1) -> s.substring(1, s.length - 1).split("\t")(0).toInt)
+    // 二级标签
+    val videoSecondCategoryMap = df_video_second_category.rdd //Dataframe转化为RDD
+      .map(row => row.getAs(Dic.colVideoTwoLevelClassificationList).toString -> row.getAs(Dic.colIndex).toString)
+      .collectAsMap() //将key-value对类型的RDD转化成Map
+      .asInstanceOf[mutable.HashMap[String, Int]]
 
-    }
-    //二级分类
-    conList = df_video_second_category.collect()
-    for (elem <- conList) {
-      val s = elem.toString()
-      videoSecondCategoryMap += (s.substring(1, s.length - 1).split("\t")(1) -> s.substring(1, s.length - 1).split("\t")(0).toInt)
-
-    }
-
-    //标签
-    conList = df_label.collect()
-    for (elem <- conList) {
-      val s = elem.toString()
-      labelMap += (s.substring(1, s.length - 1).split("\t")(1) -> s.substring(1, s.length - 1).split("\t")(0).toInt)
-
-    }
+//    var videoFirstCategoryMap: Map[String, Int] = Map()
+//    var videoSecondCategoryMap: Map[String, Int] = Map()
+//    var labelMap: Map[String, Int] = Map()
+//
+//
+//    // 一级分类
+//    var conList = df_video_first_category.collect()
+//    for (elem <- conList) {
+//      val s = elem.toString()
+//      videoFirstCategoryMap += (s.substring(1, s.length - 1).split("\t")(1) -> s.substring(1, s.length - 1).split("\t")(0).toInt)
+//
+//    }
+//    //二级分类
+//    conList = df_video_second_category.collect()
+//    for (elem <- conList) {
+//      val s = elem.toString()
+//      videoSecondCategoryMap += (s.substring(1, s.length - 1).split("\t")(1) -> s.substring(1, s.length - 1).split("\t")(0).toInt)
+//
+//    }
+//
+//    //标签
+//    conList = df_label.collect()
+//    for (elem <- conList) {
+//      val s = elem.toString()
+//      labelMap += (s.substring(1, s.length - 1).split("\t")(1) -> s.substring(1, s.length - 1).split("\t")(0).toInt)
+//
+//    }
 
 
     val prefColumns = List(Dic.colVideoOneLevelPreference, Dic.colVideoTwoLevelPreference,
@@ -213,7 +228,7 @@ object TrainSetProcess {
 //
 
     val df_train_click = df_train_user_prof.join(df_click_meta, joinKeysUserId, "left")
-      .na.fill(-1)
+      .na.fill(0)
 //
 //
 //    /**

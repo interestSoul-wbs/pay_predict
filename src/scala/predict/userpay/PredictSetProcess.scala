@@ -194,7 +194,7 @@ object PredictSetProcess {
 
 
       val df_train_click = df_predict_user_profile.join(df_click_meta, joinKeysUserId, "left")
-        .na.fill(-1)
+        .na.fill(0)
 
 
       /**
