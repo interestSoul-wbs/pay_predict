@@ -153,7 +153,6 @@ object PlaysProcessBySplitSession {
         Dic.colTimeGapLeadSameVideo,
         Dic.colSessionSign
       )
-    printDf("df_play_processed", df_play_processed)
 
     df_play_processed
   }
