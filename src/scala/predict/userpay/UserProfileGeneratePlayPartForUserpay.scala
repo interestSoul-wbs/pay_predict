@@ -247,75 +247,77 @@ object UserProfileGeneratePlayPartForUserpay {
       .join(play_medias_part_24, joinKeysUserId, "left")
       .join(play_medias_part_25, joinKeysUserId, "left")
 
-
-    val play_medias_part_31 = df_predict_plays_medias
-      .filter(
-        col(Dic.colPlayStartTime).<(now)
-          && col(Dic.colPlayStartTime).>=(pre_30)
-          && col(Dic.colVideoOneLevelClassification).===("幼儿"))
-      .groupBy(col(Dic.colUserId))
-      .agg(
-        sum(col(Dic.colTimeSum)).as(Dic.colTotalTimeChildrenVideosLast30Days),
-        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberChildrenVideosLast30Days)
-      )
-      .withColumn(Dic.colTotalTimeChildrenVideosLast30Days, round(col(Dic.colTotalTimeChildrenVideosLast30Days) / 60, 0))
-
-    val play_medias_part_32 = df_predict_plays_medias
-      .filter(
-        col(Dic.colPlayStartTime).<(now)
-          && col(Dic.colPlayStartTime).>=(pre_14)
-          && col(Dic.colVideoOneLevelClassification).===("幼儿"))
-      .groupBy(col(Dic.colUserId))
-      .agg(
-        sum(col(Dic.colTimeSum)).as(Dic.colTotalTimeChildrenVideosLast14Days),
-        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberChildrenVideosLast14Days)
-      )
-      .withColumn(Dic.colTotalTimeChildrenVideosLast14Days, round(col(Dic.colTotalTimeChildrenVideosLast14Days) / 60, 0))
-
-    val play_medias_part_33 = df_predict_plays_medias
-      .filter(
-        col(Dic.colPlayStartTime).<(now)
-          && col(Dic.colPlayStartTime).>=(pre_7)
-          && col(Dic.colVideoOneLevelClassification).===("幼儿"))
-      .groupBy(col(Dic.colUserId))
-      .agg(
-        sum(col(Dic.colTimeSum)).as(Dic.colTotalTimeChildrenVideosLast7Days),
-        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberChildrenVideosLast7Days)
-      )
-      .withColumn(Dic.colTotalTimeChildrenVideosLast7Days, round(col(Dic.colTotalTimeChildrenVideosLast7Days) / 60, 0))
-
-    val play_medias_part_34 = df_predict_plays_medias
-      .filter(
-        col(Dic.colPlayStartTime).<(now)
-          && col(Dic.colPlayStartTime).>=(pre_3)
-          && col(Dic.colVideoOneLevelClassification).===("幼儿"))
-      .groupBy(col(Dic.colUserId))
-      .agg(
-        sum(col(Dic.colTimeSum)).as(Dic.colTotalTimeChildrenVideosLast3Days),
-        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberChildrenVideosLast3Days)
-      )
-      .withColumn(Dic.colTotalTimeChildrenVideosLast3Days, round(col(Dic.colTotalTimeChildrenVideosLast3Days) / 60, 0))
-
-    val play_medias_part_35 = df_predict_plays_medias
-      .filter(
-        col(Dic.colPlayStartTime).<(now)
-          && col(Dic.colPlayStartTime).>=(pre_1)
-          && col(Dic.colVideoOneLevelClassification).===("幼儿"))
-      .groupBy(col(Dic.colUserId))
-      .agg(
-        sum(col(Dic.colTimeSum)).as(Dic.colTotalTimeChildrenVideosLast1Days),
-        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberChildrenVideosLast1Days)
-      )
-      .withColumn(Dic.colTotalTimeChildrenVideosLast1Days, round(col(Dic.colTotalTimeChildrenVideosLast1Days) / 60, 0))
+    df_user_profile_play_3
 
 
-    val df_user_profile_play = df_user_profile_play_3.join(play_medias_part_31, joinKeysUserId, "left")
-      .join(play_medias_part_32, joinKeysUserId, "left")
-      .join(play_medias_part_33, joinKeysUserId, "left")
-      .join(play_medias_part_34, joinKeysUserId, "left")
-      .join(play_medias_part_35, joinKeysUserId, "left")
-
-    df_user_profile_play
+//    val play_medias_part_31 = df_predict_plays_medias
+//      .filter(
+//        col(Dic.colPlayStartTime).<(now)
+//          && col(Dic.colPlayStartTime).>=(pre_30)
+//          && col(Dic.colVideoOneLevelClassification).===("幼儿"))
+//      .groupBy(col(Dic.colUserId))
+//      .agg(
+//        sum(col(Dic.colTimeSum)).as(Dic.colTotalTimeChildrenVideosLast30Days),
+//        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberChildrenVideosLast30Days)
+//      )
+//      .withColumn(Dic.colTotalTimeChildrenVideosLast30Days, round(col(Dic.colTotalTimeChildrenVideosLast30Days) / 60, 0))
+//
+//    val play_medias_part_32 = df_predict_plays_medias
+//      .filter(
+//        col(Dic.colPlayStartTime).<(now)
+//          && col(Dic.colPlayStartTime).>=(pre_14)
+//          && col(Dic.colVideoOneLevelClassification).===("幼儿"))
+//      .groupBy(col(Dic.colUserId))
+//      .agg(
+//        sum(col(Dic.colTimeSum)).as(Dic.colTotalTimeChildrenVideosLast14Days),
+//        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberChildrenVideosLast14Days)
+//      )
+//      .withColumn(Dic.colTotalTimeChildrenVideosLast14Days, round(col(Dic.colTotalTimeChildrenVideosLast14Days) / 60, 0))
+//
+//    val play_medias_part_33 = df_predict_plays_medias
+//      .filter(
+//        col(Dic.colPlayStartTime).<(now)
+//          && col(Dic.colPlayStartTime).>=(pre_7)
+//          && col(Dic.colVideoOneLevelClassification).===("幼儿"))
+//      .groupBy(col(Dic.colUserId))
+//      .agg(
+//        sum(col(Dic.colTimeSum)).as(Dic.colTotalTimeChildrenVideosLast7Days),
+//        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberChildrenVideosLast7Days)
+//      )
+//      .withColumn(Dic.colTotalTimeChildrenVideosLast7Days, round(col(Dic.colTotalTimeChildrenVideosLast7Days) / 60, 0))
+//
+//    val play_medias_part_34 = df_predict_plays_medias
+//      .filter(
+//        col(Dic.colPlayStartTime).<(now)
+//          && col(Dic.colPlayStartTime).>=(pre_3)
+//          && col(Dic.colVideoOneLevelClassification).===("幼儿"))
+//      .groupBy(col(Dic.colUserId))
+//      .agg(
+//        sum(col(Dic.colTimeSum)).as(Dic.colTotalTimeChildrenVideosLast3Days),
+//        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberChildrenVideosLast3Days)
+//      )
+//      .withColumn(Dic.colTotalTimeChildrenVideosLast3Days, round(col(Dic.colTotalTimeChildrenVideosLast3Days) / 60, 0))
+//
+//    val play_medias_part_35 = df_predict_plays_medias
+//      .filter(
+//        col(Dic.colPlayStartTime).<(now)
+//          && col(Dic.colPlayStartTime).>=(pre_1)
+//          && col(Dic.colVideoOneLevelClassification).===("幼儿"))
+//      .groupBy(col(Dic.colUserId))
+//      .agg(
+//        sum(col(Dic.colTimeSum)).as(Dic.colTotalTimeChildrenVideosLast1Days),
+//        countDistinct(col(Dic.colVideoId)).as(Dic.colNumberChildrenVideosLast1Days)
+//      )
+//      .withColumn(Dic.colTotalTimeChildrenVideosLast1Days, round(col(Dic.colTotalTimeChildrenVideosLast1Days) / 60, 0))
+//
+//
+//    val df_user_profile_play = df_user_profile_play_3.join(play_medias_part_31, joinKeysUserId, "left")
+//      .join(play_medias_part_32, joinKeysUserId, "left")
+//      .join(play_medias_part_33, joinKeysUserId, "left")
+//      .join(play_medias_part_34, joinKeysUserId, "left")
+//      .join(play_medias_part_35, joinKeysUserId, "left")
+//
+//    df_user_profile_play
   }
 
 

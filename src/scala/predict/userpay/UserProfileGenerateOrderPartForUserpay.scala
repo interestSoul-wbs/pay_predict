@@ -63,8 +63,8 @@ object UserProfileGenerateOrderPartForUserpay {
         sum(col(Dic.colMoney)).as(Dic.colTotalMoneyPackagesPurchased),
         max(col(Dic.colMoney)).as(Dic.colMaxMoneyPackagePurchased),
         min(col(Dic.colMoney)).as(Dic.colMinMoneyPackagePurchased),
-        avg(col(Dic.colMoney)).as(Dic.colAvgMoneyPackagePurchased),
-        stddev(col(Dic.colMoney)).as(Dic.colVarMoneyPackagePurchased)
+        avg(col(Dic.colMoney)).as(Dic.colAvgMoneyPackagePurchased)
+//        stddev(col(Dic.colMoney)).as(Dic.colVarMoneyPackagePurchased)
       )
 
     val df_order_part_2 = df_predict_order
@@ -250,7 +250,7 @@ object UserProfileGenerateOrderPartForUserpay {
 
 
     val df_user_profile_order = df_predict_id.join(df_order_part_1, joinKeysUserId, "left")
-      .join(df_order_part_2, joinKeysUserId, "left")
+//      .join(df_order_part_2, joinKeysUserId, "left")
       .join(df_order_part_3, joinKeysUserId, "left")
       .join(df_order_part_4, joinKeysUserId, "left")
       .join(df_order_part_5, joinKeysUserId, "left")

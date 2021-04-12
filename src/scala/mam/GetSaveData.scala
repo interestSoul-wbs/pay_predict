@@ -10,7 +10,7 @@ object GetSaveData {
 
   var tempTable = "temp_table"
 //    val hdfsPath = ""
-  val hdfsPath = "hdfs:///pay_predict_4_Wasu/"
+  val hdfsPath = "hdfs:///pay_predict_Wasu/"
   val delimiter = "\\t"
 
   def saveDataForXXK(df_data:DataFrame, state: String, fileName: String) = {
@@ -2881,21 +2881,21 @@ object GetSaveData {
    */
 
   def getVideoFirstCategory() = {
-    val videoFirstCategoryTempPath = hdfsPath + "data/train/common/processed/videofirstcategorytemp.txt"
-    spark.read.format("csv").load(videoFirstCategoryTempPath)
+    val videoFirstCategoryTempPath = hdfsPath + "data/train/common/processed/videofirstcategorytemp"
+    spark.read.format("parquet").load(videoFirstCategoryTempPath)
   }
 
   def getVideoSecondCategory() = {
 
-    val videoSecondCategoryTempPath = hdfsPath + "data/train/common/processed/videosecondcategorytemp.txt"
-    spark.read.format("csv").load(videoSecondCategoryTempPath)
+    val videoSecondCategoryTempPath = hdfsPath + "data/train/common/processed/videosecondcategorytemp"
+    spark.read.format("parquet").load(videoSecondCategoryTempPath)
   }
 
 
   def getVideoLabel() = {
 
-    val labelTempPath = hdfsPath + "data/train/common/processed/labeltemp.txt"
-    spark.read.format("csv").load(labelTempPath)
+    val labelTempPath = hdfsPath + "data/train/common/processed/labeltemp"
+    spark.read.format("parquet").load(labelTempPath)
   }
 
   /**
