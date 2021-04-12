@@ -13,7 +13,7 @@ import mam.{Dic, SparkSessionInit}
 object UserSplitForPredict {
 
   val timeLength = 14
-  val predictResourceId = Array(100201,100202,101101,101103,101301,101601,101701,101801,101803,101810) //要预测的套餐id
+  val predictResourceId = Array(100201, 100202, 101301, 101601, 101701, 101801) //要预测的套餐id
 
 
   def main(args: Array[String]): Unit = {
