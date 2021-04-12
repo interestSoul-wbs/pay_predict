@@ -31,7 +31,7 @@ object PlaysProcessBySplitSession {
     SparkSessionInit.init()
 
     // 2 數據讀取
-    val df_play_raw = getRawPlays2(spark)
+    val df_play_raw = getRawPlays(spark)
 //    val df_play_raw = getRawPlays2(spark)
     printDf("输入 df_play_raw", df_play_raw)
 
@@ -41,10 +41,11 @@ object PlaysProcessBySplitSession {
 
     // 3 數據處理
     val df_plays_processed = playsProcessBySpiltSession(df_play_raw, df_medias_processed)
-    printDf("输出 playProcessed", df_plays_processed)
 
     // 4 Save Processed Data
     saveProcessedPlay(df_plays_processed)
+    printDf("输出 df_plays_processed", df_plays_processed)
+
     println("播放数据处理完成！")
   }
 
@@ -110,48 +111,35 @@ object PlaysProcessBySplitSession {
      * 合并session内相同video时间间隔在30min之内的播放时长
      */
 
+    // 合并播放时长
     val df_play_sum_time = df_play_gap
       .groupBy(
         Dic.colUserId,
         Dic.colVideoId,
         Dic.colSessionSign
-      ).agg(
-      sum(col(Dic.colBroadcastTime))
-    )
-      .withColumnRenamed("sum(broadcast_time)", Dic.colTimeSum)
+      )
+      .agg(
+        sum(col(Dic.colBroadcastTime)).as(Dic.colTimeSum)
+      )
 
     printDf("df_play_sum_time", df_play_sum_time)
 
-    val df_play_session = df_play_gap
-      .join(df_play_sum_time, Seq(Dic.colUserId, Dic.colVideoId, Dic.colSessionSign), "inner")
-      .select(
-        Dic.colUserId,
-        Dic.colVideoId,
-        Dic.colPlayStartTime,
-        Dic.colTimeSum,
-        Dic.colTimeGapLeadSameVideo,
-        Dic.colSessionSign
-      )
-
-    printDf("df_play_session", df_play_session)
     /**
      * 同一个session内相同video只保留第一条数据
      */
 
-    val win2 = Window.partitionBy(
-      Dic.colUserId,
-      Dic.colVideoId,
-      Dic.colSessionSign,
-      Dic.colTimeSum
-    ).orderBy(Dic.colPlayStartTime)
-
-    val df_play_processed = df_play_session
-      .withColumn(Dic.colKeepSign, count(Dic.colSessionSign).over(win2))
-      .filter(col(Dic.colKeepSign) === 1) //keep_sign为1的保留 其他全部去掉
-      .drop(
-        Dic.colKeepSign,
-        Dic.colTimeGapLeadSameVideo,
-        Dic.colSessionSign
+    val df_play_processed = df_play_gap
+      .join(df_play_sum_time, Seq(Dic.colUserId, Dic.colVideoId, Dic.colSessionSign), "inner")
+      .groupBy(
+        Dic.colUserId, Dic.colVideoId,
+        Dic.colSessionSign, Dic.colTimeSum
+      )
+      .agg(min(Dic.colPlayStartTime).as(Dic.colPlayStartTime))
+      .select(
+        Dic.colUserId,
+        Dic.colVideoId,
+        Dic.colPlayStartTime,
+        Dic.colTimeSum
       )
 
     df_play_processed
