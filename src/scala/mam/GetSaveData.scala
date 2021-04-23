@@ -9,8 +9,9 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 object GetSaveData {
 
   var tempTable = "temp_table"
-//    val hdfsPath = ""
-  val hdfsPath = "/pay_predict_3/"
+    val hdfsPath = ""
+  //    val hdfsPath = "/pay_predict_4_Wasu/"
+//  val hdfsPath = "/pay_predict_3/"
   val delimiter = ","
 
   def saveDataForXXK(df_data: DataFrame, state: String, fileName: String) = {
@@ -24,6 +25,28 @@ object GetSaveData {
     getData(spark, path)
 
   }
+
+
+  def saveDataForWx(df_data: DataFrame, state: String, fileName: String) = {
+
+    val path = hdfsPath + "data/" + state + "/wx/" + fileName
+    saveProcessedData(df_data, path)
+
+  }
+
+  def getDataFromWx(state: String, fileName: String): DataFrame = {
+
+    val path = hdfsPath + "data/" + state + "/wx/" + fileName
+    getData(spark, path)
+
+  }
+
+  def getVideoProfile(spark: SparkSession, now: String, state: String) = {
+    val path = ""
+
+    getData(spark, path)
+  }
+
 
   def getAllBertVector() = {
     val path = hdfsPath + "data/common/xxkang/train_predict_text_bert.csv"
@@ -2527,8 +2550,7 @@ object GetSaveData {
         StructField(Dic.colBroadcastTime, FloatType)))
 
     val df = spark.read
-      .option("delimiter", delimiter)
-
+      .option("delimiter", "\\t")
       .option("header", true)
       .schema(schema)
       .csv(playRawPath)
@@ -2558,7 +2580,7 @@ object GetSaveData {
 
   def getRawClickData(spark: SparkSession) = {
 
-    val clicksRawPath = hdfsPath + "data/train/common/raw/click/"
+    val clicksRawPath = hdfsPath + "data/train/common/raw/clicks/"
 
     val schema = StructType(
       List(
@@ -3017,10 +3039,10 @@ object GetSaveData {
     df.coalesce(1).write.mode(SaveMode.Overwrite).option("header", "true").csv(path)
   }
 
-  def saveCSVXXK(df: DataFrame, state: String, fileName : String) ={
-    val path = hdfsPath + "data/" + state + "/xxkang/"+ fileName
+
+  def saveUserNode(df: DataFrame, state: String, fileName: String) = {
+    val path = hdfsPath + "data/" + state + "/xxkang/userVector/" + fileName
     saveCSVFile(df, path)
   }
-
 
 }

@@ -100,6 +100,7 @@ object Dic {
   val colIsMoneyError = "is_money_error" //金额信息异常标注
   val colCreationTimeGap = "creation_time_gap"
   val colOrderHistory = "order_history"
+  val colPackageDuration = "package_duration"  //订单时常
 
   /**
    * 用户画像中的属性
@@ -236,6 +237,12 @@ object Dic {
 
   val colDaysRemainingPackage = "days_remaining_package"
 
+  val colMeanPackageScore = "mean_package_score"
+  val colNumberOfPackagePlay = "num_of_package_play"
+  val colNumberOfMovies = "num_of_movies"
+  val colNumberOfTv = "num_of_tv"
+  val colNumberOfMoviesIn30Days = "num_of_movies_past_30"
+  val colNumberOfTvIn30Days = "num_of_tv_past_30"
 
   /**
    * 视频画像中的属性
@@ -279,6 +286,7 @@ object Dic {
   val colItemType = "itemtype"
   val colItemId = "itemid"
   val colPartitionDate = "partitiondate"
+
 
 
   /**
@@ -333,4 +341,14 @@ object Dic {
   val colTmp: String = "tmp"
   val colCustomerid: String = "customerid"
   val colDeviceid: String = "deviceid"
+
+
+  /**
+   * 处理过程中遇到的
+   */
+
+  val colId = "id"
+  val colVideoVector = "video_vector"
+
+
 }
